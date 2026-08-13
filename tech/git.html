@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Git &amp; GitHub</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html" class="active">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Git &amp; GitHub</h1>
+  <p class="subtitle">Fundamentals first, grows every time the build introduces a new command. Local git first, GitHub (remote) second. For the actual order things were run in, see the <a href="../steps.html">Steps page</a> — this page is organized by concept, not by when it happened.</p>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>Git</strong></td><td>The version control tool — runs entirely on your machine, tracks every change to every file as a history of snapshots (commits).</td></tr>
+    <tr><td><strong>GitHub</strong></td><td>A hosting service for git repositories in the cloud — adds a web UI, pull requests, issues, Actions (CI/CD), and a place for other people (or interviewers) to see your commit history.</td></tr>
+    <tr><td><strong>Repository (repo)</strong></td><td>A folder git is tracking — contains your files plus a hidden <code>.git</code> folder with the entire history.</td></tr>
+    <tr><td><strong>Remote</strong></td><td>A repo's copy hosted somewhere else (GitHub). Your local repo can push to it / pull from it. The default remote name is <code>origin</code>.</td></tr>
+  </table>
+
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    Git = the engine (local, offline, works with zero internet). GitHub = a garage that stores a copy of
+    your engine and lets other mechanics look at it. You can use git with no GitHub account at all.
+  </div>
+
+  <h2 id="local-basics">Local basics</h2>
+
+  <h3 id="git-init"><code>git init</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> turns the current folder into a git repo by creating a hidden <code>.git</code> subfolder. Nothing is tracked yet — this just switches tracking on.</li>
+    <li><strong>When/why:</strong> run exactly once, the first time, inside the folder you want tracked.</li>
+    <li><strong>Best practice:</strong> run it from an otherwise-empty or newly created project folder, before adding a remote or making a commit.</li>
+    <li><a href="https://git-scm.com/docs/git-init" target="_blank">Official docs: git-init</a></li>
+  </ul>
+
+  <h3 id="git-status"><code>git status</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> shows what's changed since the last commit — untracked files, modified files, staged files.</li>
+    <li><strong>When/why:</strong> run it constantly, before every <code>add</code>/<code>commit</code>, so you know exactly what you're about to commit.</li>
+    <li><a href="https://git-scm.com/docs/git-status" target="_blank">Official docs: git-status</a></li>
+  </ul>
+
+  <h3 id="git-add"><code>git add</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> moves a file from "changed" into the <strong>staging area</strong> — the draft list of what the next commit will contain.</li>
+    <li><strong>Flags:</strong>
+      <ul>
+        <li><code>git add &lt;file&gt;</code> — stage one specific file (safest, most deliberate).</li>
+        <li><code>git add .</code> — stage everything changed in and below the current folder.</li>
+      </ul>
+    </li>
+    <li><a href="https://git-scm.com/docs/git-add" target="_blank">Official docs: git-add</a></li>
+  </ul>
+
+  <div class="box gotcha">
+    <div class="box-title">Gotcha</div>
+    <code>git add .</code> stages everything that isn't excluded by <code>.gitignore</code> — always run
+    <code>git status</code> right after, and read the file list, before committing. This is exactly how
+    secrets/env files leak into public repos.
+  </div>
+
+  <h3 id="gitignore-file"><code>.gitignore</code></h3>
+  <ul>
+    <li><strong>What it is:</strong> a plain-text file, one pattern per line, listing what git should never
+      track even if it exists in the folder — build output, dependency folders, secrets, IDE settings.</li>
+    <li><strong>When/why:</strong> create it before your first <code>git add</code>, so generated files
+      never get a chance to be staged in the first place.</li>
+    <li><a href="https://git-scm.com/docs/gitignore" target="_blank">Official docs: gitignore</a></li>
+  </ul>
+
+  <div class="box gotcha">
+    <div class="box-title">Real mistake made in this project</div>
+    Created the file as <code>gitignore</code> (no leading dot) instead of <code>.gitignore</code> — git
+    silently treated it as just another tracked text file instead of an ignore rule, so nothing was actually
+    being excluded. <code>git ls-files</code> is what caught it (it showed <code>gitignore</code> sitting
+    right there as a tracked file, which it should never be). Fixed with <code>Rename-Item .\gitignore .gitignore</code>.
+  </div>
+
+  <h3 id="git-commit"><code>git commit</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> takes everything currently staged and saves it as a permanent,
+      named snapshot in the repo's history.</li>
+    <li><strong>Flags:</strong> <code>-m "message"</code> — write the commit message inline instead of
+      opening an editor.</li>
+    <li><strong>Best practice:</strong> short, lowercase, human-sounding messages describing <em>what</em>
+      changed — not a formal changelog sentence. <code>add gitignore + readme</code>, not
+      <code>Initialize project repository structure.</code></li>
+    <li><a href="https://git-scm.com/docs/git-commit" target="_blank">Official docs: git-commit</a></li>
+  </ul>
+
+  <h2 id="remote-basics">Remote basics (GitHub)</h2>
+
+  <h3 id="gh-repo-create"><code>gh repo create</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> GitHub's official CLI tool (<code>gh</code>) creates a new repo on
+      GitHub.com directly from your terminal — no browser needed.</li>
+    <li><strong>Flags used here:</strong> <code>--public</code> (visible to anyone, resume-linkable),
+      <code>--source=.</code> (use the current local folder as the repo content),
+      <code>--remote=origin</code> (name the connection <code>origin</code>).</li>
+    <li><a href="https://cli.github.com/manual/gh_repo_create" target="_blank">Official docs: gh repo create</a></li>
+  </ul>
+
+  <div class="box gotcha">
+    <div class="box-title">What actually happened in this project</div>
+    <code>gh</code> wasn't installed yet the first time this ran, so the GitHub repo was created through
+    the github.com web UI instead ("New repository" button), then linked locally by hand:
+    <code>git remote add origin git@github.com:theHparth/MoveTrack_Ops.git</code>. Both routes end at the
+    same place — <code>gh repo create --source=. --remote=origin</code> just does the "create on GitHub" +
+    "add the remote" steps in one command once <code>gh</code> is set up. <code>gh</code> got installed
+    later (see the CLI install section further down) for issues/PRs going forward.
+  </div>
+
+  <h3 id="git-remote"><code>git remote -v</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> lists every remote this repo knows about and its URL — confirms
+      <code>origin</code> points where you expect before you push anything.</li>
+    <li><a href="https://git-scm.com/docs/git-remote" target="_blank">Official docs: git-remote</a></li>
+  </ul>
+
+  <h3 id="git-push"><code>git push</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> uploads your local commits to the remote repo.</li>
+    <li><strong>Flags:</strong> <code>-u origin main</code> — push to <code>origin</code>'s <code>main</code>
+      branch and remember that pairing, so future pushes just need <code>git push</code>.</li>
+    <li><a href="https://git-scm.com/docs/git-push" target="_blank">Official docs: git-push</a></li>
+  </ul>
+
+  <div class="box gotcha">
+    <div class="box-title">Real error hit: "src refspec main does not match any"</div>
+    Means git can't find a local branch named <code>main</code> to push. Two different causes can produce
+    this exact message — worth knowing both: (1) no commit exists yet at all, so no branch ref exists
+    period, or (2) a commit exists, but the local branch is still named <code>master</code> (git's old
+    default) while the push targets <code>main</code>. This project hit case (2) — fixed with
+    <code>git branch -M main</code>, which renames the current branch in place.
+  </div>
+
+  <div class="diagram">
+working directory  --git add-->  staging area  --git commit-->  local repo (.git)  --git push-->  GitHub (origin)
+    (your files)                 (the draft)                    (permanent history)                (public copy)
+  </div>
+
+  <h2 id="branching">Branching &amp; Pull Request Workflow — GitHub Flow</h2>
+  <p>Starting Step 1, every change goes through a branch and a PR — nothing gets committed straight to
+    <code>main</code> again. This is <strong>GitHub Flow</strong>, the trunk-based workflow most companies
+    actually use day to day (as opposed to heavier models like Git Flow with separate develop/release
+    branches, which mainly show up on projects that ship versioned releases, not continuously-deployed apps).</p>
+
+  <div class="diagram">
+main  ──●───────────────────────────────●───────────────────────●──▶
+          \                             / (squash-merge)          \
+           ●──●──●  feat/step1-...    ●                            ●──●  feat/step2-...  (next branch, off latest main)
+         (issue #1 opened)         (PR #1 reviewed + merged,
+                                     branch deleted, issue auto-closed)
+  </div>
+
+  <div class="box why">
+    <div class="box-title">Why one branch per Step by default</div>
+    Keeps a 1:1 line between the roadmap in the deep spec, the GitHub issue, the branch, the PR, and the
+    entry on the <a href="../steps.html">Steps page</a> — anyone (including you, months later) can trace
+    a feature from spec → code → history in one hop. Split a Step into multiple branches only when it
+    genuinely bundles more than one independently-deployable piece (e.g. two separate services) — smaller
+    isn't automatically better; a branch should be one reviewable, coherent unit of work.
+  </div>
+
+  <h3 id="branch-naming">Branch naming</h3>
+  <table>
+    <tr><th>Pattern</th><th>Example</th><th>Used for</th></tr>
+    <tr><td><code>feat/step&lt;N&gt;-&lt;short-desc&gt;</code></td><td><code>feat/step1-move-entitlement-service</code></td><td>New functionality — most branches</td></tr>
+    <tr><td><code>fix/&lt;short-desc&gt;</code></td><td><code>fix/entitlement-weight-lookup</code></td><td>Bug fix, not tied to a roadmap Step</td></tr>
+    <tr><td><code>chore/&lt;short-desc&gt;</code></td><td><code>chore/upgrade-spring-boot</code></td><td>No behavior change — deps, config, tooling</td></tr>
+    <tr><td><code>infra/&lt;short-desc&gt;</code></td><td><code>infra/vpc-terraform-module</code></td><td>Terraform/Ansible/K8s manifests</td></tr>
+  </table>
+
+  <h3 id="commit-prefixes">Commit message prefixes (Conventional Commits)</h3>
+  <p>Real, widely-used convention — a prefix that says <em>what kind</em> of change, then the same
+    short/lowercase/human style already agreed on. Still your call per-commit; this just adds one prefix word.</p>
+  <table>
+    <tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr>
+    <tr><td><code>feat:</code></td><td>New feature/functionality</td><td><code>feat: add move request entity and repository</code></td></tr>
+    <tr><td><code>fix:</code></td><td>Bug fix</td><td><code>fix: correct weight table lookup for O-3 rank</code></td></tr>
+    <tr><td><code>test:</code></td><td>Tests only, no production code change</td><td><code>test: add JUnit tests for entitlement calc</code></td></tr>
+    <tr><td><code>chore:</code></td><td>Maintenance — deps, config, no behavior change</td><td><code>chore: bump spring-boot-starter to 3.3</code></td></tr>
+    <tr><td><code>docs:</code></td><td>README or comments only</td><td><code>docs: add stack line for postgres</code></td></tr>
+  </table>
+
+  <h3 id="squash-vs-merge">Squash-merge vs. merge commit</h3>
+  <div class="box tip">
+    <div class="box-title">Why squash-merge here</div>
+    Squash-merge collapses every commit on the branch into <strong>one</strong> commit on <code>main</code>
+    when the PR merges — your branch can have messy "wip", "fix typo", "actually fix it" commits, and
+    <code>main</code> still gets exactly one clean, readable line per feature. A regular merge commit keeps
+    every individual commit (useful for release-train workflows with multiple teams), which is more history
+    than a solo project needs — squash is GitHub's own recommended default for this shape of project.
+  </div>
+
+  <h3 id="branch-protection">Branch protection on <code>main</code></h3>
+  <ul>
+    <li><strong>What it does:</strong> a repo setting that blocks direct pushes to <code>main</code> —
+      every change must come in through a reviewed PR, even for the repo owner.</li>
+    <li><strong>Why it matters even solo:</strong> it's the same guardrail a real team relies on — it makes
+      the PR workflow mandatory instead of optional, so it can't quietly slip back to direct-to-main commits
+      under deadline pressure.</li>
+    <li><a href="https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets" target="_blank">Official docs: branch rulesets</a></li>
+  </ul>
+
+  <h4>Exact click path (Rulesets — GitHub's current recommended way)</h4>
+  <ol>
+    <li>Go to <code>github.com/theHparth/MoveTrack_Ops</code></li>
+    <li>Top of the repo page → <strong>Settings</strong> tab</li>
+    <li>Left sidebar → <strong>Rules</strong> → <strong>Rulesets</strong></li>
+    <li><strong>New ruleset</strong> → <strong>New branch ruleset</strong></li>
+    <li><strong>Ruleset name:</strong> <code>main-protection</code></li>
+    <li><strong>Enforcement status:</strong> Active</li>
+    <li><strong>Target branches</strong> → <strong>Add target</strong> → <strong>Include default branch</strong>
+      (this targets <code>main</code> without hardcoding the name)</li>
+    <li>Under <strong>Branch rules</strong>, check:
+      <ul>
+        <li>☑ <strong>Require a pull request before merging</strong> — required approvals can stay at
+          <code>0</code>, since you're the only reviewer; the checkbox itself is what blocks direct pushes</li>
+        <li>☑ <strong>Block force pushes</strong> — usually on by default, leave it on</li>
+      </ul>
+    </li>
+    <li>Leave <strong>Bypass list</strong> empty — see the gotcha box below for why that matters</li>
+    <li><strong>Create</strong></li>
+  </ol>
+
+  <div class="box gotcha">
+    <div class="box-title">Gotcha — bypass list</div>
+    Repo admins can be granted a bypass on their own rules. If you leave the <strong>Bypass list</strong>
+    empty when creating the ruleset, it applies to you too — direct pushes to <code>main</code> get rejected
+    even from the owner account, which is what actually makes the PR workflow mandatory instead of a
+    suggestion. Adding yourself to the bypass list defeats the point of turning this on.
+  </div>
+
+  <h3 id="gh-cli-install">GitHub CLI (<code>gh</code>) — install &amp; auth</h3>
+  <ul>
+    <li><strong>What it is:</strong> GitHub's official CLI — creates issues, PRs, and does reviews/merges
+      from the terminal instead of clicking through github.com.</li>
+  </ul>
+  <pre><code># install (Windows, via winget)
+winget install --id GitHub.cli -e
+
+# authenticate once — pick GitHub.com, HTTPS, login with a web browser
+gh auth login</code></pre>
+  <p><a href="https://cli.github.com/manual/" target="_blank">Official docs: gh CLI manual</a></p>
+
+  <div class="box gotcha">
+    <div class="box-title">Gotcha — stale PATH after install</div>
+    A fresh <code>winget install</code> updates the system/user PATH variable, but an already-open
+    PowerShell window doesn't reload it automatically — <code>gh</code> still errors as "not recognized"
+    right after installing. Either open a new terminal window, or refresh the current one without
+    restarting: <code>$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+    [System.Environment]::GetEnvironmentVariable("Path","User")</code>.
+  </div>
+  <p><strong>Auth choices used:</strong> GitHub.com → HTTPS → "Authenticate Git with your GitHub
+    credentials?" Yes → "Login with a web browser" (device-code flow: a one-time code, pasted at
+    <code>github.com/login/device</code>, approved in the browser).</p>
+
+  <h2 id="pull-requests">Pull Requests</h2>
+  <p>A Pull Request (PR) is a request to merge one branch into another, with a review step in between.
+    Since branch protection is on, this is the <em>only</em> way code reaches <code>main</code> now — direct
+    pushes are blocked, even for the repo owner.</p>
+
+  <h3 id="gh-pr-create"><code>gh pr create</code></h3>
+  <table>
+    <tr><th>Flag</th><th>What it means</th></tr>
+    <tr><td><code>--title</code></td><td>The PR's headline — what shows in the list of PRs on GitHub</td></tr>
+    <tr><td><code>--body "Closes #N"</code></td><td><code>Closes #N</code> is a keyword GitHub recognizes — the referenced issue auto-closes the moment this PR merges, no manual step</td></tr>
+    <tr><td><code>--base main</code></td><td>Which branch to merge <em>into</em>. Usually inferred correctly anyway since <code>main</code> is the default branch — explicit here for clarity</td></tr>
+  </table>
+  <p><a href="https://cli.github.com/manual/gh_pr_create" target="_blank">Official docs: gh pr create</a></p>
+
+  <div class="diagram">
+issue #N (the ticket)
+      |
+      v
+feat/some-branch (your branch, all the commits)
+      |
+      |  gh pr create
+      v
+   Pull Request  <-- read the diff here on github.com, catches things a terminal diff misses
+      |
+      |  gh pr merge --squash --delete-branch
+      v
+   main  (one clean commit added, branch deleted, issue #N auto-closed)
+  </div>
+
+  <div class="box why">
+    <div class="box-title">Why "review your own diff" isn't just ceremony</div>
+    The PR page shows the whole change as one reviewable block, file by file, with syntax highlighting —
+    a different vantage point than scrolling through terminal output while writing it. This is where an
+    accidentally-included file, a stray debug line, or a formatting mistake tends to actually get noticed.
+  </div>
+
+  <h3 id="why-delete-branches">Why delete the branch after merging</h3>
+  <ul>
+    <li>The branch is temporary scaffolding, not the record. The <strong>PR itself is never deleted</strong>
+      — every commit, the full diff, any comments, stay permanently viewable at the PR's URL, even after
+      merge (github.com → repo → Pull Requests → Closed tab).</li>
+    <li>The squashed commit lives forever in <code>main</code>'s <code>git log</code> regardless.</li>
+    <li>Deleting on merge keeps the active-branch list meaning exactly one thing — work still in progress.
+      Left undeleted, a long-running project accumulates dozens of stale branch names with no way to tell
+      "still working on this" from "finished weeks ago" at a glance. GitHub's own default repo setting is
+      to auto-delete merged branches, for this exact reason.</li>
+    <li>To see what a finished branch actually did later: go to its closed PR, not the branch.</li>
+  </ul>
+
+  <h3 id="per-step-workflow">Per-Step workflow — the template used from Step 1 onward</h3>
+  <pre><code># 1. open an issue for the step (plain description, no "Step N"/"Phase N" labels — see the gotcha above)
+gh issue create --title "&lt;plain description of the work&gt;" --body "&lt;1-2 sentence plain summary&gt;"
+
+# 2. branch off the latest main
+git checkout main
+git pull
+git checkout -b feat/&lt;short-desc&gt;
+
+# 3. work, committing in small, prefixed, human commits as you go
+git add &lt;files&gt;
+git commit -m "feat: &lt;short description&gt;"
+# ...repeat as needed...
+
+# 4. push the branch and open the PR, linking the issue
+git push -u origin feat/&lt;short-desc&gt;
+gh pr create --title "&lt;plain description of the work&gt;" --body "Closes #&lt;issue-number&gt;" --base main
+
+# 5. review your own diff on github.com (real practice even solo), then merge + clean up
+gh pr merge --squash --delete-branch
+
+# 6. sync local main with the squashed merge before starting the next branch
+git checkout main
+git pull</code></pre>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-staged-vs-committed">
+    <div class="q">What's the difference between staged and committed?</div>
+    <div class="a">Staged means the file is in the draft area (<code>git add</code> ran), waiting to be
+      included in the next snapshot. Committed means that snapshot was actually saved to history
+      (<code>git commit</code> ran). You can stage and unstage freely without touching history.</div>
+  </div>
+  <div class="qa" id="qa-gitignore-timing">
+    <div class="q">Why write <code>.gitignore</code> before the first commit instead of after?</div>
+    <div class="a">Once a file is committed, adding it to <code>.gitignore</code> later doesn't remove it
+      from history — it only stops <em>future</em> changes from being tracked. Getting it right before the
+      first <code>git add</code> avoids ever having to scrub a secret or a build folder out of history.</div>
+  </div>
+  <div class="qa" id="qa-why-branches-prs">
+    <div class="q">Why feature branches + PRs instead of committing straight to main, especially solo?</div>
+    <div class="a">Two reasons that hold even with one developer: it forces a self-review step — reading
+      your own diff on GitHub's PR view catches things a local <code>git diff</code> in a terminal doesn't
+      — and it keeps <code>main</code> always in a known-good, deployable state, since work-in-progress
+      never lands there directly. On a real team it also adds actual code review and CI gating before merge.</div>
+  </div>
+  <div class="qa" id="qa-why-delete-branch">
+    <div class="q">Doesn't deleting the branch after merge lose the record of what work was done?</div>
+    <div class="a">No — the branch is just a temporary pointer, not the record. The Pull Request itself is
+      never deleted; every commit, the full diff, and any comments stay permanently viewable at its URL
+      even after merge, and the squashed commit lives forever in <code>main</code>'s history regardless.
+      Deleting the branch only removes clutter from the active-branch list — to see what a finished piece
+      of work actually did, you'd look at its closed PR, not a branch name.</div>
+  </div>
+  <div class="qa" id="qa-squash-vs-merge-commit">
+    <div class="q">Squash-merge vs. a regular merge commit — when would you pick each?</div>
+    <div class="a">Squash-merge when you want <code>main</code>'s history to read as one commit per feature
+      — easy to scan, easy to revert a whole feature in one command. A regular merge commit when you need
+      every intermediate commit preserved — e.g. a long-lived release branch, or a team convention that
+      ties commits to individual review comments. For a single-developer project shipping continuously,
+      squash is the simpler, cleaner default.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+</body>
+</html>

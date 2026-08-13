@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Docker &amp; Compose</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html" class="active">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Docker &amp; Compose</h1>
+  <p class="subtitle">Fundamentals + how this project actually uses it. For when each piece was introduced, see the <a href="../steps.html">Steps page</a>.</p>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>Docker</strong></td><td>Runs an app inside an isolated container — its own filesystem, processes, network — without a full virtual machine.</td></tr>
+    <tr><td><strong>Image</strong></td><td>A frozen snapshot (filesystem + config) a container is created from — e.g. <code>postgres:17-alpine</code>.</td></tr>
+    <tr><td><strong>Container</strong></td><td>A running (or stopped) instance of an image.</td></tr>
+    <tr><td><strong>Docker Compose</strong></td><td>Defines multiple containers, their config, and how they connect, in one YAML file — <code>docker compose up</code> starts the whole set together instead of one long <code>docker run</code> command per container.</td></tr>
+    <tr><td><strong>Dockerfile</strong></td><td>The recipe for building <em>one</em> image — what base image, what files to copy in, what command starts the app. Used by <code>docker build</code>.</td></tr>
+  </table>
+
+  <div class="box tip">
+    <div class="box-title">Dockerfile vs. docker-compose.yml — different jobs</div>
+    Dockerfile = the recipe card for <em>one</em> dish. docker-compose.yml = the whole dinner party plan —
+    which dishes get served together, how the table's arranged (networking), what's in the fridge
+    (volumes). This project's <code>postgres</code> service uses a pre-built image
+    (<code>image: postgres:17-alpine</code>, pulled from Docker Hub — no Dockerfile needed, we didn't write
+    Postgres). Our own services use <code>build: ./services/&lt;service&gt;</code> instead, pointing at a
+    Dockerfile we wrote, since there's no pre-made image for code we haven't built yet.
+  </div>
+
+  <h2 id="storage">Where Docker actually stores things</h2>
+  <ul>
+    <li><strong>Same physical computer, different filesystem.</strong> On Windows, Docker Desktop runs a
+      lightweight Linux VM via WSL2, and every image/container lives inside one large virtual disk file
+      (<code>%LOCALAPPDATA%\Docker\wsl\data\ext4.vhdx</code>) — a complete filesystem packed inside one
+      opaque file Windows can't browse directly. Not remote, not cloud — just not a normal folder tree.</li>
+    <li><strong><code>COPY</code> without <code>--from=</code></strong> pulls from your real project folder
+      (the <strong>build context</strong> — whatever folder you ran <code>docker build</code> from) into the
+      image being built. A one-time snapshot: editing your real files afterward doesn't change an
+      already-built image.</li>
+    <li><strong><code>COPY --from=&lt;stage-name&gt;</code></strong> pulls from an <em>earlier build
+      stage's own filesystem</em> instead — Docker talking to itself, your computer not involved at all for
+      that specific line. This is what makes multi-stage builds work (next section).</li>
+    <li><strong>Every service gets a fully separate build.</strong> Claims Service and Move &amp;
+      Entitlement Service each have their own Dockerfile, built with their own separate
+      <code>docker build</code> run from their own folder — one build process can't see the other
+      service's files at all, since the build context defines the entire universe of files that build has
+      access to.</li>
+  </ul>
+
+  <h2 id="multi-stage">Multi-stage builds</h2>
+  <p>This project's service Dockerfiles all follow the same two-stage pattern:</p>
+  <pre><code>FROM eclipse-temurin:25-jdk AS build
+WORKDIR /app
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
+
+FROM eclipse-temurin:25-jre AS run
+WORKDIR /app
+COPY --from=build /app/target/&lt;service&gt;-*.jar app.jar
+EXPOSE &lt;port&gt;
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+  <table>
+    <tr><th>Stage</th><th>Base image</th><th>Has</th></tr>
+    <tr><td><code>build</code></td><td>Full JDK</td><td>Compiler, Maven wrapper, source code, dependency cache — everything needed to <em>produce</em> the jar</td></tr>
+    <tr><td><code>run</code></td><td>JRE only, no compiler</td><td>Just the final <code>.jar</code>, copied from stage 1 via <code>COPY --from=build</code></td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why two stages instead of one</div>
+    The final image only contains stage 2's contents — none of stage 1's build tools, source code, or
+    Maven cache ship to production. Smaller image, faster to pull/deploy, smaller attack surface (no
+    compiler sitting in a production container). Copying <code>pom.xml</code> before <code>src/</code>, and
+    running <code>dependency:go-offline</code> in between, is also deliberate — Docker caches each
+    instruction as a layer, so dependencies only re-download when <code>pom.xml</code> actually changes,
+    not on every source edit.
+  </div>
+  <p><code>.dockerignore</code> (same idea as <code>.gitignore</code>) keeps <code>target/</code>, IDE
+    files, and <code>.git/</code> out of the build context entirely, so they're never even candidates for
+    the <code>COPY</code> in stage 1.</p>
+
+  <h2 id="compose-file">The compose file</h2>
+  <p>This project's <code>docker-compose.yml</code> lives at the repo root (not inside any service folder) since it's meant to eventually orchestrate every backend service, not just one:</p>
+  <pre><code>services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: movetrack-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:</code></pre>
+  <table>
+    <tr><th>Key</th><th>What it does</th></tr>
+    <tr><td><code>image</code></td><td>Which snapshot to build the container from — <code>-alpine</code> variants are the small/minimal-OS flavor, common default for services that don't need much beyond the software itself.</td></tr>
+    <tr><td><code>container_name</code></td><td>A fixed, predictable name (<code>movetrack-postgres</code>) instead of Compose's auto-generated <code>&lt;project&gt;-&lt;service&gt;-&lt;n&gt;</code> pattern.</td></tr>
+    <tr><td><code>environment</code></td><td>Env vars passed into the container. <code>${POSTGRES_DB}</code> syntax pulls the value from a <code>.env</code> file automatically — Compose reads one in the same folder without being told to.</td></tr>
+    <tr><td><code>ports: "5432:5432"</code></td><td><code>host:container</code> — maps port 5432 on your actual machine to port 5432 inside the container. Without this, the container's port is only reachable from other containers, not from your laptop.</td></tr>
+    <tr><td><code>volumes</code></td><td>A named volume (<code>postgres_data</code>) persists the database's files outside the container's own filesystem — survives <code>docker compose down</code>, only lost if the volume itself is explicitly deleted.</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    No top-level <code>version:</code> key needed — that field is deprecated in current Compose and safe to
+    leave out entirely, even though a lot of older tutorials still show it.
+  </div>
+
+  <h2 id="multi-database-init">Multiple databases, one container</h2>
+  <ul>
+    <li><strong>The limit:</strong> the <code>POSTGRES_DB</code> environment variable only creates
+      <em>one</em> database, the very first time the container starts on an empty volume. A second service
+      needing its own database in the same container needs a different mechanism.</li>
+    <li><strong>The mechanism:</strong> Postgres's own official image runs a startup script that checks a
+      fixed path, <code>/docker-entrypoint-initdb.d</code>, every time it boots — any <code>.sql</code>/<code>.sh</code>
+      files found there get executed, in alphabetical order, but <em>only</em> on a genuinely empty data
+      directory (true first-time initialization).</li>
+    <li><strong>Getting a local file into that path:</strong> a bind mount —
+      <code>host-folder:container-path</code>, same syntax as <code>ports</code> but for folders. A
+      container can't see the host filesystem at all unless a mount explicitly exposes part of it.</li>
+  </ul>
+  <pre><code># infra/postgres-init/init-claims-db.sql
+CREATE DATABASE claims_db;</code></pre>
+  <pre><code># docker-compose.yml, postgres service
+volumes:
+  - postgres_data:/var/lib/postgresql/data
+  - ./infra/postgres-init:/docker-entrypoint-initdb.d</code></pre>
+
+  <div class="box gotcha">
+    <div class="box-title">Init scripts don't run on an already-initialized volume</div>
+    Adding the mount alone does nothing if <code>postgres_data</code> already has data in it from a
+    previous <code>docker compose up</code> — Postgres only treats a completely empty data directory as
+    "first boot." Forcing a genuine fresh start requires deleting the volume, not just the container:
+    <code>docker compose down -v</code> (note the <code>-v</code> — this project's every earlier
+    <code>down</code> omitted it deliberately) followed by <code>docker compose up -d</code>. Only safe to
+    do casually before any real data exists.
+  </div>
+
+  <h3>Checking what actually exists inside the container</h3>
+  <pre><code>docker exec -it movetrack-postgres psql -U movetrack -l</code></pre>
+  <p><code>docker exec -it</code> runs a command <em>inside</em> an already-running container — here,
+    launching <code>psql</code> (Postgres's own CLI) and asking it to list every database
+    (<code>-l</code>). Prompts for the password set in <code>.env</code>.</p>
+  <p><a href="https://www.postgresql.org/docs/current/app-psql.html" target="_blank">Official docs: psql</a></p>
+
+  <h2 id="networking">Container networking — service names, not <code>localhost</code></h2>
+  <ul>
+    <li>Compose automatically creates a private network shared by every service in the same
+      <code>docker-compose.yml</code>. Each service can reach the others <strong>by service name</strong> —
+      like a hostname — but <em>not</em> by <code>localhost</code>. From inside a container,
+      <code>localhost</code> means that container itself, not a sibling container.</li>
+    <li>This project's services keep <code>localhost</code> in <code>application.properties</code> (for
+      running via <code>mvnw spring-boot:run</code> directly on the host, where Postgres's port <em>is</em>
+      published to <code>localhost</code>) and <strong>override</strong> it in
+      <code>docker-compose.yml</code> for the containerized case:</li>
+  </ul>
+  <pre><code>claims-service:
+    build: ./services/claims-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/claims_db</code></pre>
+  <p><code>postgres</code> here is the Postgres <strong>service name</strong> from the same compose file
+    — resolved by Docker's internal DNS to the actual Postgres container. Spring Boot's relaxed binding
+    maps the env var <code>SPRING_DATASOURCE_URL</code> straight onto the
+    <code>spring.datasource.url</code> property, overriding whatever's in <code>application.properties</code>
+    without touching the file or the code.</p>
+  <div class="box why">
+    <div class="box-title">Confirmed, not assumed</div>
+    Verified via <code>docker compose logs &lt;service&gt;</code> — Hibernate's own startup log prints the
+    actual JDBC URL it connected with, e.g. <code>Database JDBC URL [jdbc:postgresql://postgres:5432/claims_db]</code>.
+    Seeing <code>postgres</code> instead of <code>localhost</code> there is direct proof the override
+    actually took effect, not just that the container started.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title"><code>depends_on</code> is not a readiness check</div>
+    <code>depends_on: - postgres</code> only controls <strong>start order</strong> — Compose starts
+    Postgres's container first. It does not wait for Postgres to actually be ready to accept connections;
+    a container can report "started" before the database engine inside it has finished initializing. Not
+    fixed pre-emptively here (no healthcheck yet) — if a dependent service ever fails to connect on first
+    boot because of this, that's the point to add one, not before.
+  </div>
+
+  <h2 id="env-files">Keeping secrets out of git</h2>
+  <ul>
+    <li><strong>What:</strong> real values live in <code>.env</code> (gitignored — covered by the root
+      <code>.gitignore</code>'s <code>.env</code> / <code>.env.*</code> / <code>!.env.example</code> rules).
+      A parallel <code>.env.example</code>, committed, lists the same variable names with empty/placeholder
+      values.</li>
+    <li><strong>Why even for a throwaway local dev password:</strong> the habit matters more than this
+      specific value — the same pattern is what prevents a real secret from ever being committed later.</li>
+  </ul>
+  <div class="box why">
+    <div class="box-title">This project's tradeoff, stated honestly</div>
+    <code>application.properties</code> (inside the service, also committed to git) hardcodes the same local
+    dev values directly rather than reading them from environment variables — a deliberate simplification
+    for local-only development. A real deployed environment (Phase 15, AWS/Terraform) will use actual
+    secrets management instead; not solved today, flagged here so it's not mistaken for the production
+    pattern.
+  </div>
+
+  <h2 id="stop-vs-down">Commands — <code>docker stop</code> vs. <code>docker compose down</code></h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th><th>Container still exists after?</th></tr>
+    <tr><td><code>docker stop &lt;name&gt;</code></td><td>Stops the running process inside the container</td><td><strong>Yes</strong> — <code>docker start &lt;name&gt;</code> brings it back with the exact same config</td></tr>
+    <tr><td><code>docker compose down</code></td><td>Stops <em>and deletes</em> the container(s) + the network Compose created</td><td><strong>No</strong> — next <code>up</code> builds fresh ones from the compose file</td></tr>
+  </table>
+  <ul>
+    <li><code>docker stop</code> works on any container by name, one at a time — not Compose-aware.</li>
+    <li><code>docker compose down</code> / <code>docker compose stop</code> act on every service in that
+      project's compose file at once, using the file as the source of truth.</li>
+    <li>Neither touches a named volume unless <code>down</code> is run with an explicit <code>-v</code> flag.</li>
+  </ul>
+  <div class="box why">
+    <div class="box-title">Why this distinction actually mattered here</div>
+    A container created during a <em>failed</em> first attempt can end up with broken config baked in (see
+    <a href="../steps.html#step2">Steps → Step 2</a> for the real incident). <code>stop</code>+<code>start</code>
+    just restarts that same broken container. <code>down</code>+<code>up</code> deletes it and builds a
+    genuinely new one — the only way to actually fix a bad container, not just pause it.
+  </div>
+
+  <h3><code>-d</code> flag (detached mode)</h3>
+  <ul>
+    <li><strong>Without it:</strong> <code>docker compose up</code> takes over the terminal, streaming live
+      logs; closing the terminal or <code>Ctrl+C</code> stops the containers.</li>
+    <li><strong>With <code>-d</code>:</strong> starts the containers in the background and returns the
+      terminal immediately — what this project always uses, since Postgres needs to keep running while work
+      continues elsewhere.</li>
+    <li>To see a detached container's logs later: <code>docker compose logs -f</code> (<code>-f</code> = follow).</li>
+  </ul>
+
+  <h2>Diagnostic commands</h2>
+  <table>
+    <tr><th>Command</th><th>What it shows</th></tr>
+    <tr><td><code>docker ps</code></td><td>Every running container across <em>all</em> projects on this machine — not just the current folder's compose stack. What caught Case Tracking Application's leftover Postgres holding port 5432.</td></tr>
+    <tr><td><code>docker compose ps</code></td><td>Just this project's containers. PORTS column shows <code>0.0.0.0:5432-&gt;5432/tcp</code> if actually published to the host, or bare <code>5432/tcp</code> if only reachable from other containers — that difference is what exposed Incident 2.</td></tr>
+  </table>
+
+  <div class="box tip">
+    <div class="box-title">Telling Compose-managed containers apart from ad-hoc ones</div>
+    Compose auto-names containers <code>&lt;project&gt;-&lt;service&gt;-&lt;n&gt;</code> (or uses an explicit
+    <code>container_name:</code> override, like <code>movetrack-postgres</code>). A random two-word name like
+    <code>relaxed_leavitt</code> is Docker's own auto-generated name for a container started without
+    <code>--name</code> — a reliable sign it came from a manual <code>docker run</code>, not any project's
+    compose file.
+  </div>
+
+  <h2>Interview Q&amp;A</h2>
+  <div class="qa" id="qa-image-vs-container">
+    <div class="q">What's the difference between a Docker image and a container?</div>
+    <div class="a">An image is a frozen, read-only snapshot — filesystem plus config, like a class. A
+      container is a running (or stopped) instance created from that image — like an object instantiated
+      from that class. One image can produce many independent containers.</div>
+  </div>
+  <div class="qa" id="qa-why-named-volume">
+    <div class="q">Why use a named volume instead of just letting the container store data in its own filesystem?</div>
+    <div class="a">A container's own filesystem disappears the moment the container is deleted —
+      exactly what <code>docker compose down</code> does. A named volume lives independently of any specific
+      container, so the database's actual data survives a full container recreate (like the one this
+      project's Incident 2 required) and is only lost if the volume itself is explicitly removed.</div>
+  </div>
+  <div class="qa" id="qa-multi-stage-why">
+    <div class="q">Why use a multi-stage Dockerfile instead of one stage that both builds and runs the app?</div>
+    <div class="a">A single stage would ship the full JDK, Maven's dependency cache, and the source code
+      inside the production image — bigger, slower to deploy, and a larger attack surface (a compiler
+      sitting in production is pure downside). A second stage starting fresh from a JRE-only base image and
+      copying in just the finished jar keeps the final image to only what's needed to run it.</div>
+  </div>
+  <div class="qa" id="qa-localhost-vs-service-name">
+    <div class="q">Why doesn't <code>localhost</code> work for one container to reach another?</div>
+    <div class="a">Inside a container, <code>localhost</code> always refers to that container itself, not
+      a sibling. Docker Compose gives every service in the same compose file a private network where they
+      can reach each other by <em>service name</em> instead — that's why this project overrides
+      <code>spring.datasource.url</code> with the hostname <code>postgres</code> (not <code>localhost</code>)
+      via an environment variable specifically for the containerized case, while local dev outside Docker
+      keeps using <code>localhost</code> unchanged.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+</body>
+</html>

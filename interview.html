@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Interview Questions</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="tech/git.html">Git &amp; GitHub</a>
+  <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="tech/docker.html">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="interview.html" class="active">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>All Interview Questions</h1>
+  <p class="subtitle">
+    Every Q&amp;A on this site, copied here in full so this page alone is enough to read start to finish —
+    no clicking around needed. Grouped by where it came from; each one links back to that page if you want
+    the surrounding context (the command, the diagram, the rest of that section).
+  </p>
+
+  <h2 id="from-steps">From the Steps page</h2>
+
+  <div class="qa">
+    <div class="q">Why set up CI/CD and repo structure before writing any feature code?</div>
+    <div class="a">It's cheap to get right at the start and expensive to retrofit — branch protection,
+      .gitignore scope, and commit hygiene all get harder to fix once history exists. Doing it first
+      also means every subsequent step has something real to point to in the commit log during an
+      interview walkthrough.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-cicd-before-code">Steps → Step 0</a></p>
+
+  <div class="qa">
+    <div class="q">Why keep study/reference docs out of the repo instead of just gitignoring them?</div>
+    <div class="a">Gitignore only prevents a future accidental <code>git add</code> from succeeding
+      silently — it doesn't prevent someone from force-adding the file, and it still leaves the content
+      sitting inside the same folder tree as the public repo. Keeping it in a physically separate folder
+      removes the mistake as a category, not just as a default.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-docs-outside-repo">Steps → Step 0</a></p>
+
+  <div class="qa">
+    <div class="q">Why run <code>git log</code>/<code>ls-remote</code> before touching anything, instead of just re-running the fix?</div>
+    <div class="a">A push failure can come from several unrelated causes — read-only commands confirm
+      which one you actually have before you act. Here it ruled out "no commit exists" and "repo doesn't
+      exist / bad auth" in under a minute, narrowing it to a branch-name mismatch, which meant a one-line
+      fix instead of redoing work that was never actually lost.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-diagnose-before-fix">Steps → Step 0</a></p>
+
+  <div class="qa">
+    <div class="q">Is a Java annotation the same thing as a Python decorator?</div>
+    <div class="a">They look similar (<code>@Something</code>) but work differently. A Python decorator
+      actually executes and wraps the function at the moment Python runs that line. A Java annotation
+      doesn't execute anything by itself — it's metadata that other tools (here, Spring's startup
+      process) scan for and react to. <code>@SpringBootApplication</code> doesn't "run" — Spring's
+      bootstrap code looks for it and configures itself accordingly.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-annotation-vs-decorator">Steps → Step 1</a></p>
+
+  <div class="qa">
+    <div class="q">What does Maven's <code>scope=runtime</code> mean, and why does the Postgres driver use it?</div>
+    <div class="a">It means the dependency is needed when the app <em>runs</em>, but not to
+      <em>compile</em> it — our own code never directly imports Postgres driver classes; Hibernate looks
+      the driver up and uses it internally once the app is running. Compare to the default scope
+      (<code>compile</code>, needed for both) and <code>test</code> scope (only present when running tests).</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-runtime-scope">Steps → Step 1</a></p>
+
+  <div class="qa">
+    <div class="q">The generated test method (<code>contextLoads()</code>) has an empty body — what does it actually test?</div>
+    <div class="a">It's a smoke test: the method body does nothing, but <code>@SpringBootTest</code>
+      forces the entire Spring application to actually start up for this test. If startup fails for any
+      reason — bad config, broken wiring, a bad database connection — this test fails even though it
+      never makes an explicit assertion. Trivial right now with almost nothing to start; becomes
+      meaningful the moment real configuration (like a DB connection) exists to break.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-smoke-test">Steps → Step 1</a></p>
+
+  <div class="qa">
+    <div class="q">How did you know the second failure was a networking/publishing problem and not a wrong username/password?</div>
+    <div class="a">The exact exception mattered: <code>Connection to localhost:5432 refused</code> is a
+      TCP-level failure — nothing was even listening to accept the connection attempt. A wrong
+      username/password would instead connect successfully at the network level and fail later with a
+      Postgres authentication error. Reading the specific exception type, not just "it failed," is what
+      pointed straight at the port-publishing issue instead of the credentials.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-diagnose-refused-vs-auth">Steps → Step 2</a></p>
+
+  <div class="qa">
+    <div class="q"><code>docker stop</code> vs. <code>docker compose down</code> — why did only one fix the stale container?</div>
+    <div class="a"><code>stop</code> halts a container's process but leaves the container object (and its
+      original config) intact — restarting it brings back the exact same, still-broken configuration.
+      <code>down</code> deletes the container entirely, so the next <code>up</code> builds a genuinely new
+      one from the compose file, correctly re-applying the port-publish. When a container's own
+      configuration is the problem, only removal and recreation actually fixes it.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-stop-vs-down">Steps → Step 2</a></p>
+
+  <div class="qa">
+    <div class="q">Why give Claims Service its own database instead of just adding tables to move_entitlement_db?</div>
+    <div class="a">Database-per-service is standard microservices practice, even when services share the
+      same physical Postgres container — it keeps each service's schema genuinely independent, so one
+      service's migration or schema change can't accidentally break another. Sharing infrastructure (one
+      container) for cost/simplicity is fine; sharing a schema across two independently-deployable services
+      is the coupling that actually causes problems later.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-database-per-service">Steps → Step 4</a></p>
+
+  <div class="qa">
+    <div class="q">How does Postgres's Docker image know to run a <code>CREATE DATABASE</code> script automatically?</div>
+    <div class="a">The official Postgres image's own startup script checks a fixed path,
+      <code>/docker-entrypoint-initdb.d</code>, every time it boots, and runs any <code>.sql</code>/<code>.sh</code>
+      files found there — but only on a completely empty data directory, i.e. genuinely first-time startup.
+      A bind mount (<code>./infra/postgres-init:/docker-entrypoint-initdb.d</code>) is what makes a local
+      file on the host actually visible at that path inside the container in the first place.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-init-scripts">Steps → Step 4</a></p>
+
+  <div class="qa">
+    <div class="q">Why <code>@ConfigurationProperties</code> instead of a simpler <code>@Value("${claims.approval.supervisor-threshold}")</code> injection?</div>
+    <div class="a"><code>@Value</code> works for a single property, but doesn't scale cleanly to a group
+      of related settings, isn't type-checked as a cohesive unit, and is easy to typo without the IDE
+      catching it. <code>@ConfigurationProperties</code> binds a whole related group onto one class with
+      real fields — better for anything beyond a single standalone value, and it's what this project will
+      keep reaching for as more configuration groups show up.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-config-properties">Steps → Step 6</a></p>
+
+  <div class="qa">
+    <div class="q">Why did Mockito fail a test whose actual logic was correct?</div>
+    <div class="a">Mockito's default strict stubbing checks that every stub you set up actually gets
+      used somewhere in that test — an unused stub usually means the test setup doesn't match what the
+      code under test really does, which is worth knowing even when the assertion itself would have
+      passed. It's a test-design smell detector, not just an exception-matcher.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-unnecessary-stubbing">Steps → Step 8</a></p>
+
+  <h2 id="from-git">From Git &amp; GitHub</h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between staged and committed?</div>
+    <div class="a">Staged means the file is in the draft area (<code>git add</code> ran), waiting to be
+      included in the next snapshot. Committed means that snapshot was actually saved to history
+      (<code>git commit</code> ran). You can stage and unstage freely without touching history.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-staged-vs-committed">Git &amp; GitHub</a></p>
+
+  <div class="qa">
+    <div class="q">Why write <code>.gitignore</code> before the first commit instead of after?</div>
+    <div class="a">Once a file is committed, adding it to <code>.gitignore</code> later doesn't remove it
+      from history — it only stops <em>future</em> changes from being tracked. Getting it right before the
+      first <code>git add</code> avoids ever having to scrub a secret or a build folder out of history.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-gitignore-timing">Git &amp; GitHub</a></p>
+
+  <div class="qa">
+    <div class="q">Why feature branches + PRs instead of committing straight to main, especially solo?</div>
+    <div class="a">Two reasons that hold even with one developer: it forces a self-review step — reading
+      your own diff on GitHub's PR view catches things a local <code>git diff</code> in a terminal doesn't
+      — and it keeps <code>main</code> always in a known-good, deployable state, since work-in-progress
+      never lands there directly. On a real team it also adds actual code review and CI gating before merge.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-why-branches-prs">Git &amp; GitHub</a></p>
+
+  <div class="qa">
+    <div class="q">Squash-merge vs. a regular merge commit — when would you pick each?</div>
+    <div class="a">Squash-merge when you want <code>main</code>'s history to read as one commit per feature
+      — easy to scan, easy to revert a whole feature in one command. A regular merge commit when you need
+      every intermediate commit preserved — e.g. a long-lived release branch, or a team convention that
+      ties commits to individual review comments. For a single-developer project shipping continuously,
+      squash is the simpler, cleaner default.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-squash-vs-merge-commit">Git &amp; GitHub</a></p>
+
+  <div class="qa">
+    <div class="q">Doesn't deleting the branch after merge lose the record of what work was done?</div>
+    <div class="a">No — the branch is just a temporary pointer, not the record. The Pull Request itself is
+      never deleted; every commit, the full diff, and any comments stay permanently viewable at its URL
+      even after merge, and the squashed commit lives forever in <code>main</code>'s history regardless.
+      Deleting the branch only removes clutter from the active-branch list — to see what a finished piece
+      of work actually did, you'd look at its closed PR, not a branch name.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-why-delete-branch">Git &amp; GitHub</a></p>
+
+  <h2 id="from-java-spring">From Java, Spring &amp; Maven</h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between Spring and Spring Boot?</div>
+    <div class="a">Spring is the underlying framework (dependency injection, MVC, data access abstractions)
+      — powerful but historically required a lot of manual XML/Java config to wire together. Spring Boot is
+      an opinionated layer on top: auto-configuration, an embedded server, and starter dependencies
+      (<code>spring-boot-starter-web</code>, etc.) that pull in a coherent, working set of versions so you
+      get a running app with minimal config.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/java-spring.html#qa-spring-vs-springboot">Java, Spring &amp; Maven</a></p>
+
+  <div class="qa">
+    <div class="q">Why JPA/Hibernate instead of writing raw SQL with JDBC directly?</div>
+    <div class="a">JPA maps Java objects to rows so most CRUD never needs hand-written SQL, which is faster
+      to write and less error-prone for straightforward access patterns. The tradeoff is less control over
+      the exact query — for a genuinely complex or performance-critical query, dropping to a native query or
+      raw JDBC for that one case is still normal and expected, not a sign JPA was the wrong choice overall.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/java-spring.html#qa-jpa-vs-jdbc">Java, Spring &amp; Maven</a></p>
+
+  <div class="qa">
+    <div class="q">Why not just return the JPA entity directly from a REST endpoint instead of mapping to a DTO?</div>
+    <div class="a">It couples your public API shape to your database schema — a column rename in the
+      entity becomes a breaking API change for every client. JPA entities can also have lazy-loaded fields
+      that serialize unpredictably. A DTO is a deliberate, separate contract: only what a client actually
+      needs, independent of how the data happens to be stored.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/java-spring.html#qa-dto-vs-entity">Java, Spring &amp; Maven</a></p>
+
+  <h2 id="from-docker">From Docker &amp; Compose</h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between a Docker image and a container?</div>
+    <div class="a">An image is a frozen, read-only snapshot — filesystem plus config, like a class. A
+      container is a running (or stopped) instance created from that image — like an object instantiated
+      from that class. One image can produce many independent containers.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-image-vs-container">Docker &amp; Compose</a></p>
+
+  <div class="qa">
+    <div class="q">Why use a named volume instead of just letting the container store data in its own filesystem?</div>
+    <div class="a">A container's own filesystem disappears the moment the container is deleted — exactly
+      what <code>docker compose down</code> does. A named volume lives independently of any specific
+      container, so the database's actual data survives a full container recreate and is only lost if the
+      volume itself is explicitly removed.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-why-named-volume">Docker &amp; Compose</a></p>
+
+  <div class="qa">
+    <div class="q">Why use a multi-stage Dockerfile instead of one stage that both builds and runs the app?</div>
+    <div class="a">A single stage would ship the full JDK, Maven's dependency cache, and the source code
+      inside the production image — bigger, slower to deploy, and a larger attack surface (a compiler
+      sitting in production is pure downside). A second stage starting fresh from a JRE-only base image and
+      copying in just the finished jar keeps the final image to only what's needed to run it.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-multi-stage-why">Docker &amp; Compose</a></p>
+
+  <div class="qa">
+    <div class="q">Why doesn't <code>localhost</code> work for one container to reach another?</div>
+    <div class="a">Inside a container, <code>localhost</code> always refers to that container itself, not
+      a sibling. Docker Compose gives every service in the same compose file a private network where they
+      can reach each other by <em>service name</em> instead — that's why this project overrides
+      <code>spring.datasource.url</code> with the hostname <code>postgres</code> (not <code>localhost</code>)
+      via an environment variable specifically for the containerized case, while local dev outside Docker
+      keeps using <code>localhost</code> unchanged.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-localhost-vs-service-name">Docker &amp; Compose</a></p>
+
+  <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
+</main>
+</div>
+</body>
+</html>

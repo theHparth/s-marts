@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Build Steps</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="steps.html" class="active">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="tech/git.html">Git &amp; GitHub</a>
+  <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="tech/docker.html">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Build Steps</h1>
+  <p class="subtitle">
+    One entry per step, in order — the actual commands run, in the actual order they were run, including
+    mistakes and fixes. Concept explanations live on the technology reference pages instead; every command
+    below links out to it rather than re-explaining it here.
+  </p>
+
+  <h2 id="organization">How this build is organized — Phase → PR → Step</h2>
+  <table>
+    <tr><th>Level</th><th>What it is</th></tr>
+    <tr><td><strong>Phase</strong></td><td>A big milestone — an entire microservice, an entire infra layer. Orientation only, not something done in one sitting.</td></tr>
+    <tr><td><strong>PR / branch</strong></td><td>A reviewable slice of a Phase — small enough to actually review in one sitting. This is what gets a GitHub issue, a branch, and a squash-merged PR.</td></tr>
+    <tr><td><strong>Step</strong></td><td>One focused, understandable task — one entity, one service class, one test file. Numbered sequentially across the <em>whole project</em>, never resets per phase. Usually one commit. This is what gets its own entry below.</td></tr>
+  </table>
+
+  <div class="box why">
+    <div class="box-title">Why not just 15 steps (the deep spec's roadmap count)</div>
+    The deep spec's 15 "roadmap phases" are milestones, not learnable units — "Phase 1: Move &amp; Entitlement
+    + Claims services" alone is two separate microservices, each needing an entity layer, business logic,
+    a REST API, tests, and containerization. Redone at Step granularity, this project realistically runs to
+    roughly <strong>190 Steps</strong> across every phase — a rough estimate, not a fixed plan; each phase's
+    exact Steps get drafted when that phase is actually reached, especially the Terraform/K8s/AWS work
+    (Phase 15), whose specifics depend on decisions made in earlier phases.
+  </div>
+
+  <h3>Phase list (estimated Step counts, will flex)</h3>
+  <table>
+    <tr><th>#</th><th>Phase</th><th>~Steps</th></tr>
+    <tr><td>1</td><td>Move &amp; Entitlement Service</td><td>14</td></tr>
+    <tr><td>2</td><td>Claims Service</td><td>13</td></tr>
+    <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>13</td></tr>
+    <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>18</td></tr>
+    <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>10</td></tr>
+    <tr><td>6</td><td>Go Ingestion Service (REST)</td><td>12</td></tr>
+    <tr><td>7</td><td>SOAP Legacy Adapter</td><td>8</td></tr>
+    <tr><td>8</td><td>Claims triage ML + Redis</td><td>10</td></tr>
+    <tr><td>9</td><td>WebSocket live feed</td><td>6</td></tr>
+    <tr><td>10</td><td>Kafka</td><td>10</td></tr>
+    <tr><td>11</td><td>Svelte micro-widget</td><td>5</td></tr>
+    <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>4</td></tr>
+    <tr><td>13</td><td>Raw sockets + WireGuard + failover</td><td>12</td></tr>
+    <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>10</td></tr>
+    <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>30</td></tr>
+    <tr><td>16</td><td>k6/Locust load test</td><td>5</td></tr>
+  </table>
+
+  <div class="step" id="step0">
+    <div class="step-header">
+      <span class="step-num">STEP 0</span>
+      <span class="step-title">Project &amp; GitHub Setup</span>
+      <span class="step-status done">Done</span>
+    </div>
+
+    <p><strong>Goal:</strong> local project folder exists, is a git repo, has a first commit, and is pushed
+    to a public GitHub repo — before any application code gets written.</p>
+
+    <h3>What got set up</h3>
+    <ul>
+      <li>Project folder: <code>C:\Users\hpart\OneDrive - stevens.edu\Desktop\MoveTrack_Ops</code></li>
+      <li><code>.gitignore</code> covering all 3 languages (Java/Maven, Python, Go), Node/React, Terraform
+        state, Docker, IDE files, and secrets/env files — everything runs in this one repo eventually, so
+        the ignore file is written for the whole stack up front, not grown language-by-language.</li>
+      <li><code>README.md</code> — project overview, tech stack table, architecture summary, status.</li>
+      <li>First commit made locally.</li>
+      <li>Public GitHub repo created and linked as <code>origin</code>.</li>
+    </ul>
+
+    <h3>Commands run</h3>
+    <p>Local init, ignore file, first commit — concepts explained on
+      <a href="tech/git.html#local-basics">Git &amp; GitHub → Local basics</a>:</p>
+    <pre><code>cd "C:\Users\hpart\OneDrive - stevens.edu\Desktop"
+mkdir MoveTrack_Ops
+cd MoveTrack_Ops
+
+<a href="tech/git.html#git-init">git init</a>
+
+# create .gitignore and README.md (content given in chat)
+
+<a href="tech/git.html#git-status">git status</a>
+<a href="tech/git.html#git-add">git add</a> .
+git status
+<a href="tech/git.html#git-commit">git commit</a> -m "initial commit: project scaffold + gitignore"</code></pre>
+
+    <div class="box gotcha">
+      <div class="box-title">Incident — wrong folder, bad filename, wrong branch name</div>
+      Three separate mistakes surfaced together when the GitHub push failed:
+      <ul>
+        <li>Work actually happened in a stale, empty leftover folder (<code>MoveTrack_Military</code>,
+          from an earlier naming draft) instead of <code>MoveTrack_Ops</code> — the <code>mkdir</code>/<code>cd</code>
+          step got skipped.</li>
+        <li><code>.gitignore</code> got created without its leading dot — see the
+          <a href="tech/git.html#gitignore-file">gitignore gotcha</a> for what that actually breaks.</li>
+        <li>Local branch was <code>master</code>, not <code>main</code> — see the
+          <a href="tech/git.html#git-push">git push refspec error</a> for why that specific error message
+          shows up.</li>
+      </ul>
+      Diagnosed read-only first — <code>git log</code>, <code>git status</code>, <code>git ls-files</code>,
+      <code>git ls-remote origin</code> — before changing anything, to confirm the commit itself was safe
+      and the empty GitHub repo already existed via SSH.
+    </div>
+
+    <h3>Fix</h3>
+    <pre><code>Move-Item "...\MoveTrack_Military" "...\MoveTrack_Ops"
+cd "...\MoveTrack_Ops"
+Rename-Item .\gitignore .gitignore
+git status
+git add -A
+git status
+git commit -m "fix gitignore filename"
+git branch -M main</code></pre>
+
+    <h3>GitHub — repo creation, remote, push, protection</h3>
+    <p>Concepts explained on <a href="tech/git.html#remote-basics">Git &amp; GitHub → Remote basics</a>
+      and <a href="tech/git.html#branch-protection">→ Branch protection</a>:</p>
+    <ul>
+      <li><code>gh</code> wasn't installed yet — repo <code>theHparth/MoveTrack_Ops</code> created via the
+        github.com web UI instead, then <code>git remote add origin git@github.com:theHparth/MoveTrack_Ops.git</code>
+        by hand.</li>
+      <li><code>git push -u origin main</code> — succeeded once the branch rename above landed.</li>
+      <li>Branch ruleset <code>main-protection</code> created on GitHub — PR required before merging,
+        force pushes blocked, empty bypass list (applies to the owner too). Exact click path on
+        <a href="tech/git.html#branch-protection">Git &amp; GitHub → Branch protection</a>.</li>
+      <li><code>gh</code> CLI installed afterward (<code>winget install --id GitHub.cli -e</code>,
+        <code>gh auth login</code>) for issues/PRs going forward — see
+        <a href="tech/git.html#gh-cli-install">Git &amp; GitHub → gh CLI install &amp; auth</a>.</li>
+    </ul>
+
+    <div class="box why">
+      <div class="box-title">Why a public repo, and why now</div>
+      This becomes a resume-linked project, so it's public from commit 1 — same as Case Tracking Application.
+      Setting up git/GitHub before any code exists means every real step from here on has a clean, honest
+      commit history instead of one giant "initial upload" commit later.
+    </div>
+
+    <div class="box gotcha">
+      <div class="box-title">What stays out of the repo</div>
+      The HTML study docs you're reading right now live in a separate folder
+      (<code>MoveTrack_Ops_StudyDocs</code>), outside the project folder entirely — git never sees them,
+      so there's no <code>.gitignore</code> rule needed for them and no chance of accidentally publishing
+      personal study/interview-prep material to a public resume repo.
+    </div>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-cicd-before-code">
+      <div class="q">Why set up CI/CD and repo structure before writing any feature code?</div>
+      <div class="a">It's cheap to get right at the start and expensive to retrofit — branch protection,
+        .gitignore scope, and commit hygiene all get harder to fix once history exists. Doing it first
+        also means every subsequent step has something real to point to in the commit log during an
+        interview walkthrough.</div>
+    </div>
+    <div class="qa" id="qa-docs-outside-repo">
+      <div class="q">Why keep study/reference docs out of the repo instead of just gitignoring them?</div>
+      <div class="a">Gitignore only prevents a future accidental <code>git add</code> from succeeding
+        silently — it doesn't prevent someone from force-adding the file, and it still leaves the content
+        sitting inside the same folder tree as the public repo. Keeping it in a physically separate folder
+        removes the mistake as a category, not just as a default.</div>
+    </div>
+    <div class="qa" id="qa-diagnose-before-fix">
+      <div class="q">Why run <code>git log</code>/<code>ls-remote</code> before touching anything, instead of just re-running the fix?</div>
+      <div class="a">A push failure can come from several unrelated causes — read-only commands confirm
+        which one you actually have before you act. Here it ruled out "no commit exists" and "repo doesn't
+        exist / bad auth" in under a minute, narrowing it to a branch-name mismatch, which meant a one-line
+        fix instead of redoing work that was never actually lost.</div>
+    </div>
+  </div>
+
+  <h2 id="phase1">Phase 1 — Move &amp; Entitlement Service</h2>
+  <p class="pill">5 PRs planned: <strong>PR #1 ✓ merged</strong> Steps 1–2 (skeleton + local DB) · <strong>PR #2</strong> Step 13+ (domain model, in progress) · <strong>PR #3</strong> REST API · <strong>PR #4</strong> change control · <strong>PR #5</strong> containerize</p>
+  <div class="box gotcha">
+    <div class="box-title">Note — step numbers for PRs #2–5 not pre-assigned</div>
+    Originally planned as Steps 3–14. Phase 2 (Claims Service) started before this phase's PR #2, and its
+    Steps 3–4 claimed those numbers instead — work is being interleaved between phases rather than
+    finishing one completely before starting the next. Exact step numbers for this phase's remaining PRs
+    get assigned when each is actually built, not pre-reserved, to avoid this collision happening again.
+  </div>
+
+  <div class="step" id="step1">
+    <div class="step-header">
+      <span class="step-num">STEP 1</span>
+      <span class="step-title">PR #1 — Service Skeleton</span>
+      <span class="step-status done">Done</span>
+    </div>
+
+    <p><strong>Goal (PR #1, Steps 1–2):</strong> a buildable Spring Boot project that can connect to a
+    local Postgres instance — nothing functional yet, just a working foundation the rest of the service
+    gets built on.</p>
+
+    <h3>Repo layout established this step</h3>
+    <div class="diagram">
+MoveTrack_Ops/
+ +-- services/
+ |    +-- move-entitlement-service/   <- this phase
+ |    +-- claims-service/             <- Phase 2
+ |    +-- ...                         <- one subfolder per microservice, added as each is built
+ +-- frontend/
+ +-- infra/
+ +-- docker-compose.yml
+ +-- README.md
+ +-- .gitignore
+    </div>
+    <div class="box tip">
+      <div class="box-title">Why one repo, many service folders (monorepo)</div>
+      All 5 backend services + frontend + infra live in this one GitHub repo, each in its own subfolder,
+      instead of a separate repo per service. Common real pattern for a set of closely-related services
+      owned by one team — one PR can touch two services at once if a change genuinely spans both, and
+      there's only one issue tracker/branch history to look at instead of five.
+    </div>
+
+    <h3>Commands run</h3>
+    <p>Issue + branch, per the
+      <a href="tech/git.html#per-step-workflow">Git &amp; GitHub → Per-Step workflow template</a>:</p>
+    <pre><code>gh issue create --title "PR #1: Move & Entitlement Service — skeleton + local DB" --body "Spring Boot project generated, connects to local Postgres."
+
+git checkout main
+git pull
+git checkout -b feat/move-entitlement-skeleton</code></pre>
+
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — internal labels leaked into GitHub-facing text</div>
+      The issue body originally read "Steps 1-2 of Phase 1. Spring Boot project generated..." — the
+      "Steps 1-2 of Phase 1" part is our own internal doc-organization scheme (this site only) and has no
+      meaning to anyone viewing the public repo. Fixed by editing the issue body down to just the plain
+      technical description. Standing rule now: <strong>"Step N" / "Phase N" / "PR #N" labels never appear
+      in anything GitHub-facing</strong> — issue/PR titles &amp; bodies, commit messages — only in this
+      site. The issue title above still has "PR #1" in it (not yet cleaned up) as a reminder of exactly
+      what to avoid next time.
+    </div>
+
+    <h3>Checked tooling before using it</h3>
+    <p>Per the "check before you use it" rule — ran <code>java -version</code> and <code>mvn -version</code>
+      first. Found Java 25 (Oracle JDK) and Maven 3.9.1 already installed — no install needed, just adjusted
+      the generator command below to request <code>javaVersion=25</code> instead of an assumed 21.</p>
+
+    <p>Project skeleton, via <a href="tech/java-spring.html#spring-initializr">Java, Spring &amp; Maven → Spring Initializr</a>:</p>
+    <pre><code>mkdir services
+cd services
+mkdir move-entitlement-service
+cd move-entitlement-service
+
+curl.exe https://start.spring.io/starter.zip `
+  -d dependencies=web,data-jpa,postgresql,validation,lombok `
+  -d type=maven-project `
+  -d language=java `
+  -d javaVersion=25 `
+  -d groupId=com.movetrackops `
+  -d artifactId=move-entitlement-service `
+  -d name=move-entitlement-service `
+  -d packageName=com.movetrackops.moveentitlement `
+  -o move-entitlement-service.zip
+
+Expand-Archive -Path move-entitlement-service.zip -DestinationPath . -Force
+Remove-Item move-entitlement-service.zip</code></pre>
+
+    <h3>Verified the generated project</h3>
+    <p>Checked <code>pom.xml</code> and everything in <code>src/</code> against what was actually
+      requested — full breakdown on
+      <a href="tech/java-spring.html#generated-project-walkthrough">Java, Spring &amp; Maven → Generated project walkthrough</a>.
+      Confirmed: Java 25 recorded correctly, all 5 requested dependencies present, 3 matching test-support
+      starters added automatically, Spring Boot parent is version <strong>4.1.0</strong> — this project is
+      on Spring Boot 4, which renames some starters compared to older Spring Boot 3.x tutorials (e.g.
+      <code>spring-boot-starter-web</code> → <code>spring-boot-starter-webmvc</code>).</p>
+
+    <h3>Committed</h3>
+    <pre><code>cd "C:\Users\hpart\OneDrive - stevens.edu\Desktop\MoveTrack_Ops"
+git status
+git add services/
+git status
+git commit -m "feat: scaffold move-entitlement-service with spring initializr"</code></pre>
+    <p class="pill">Pushed with <code>git push -u origin feat/move-entitlement-skeleton</code>. PR opens after Step 2 (Postgres) is also done, since PR #1 covers both.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-annotation-vs-decorator">
+      <div class="q">Is a Java annotation the same thing as a Python decorator?</div>
+      <div class="a">They look similar (<code>@Something</code>) but work differently. A Python decorator
+        actually executes and wraps the function at the moment Python runs that line. A Java annotation
+        doesn't execute anything by itself — it's metadata that other tools (here, Spring's startup
+        process) scan for and react to. <code>@SpringBootApplication</code> doesn't "run" — Spring's
+        bootstrap code looks for it and configures itself accordingly.</div>
+    </div>
+    <div class="qa" id="qa-runtime-scope">
+      <div class="q">What does Maven's <code>scope=runtime</code> mean, and why does the Postgres driver use it?</div>
+      <div class="a">It means the dependency is needed when the app <em>runs</em>, but not to
+        <em>compile</em> it — our own code never directly imports Postgres driver classes; Hibernate looks
+        the driver up and uses it internally once the app is running. Compare to the default scope
+        (<code>compile</code>, needed for both) and <code>test</code> scope (only present when running tests).</div>
+    </div>
+    <div class="qa" id="qa-smoke-test">
+      <div class="q">The generated test method (<code>contextLoads()</code>) has an empty body — what does it actually test?</div>
+      <div class="a">It's a smoke test: the method body does nothing, but <code>@SpringBootTest</code>
+        forces the entire Spring application to actually start up for this test. If startup fails for any
+        reason — bad config, broken wiring, in Step 2's case a bad database connection — this test fails
+        even though it never makes an explicit assertion. Trivial right now with almost nothing to start;
+        becomes meaningful the moment real configuration (like a DB connection) exists to break.</div>
+    </div>
+  </div>
+
+  <div class="step" id="step2">
+    <div class="step-header">
+      <span class="step-num">STEP 2</span>
+      <span class="step-title">Local Postgres via Docker Compose</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> a local Postgres container the service connects to, plus
+      <code>application.properties</code> wired to it. Closes out PR #1.</p>
+
+    <h3>Checked tooling first</h3>
+    <p><code>docker --version</code> → 29.6.2, <code>docker compose version</code> → v5.3.1 — both current, nothing to install.</p>
+
+    <h3>Secrets kept out of git</h3>
+    <p>Concept + why on <a href="tech/docker.html#env-files">Docker &amp; Compose → Keeping secrets out of git</a>.
+      Created <code>.env</code> (gitignored) and <code>.env.example</code> (committed) at the repo root, then
+      <code>docker-compose.yml</code> — full file and explanation on
+      <a href="tech/docker.html#compose-file">Docker &amp; Compose → The compose file</a>.</p>
+
+    <div class="box gotcha">
+      <div class="box-title">Incident 1 — port 5432 already in use</div>
+      First <code>docker compose up -d</code> failed: <code>Bind for 0.0.0.0:5432 failed: port is already
+      allocated</code>. <code>docker ps</code> showed Case Tracking Application's own Postgres container
+      (<code>casetrackingapplication-db-1</code>) still running in the background from an earlier session —
+      completely unrelated project, just sharing the same Docker daemon and the same default Postgres port.
+      Fixed with <code>docker stop casetrackingapplication-frontend-1 casetrackingapplication-backend-1
+      casetrackingapplication-db-1</code> — stops, not removes, fully reversible whenever that project comes
+      back. Left <code>relaxed_leavitt</code> (an ad-hoc, non-Compose container, identifiable by its
+      Docker-generated random name) alone since it wasn't clearly related.
+    </div>
+
+    <div class="box gotcha">
+      <div class="box-title">Incident 2 — port freed, but Postgres still refused connections</div>
+      After the port was free, <code>docker compose up -d</code> reported success and <code>docker compose
+      ps</code> showed the container "Up" — but Maven's test still failed with
+      <code>Connection to localhost:5432 refused</code>. The tell: <code>docker compose ps</code>'s PORTS
+      column showed bare <code>5432/tcp</code>, not <code>0.0.0.0:5432-&gt;5432/tcp</code> — the port was
+      never actually published to the host. Root cause: the container object was created during the
+      <em>first</em>, failed attempt (before the port was free), and restarting that same broken container
+      didn't retry the port-publish step. Fixed with a full recreate — full explanation of why
+      <code>down</code> was required instead of <code>stop</code> on
+      <a href="tech/docker.html#stop-vs-down">Docker &amp; Compose → docker stop vs. docker compose down</a>:
+      <pre><code>docker compose down
+docker compose up -d
+docker compose ps   # confirmed 0.0.0.0:5432->5432/tcp this time</code></pre>
+    </div>
+
+    <h3>Wired the app to it</h3>
+    <p>Added to <code>services/move-entitlement-service/src/main/resources/application.properties</code> —
+      full field-by-field explanation on
+      <a href="tech/java-spring.html#datasource-config">Java, Spring &amp; Maven → Datasource config</a>.</p>
+
+    <h3>Verified — smoke test actually exercised the database this time</h3>
+    <pre><code>cd services\move-entitlement-service
+.\mvnw.cmd test
+# BUILD SUCCESS — Tests run: 1, Failures: 0, Errors: 0</code></pre>
+    <p>Exactly the scenario predicted in Step 1's Q&amp;A: <code>contextLoads()</code> now genuinely proves
+      the app can reach Postgres, not just that Spring can boot with nothing to connect to.</p>
+
+    <h3>Committed, pushed, PR opened and merged</h3>
+    <pre><code>git add docker-compose.yml .env.example services/move-entitlement-service/src/main/resources/application.properties
+git commit -m "feat: add local postgres via docker compose, wire datasource config"
+git push
+
+gh pr create --title "Move & Entitlement Service: project skeleton + local Postgres" --body "Closes #1" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>PR merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/2" target="_blank">#2</a>
+      (became #2 since issue #1 already claimed that number — issues and PRs share one counter per repo).
+      Local + remote copies of <code>feat/move-entitlement-skeleton</code> both deleted; confirmed with
+      <code>git fetch --prune</code> that the remote-tracking ref was just a stale local cache, not a real
+      leftover branch.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-diagnose-refused-vs-auth">
+      <div class="q">How did you know the second failure was a networking/publishing problem and not a wrong username/password?</div>
+      <div class="a">The exact exception mattered: <code>Connection to localhost:5432 refused</code> is a
+        TCP-level failure — nothing was even listening to accept the connection attempt. A wrong
+        username/password would instead connect successfully at the network level and fail later with a
+        Postgres authentication error. Reading the specific exception type, not just "it failed," is what
+        pointed straight at the port-publishing issue instead of the credentials.</div>
+    </div>
+    <div class="qa" id="qa-stop-vs-down">
+      <div class="q"><code>docker stop</code> vs. <code>docker compose down</code> — why did only one fix the stale container?</div>
+      <div class="a"><code>stop</code> halts a container's process but leaves the container object (and its
+        original config) intact — restarting it brings back the exact same, still-broken configuration.
+        <code>down</code> deletes the container entirely, so the next <code>up</code> builds a genuinely new
+        one from the compose file, correctly re-applying the port-publish. When a container's own
+        configuration is the problem, only removal and recreation actually fixes it.</div>
+    </div>
+  </div>
+
+  <h2 id="phase2">Phase 2 — Claims Service</h2>
+  <p class="pill">4 PRs planned: <strong>PR #1 ✓ merged</strong> Steps 3–4 (skeleton + its own DB) · <strong>PR #2 ✓ merged</strong> Steps 5–8 (two-step approval domain + business logic) · <strong>PR #3 ✓ merged</strong> Steps 9–10 (REST API) · <strong>PR #4 ✓ merged</strong> Steps 11–12 (containerize) — <strong>Phase 2 complete</strong></p>
+
+  <div class="box why">
+    <div class="box-title">What this service is actually for</div>
+    Two services, two separate moments in the real process: Move &amp; Entitlement handles everything
+    <em>before</em> a move (scheduling, entitlement calc). Claims Service handles what happens
+    <em>after</em> — if the movers damaged or lost something, the service member files a claim, an
+    adjuster reviews it, and a supervisor also has to approve above a dollar threshold. Different business
+    process, different people involved, different timing — genuinely separate concerns even though a claim
+    always references a specific move, which is the real justification for splitting them into independent
+    services instead of one app.
+  </div>
+
+  <div class="step" id="step3">
+    <div class="step-header">
+      <span class="step-num">STEP 3</span>
+      <span class="step-title">Claims Service — skeleton</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal (PR #1, Steps 3–4):</strong> a buildable Claims Service project skeleton, same stack
+      as Move &amp; Entitlement — reused the exact same Spring Initializr dependency set and reasoning,
+      see <a href="tech/java-spring.html#spring-initializr">Java, Spring &amp; Maven → Spring Initializr</a>.</p>
+    <pre><code>gh issue create --title "Claims Service: project skeleton + local Postgres" --body "Spring Boot project generated for the Claims Service, connects to its own claims_db in the shared local Postgres container."
+
+git checkout main
+git pull
+git checkout -b feat/claims-service-skeleton</code></pre>
+    <pre><code>mkdir services\claims-service
+cd services\claims-service
+
+curl.exe https://start.spring.io/starter.zip `
+  -d dependencies=web,data-jpa,postgresql,validation,lombok `
+  -d type=maven-project `
+  -d language=java `
+  -d javaVersion=25 `
+  -d groupId=com.movetrackops `
+  -d artifactId=claims-service `
+  -d name=claims-service `
+  -d packageName=com.movetrackops.claims `
+  -o claims-service.zip
+
+Expand-Archive -Path claims-service.zip -DestinationPath . -Force
+Remove-Item claims-service.zip</code></pre>
+    <p>No tooling re-check needed — same Java/Maven versions confirmed current back in Step 1, nothing changed since.</p>
+  </div>
+
+  <div class="step" id="step4">
+    <div class="step-header">
+      <span class="step-num">STEP 4</span>
+      <span class="step-title">Claims Service — its own database</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> Claims Service gets a genuinely separate database (<code>claims_db</code>)
+      inside the same shared Postgres container — not tables bolted onto <code>move_entitlement_db</code>.
+      Even services that share infrastructure keep separate schemas, so a change in one service's tables
+      can't silently break another's.</p>
+
+    <h3>The mechanism — Postgres init scripts</h3>
+    <p>Full concept explanation on
+      <a href="tech/docker.html#multi-database-init">Docker &amp; Compose → Multiple databases, one container</a>.
+      New file, <code>infra/postgres-init/init-claims-db.sql</code>:</p>
+    <pre><code>CREATE DATABASE claims_db;</code></pre>
+    <p>Mounted into <code>docker-compose.yml</code>'s <code>postgres</code> service:</p>
+    <pre><code>    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d</code></pre>
+
+    <div class="box gotcha">
+      <div class="box-title">Init scripts only run on a genuinely fresh volume</div>
+      <code>postgres_data</code> already existed from Step 2, so simply restarting wouldn't re-run the new
+      init script. Since there was no real data yet — just a connectivity smoke test — safe to reset:
+      <pre><code>docker compose down -v
+docker compose up -d</code></pre>
+      The <code>-v</code> on <code>down</code> is the difference from every earlier use of this command —
+      it deletes the volume too, which is exactly what forces Postgres to treat the next startup as fresh
+      and run the init script. Not something to do casually once real data exists.
+    </div>
+
+    <p>Verified both databases exist:</p>
+    <pre><code>docker exec -it movetrack-postgres psql -U movetrack -l</code></pre>
+    <p>Wired <code>services/claims-service/src/main/resources/application.properties</code> to
+      <code>claims_db</code> — same fields as Move &amp; Entitlement's, different database name in the URL,
+      full explanation already on
+      <a href="tech/java-spring.html#datasource-config">Java, Spring &amp; Maven → Datasource config</a>.</p>
+
+    <p>Verified <em>both</em> services still connect correctly after the volume reset — not just the new one:</p>
+    <pre><code>cd services\claims-service
+.\mvnw.cmd test
+cd ..\move-entitlement-service
+.\mvnw.cmd test</code></pre>
+
+    <h3>Committed, pushed, PR opened and merged</h3>
+    <pre><code>git add docker-compose.yml infra/ services/claims-service/
+git commit -m "feat: add claims-service skeleton with its own claims_db"
+git push -u origin feat/claims-service-skeleton
+
+gh pr create --title "Claims Service: project skeleton + local Postgres" --body "Closes #3" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/4" target="_blank">#4</a>.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-database-per-service">
+      <div class="q">Why give Claims Service its own database instead of just adding tables to move_entitlement_db?</div>
+      <div class="a">Database-per-service is standard microservices practice, even when services share the
+        same physical Postgres container — it keeps each service's schema genuinely independent, so one
+        service's migration or schema change can't accidentally break another. Sharing infrastructure
+        (one container) for cost/simplicity is fine; sharing a schema across two independently-deployable
+        services is the coupling that actually causes problems later.</div>
+    </div>
+    <div class="qa" id="qa-init-scripts">
+      <div class="q">How does Postgres's Docker image know to run a <code>CREATE DATABASE</code> script automatically?</div>
+      <div class="a">The official Postgres image's own startup script checks a fixed path,
+        <code>/docker-entrypoint-initdb.d</code>, every time it boots, and runs any <code>.sql</code>/<code>.sh</code>
+        files found there — but only on a completely empty data directory, i.e. genuinely first-time
+        startup. A bind mount (<code>./infra/postgres-init:/docker-entrypoint-initdb.d</code>) is what makes
+        a local file on the host actually visible at that path inside the container in the first place.</div>
+    </div>
+  </div>
+
+  <div class="step" id="step5">
+    <div class="step-header">
+      <span class="step-num">STEP 5</span>
+      <span class="step-title">Claims Service — domain model</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> the first real domain code in the project — <code>Claim</code>,
+      <code>ClaimStatus</code>, and <code>ClaimRepository</code>. No business logic yet, just what a claim
+      <em>is</em>. Full annotation-by-annotation breakdown on
+      <a href="tech/java-spring.html#datasource-config">Java, Spring &amp; Maven</a> — see below for what's
+      new here specifically.</p>
+
+    <h3>Files created</h3>
+    <ul>
+      <li><code>entity/ClaimStatus.java</code> — a plain enum: <code>SUBMITTED</code>,
+        <code>ADJUSTER_REVIEW</code>, <code>PENDING_SUPERVISOR_APPROVAL</code>, <code>APPROVED</code>,
+        <code>REJECTED</code>.</li>
+      <li><code>entity/Claim.java</code> — the <code>@Entity</code>, mapped to the <code>claims</code>
+        table. <code>@Enumerated(EnumType.STRING)</code> stores <code>ClaimStatus</code> by name, not
+        ordinal position — immune to breaking if the enum's declared order ever changes.
+        <code>claimedAmount</code> is a <code>BigDecimal</code>, never a <code>float</code>/<code>double</code>,
+        for the usual money-precision reason.</li>
+      <li><code>repository/ClaimRepository.java</code> — extends <code>JpaRepository&lt;Claim, Long&gt;</code>,
+        no method bodies; Spring Data JPA implements CRUD automatically.</li>
+    </ul>
+
+    <div class="box why">
+      <div class="box-title">Deliberate design choice — no real JPA relationship to MoveRequest</div>
+      <code>moveRequestId</code> is a plain <code>Long</code>, not a <code>@ManyToOne</code>. The actual
+      <code>MoveRequest</code> lives in a different service with its own separate database — there's no
+      way to have a real foreign-key constraint across two different Postgres databases. This is a genuine,
+      common microservices pattern: store the ID as a "soft reference," trust each service to keep its own
+      data consistent.
+    </div>
+
+    <h3>Committed</h3>
+    <pre><code>git add services/claims-service/src/main/java/com/movetrackops/claims/entity/ services/claims-service/src/main/java/com/movetrackops/claims/repository/
+git commit -m "feat: add claim entity, status enum, and repository"
+git push -u origin feat/claims-domain-model</code></pre>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-annotation-vs-decorator-2">
+      <div class="q">Is a Java annotation the same thing as a Python decorator?</div>
+      <div class="a">Same answer as Step 1's — see <a href="#qa-annotation-vs-decorator">Steps → Step 1</a>.
+        Came up again here with <code>@Entity</code>/<code>@Enumerated</code> specifically: neither
+        annotation executes anything itself, they're metadata Hibernate reads when it scans the class.</div>
+    </div>
+  </div>
+
+  <div class="step" id="step6">
+    <div class="step-header">
+      <span class="step-num">STEP 6</span>
+      <span class="step-title">Claims Service — approval-threshold config</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> the dollar amount that decides whether a claim needs supervisor approval —
+      as configuration, not a magic number hardcoded into Java, since it's a business rule that can change
+      without a redeploy.</p>
+
+    <h3>Files</h3>
+    <p>Added to <code>application.properties</code>:</p>
+    <pre><code>claims.approval.supervisor-threshold=1000.00</code></pre>
+    <p>New <code>config/ClaimsApprovalProperties.java</code> — binds it via
+      <code>@ConfigurationProperties(prefix = "claims.approval")</code>, using Spring's "relaxed binding"
+      to translate <code>supervisor-threshold</code> (properties-file kebab-case) to
+      <code>supervisorThreshold</code> (Java camelCase) automatically. Registered by adding
+      <code>@ConfigurationPropertiesScan</code> to <code>ClaimsServiceApplication.java</code> — without it,
+      the properties class would just be an inert class Spring never instantiates.</p>
+
+    <h3>Committed</h3>
+    <pre><code>git add .gitignore services/claims-service/src/main/java/com/movetrackops/claims/ClaimsServiceApplication.java services/claims-service/src/main/resources/application.properties services/claims-service/src/main/java/com/movetrackops/claims/config/
+git commit -m "feat: add claims approval threshold config"
+git push</code></pre>
+    <p class="pill">A stray <code>.gitignore</code> change (<code>/.metadata/</code>) rode along in this
+      commit — VS Code's Java extension workspace-reload folder, harmless, correctly belongs ignored.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-config-properties">
+      <div class="q">Why <code>@ConfigurationProperties</code> instead of a simpler <code>@Value("${claims.approval.supervisor-threshold}")</code> injection?</div>
+      <div class="a"><code>@Value</code> works for a single property, but doesn't scale cleanly to a group
+        of related settings, isn't type-checked as a cohesive unit, and is easy to typo without the IDE
+        catching it. <code>@ConfigurationProperties</code> binds a whole related group onto one class with
+        real fields — better for anything beyond a single standalone value, and it's what this project will
+        keep reaching for as more configuration groups show up.</div>
+    </div>
+  </div>
+
+  <div class="step" id="step7">
+    <div class="step-header">
+      <span class="step-num">STEP 7</span>
+      <span class="step-title">Claims Service — approval business logic</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>ClaimApprovalService</code> — moves a claim through
+      <code>ClaimStatus</code> using Step 6's threshold. First <code>@Service</code> class in the project;
+      layer comparison (entity vs. repository vs. service vs. config) on
+      <a href="tech/java-spring.html#layers">Java, Spring &amp; Maven → Layers</a>.</p>
+    <ul>
+      <li>Constructor injection, not field <code>@Autowired</code> — dependencies are <code>final</code>, testable without Spring running.</li>
+      <li><code>BigDecimal.compareTo()</code>, not <code>&gt;</code> — <code>BigDecimal</code> is an object, <code>&gt;</code> won't compile on it.</li>
+      <li><code>Optional.orElseThrow()</code> — forces handling the "claim not found" case explicitly.</li>
+      <li>Each method guards the claim's current status before acting — can't supervisor-approve a claim that was never escalated.</li>
+    </ul>
+    <pre><code>git add services/claims-service/src/main/java/com/movetrackops/claims/service/
+git commit -m "feat: add claim approval business logic"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step8">
+    <div class="step-header">
+      <span class="step-num">STEP 8</span>
+      <span class="step-title">Claims Service — unit tests for approval logic</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>ClaimApprovalServiceTest</code> — first real unit test in the project
+      (Mockito, no Spring context, no Postgres), covering the reject/approve/threshold/guard branches of
+      Step 7's logic.</p>
+
+    <div class="box gotcha">
+      <div class="box-title">Real error: <code>UnnecessaryStubbingException</code></div>
+      A shared test helper stubbed <code>claimRepository.save()</code> for every test, but the
+      wrong-status-guard test throws before ever reaching <code>save()</code>. Mockito's strict mode failed
+      the test for stubbing something that was never called — a real signal, not a flake. Fixed by
+      splitting the helper so <code>save()</code> is only stubbed in tests that actually trigger it.
+    </div>
+
+    <pre><code>git add services/claims-service/src/test/java/com/movetrackops/claims/service/
+git commit -m "test: add unit tests for claim approval logic"
+git push
+
+gh pr create --title "Claims Service: claim domain model and approval logic" --body "Closes #3" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/6" target="_blank">#6</a> — closes out PR #2 of Phase 2 (Steps 5–8).</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-unnecessary-stubbing">
+      <div class="q">Why did Mockito fail a test whose actual logic was correct?</div>
+      <div class="a">Mockito's default strict stubbing checks that every stub you set up actually gets
+        used somewhere in that test — an unused stub usually means the test setup doesn't match what the
+        code under test really does, which is worth knowing even when the assertion itself would have
+        passed. It's a test-design smell detector, not just an exception-matcher.</div>
+    </div>
+  </div>
+
+  <div class="step" id="step9">
+    <div class="step-header">
+      <span class="step-num">STEP 9</span>
+      <span class="step-title">Claims Service — REST API</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> expose the approval workflow over HTTP — <code>ClaimController</code> plus
+      three DTOs. First REST layer in the project; full annotation table and the DTO-vs-entity reasoning on
+      <a href="tech/java-spring.html#rest-controller">Java, Spring &amp; Maven → REST controller basics</a>.</p>
+    <ul>
+      <li><code>POST /api/claims</code>, <code>GET /api/claims/{id}</code>, <code>POST /api/claims/{id}/adjuster-decision</code>, <code>POST /api/claims/{id}/supervisor-decision</code></li>
+      <li>One small addition to <code>ClaimApprovalService</code> — a <code>getClaim(id)</code> lookup, needed for the GET endpoint</li>
+    </ul>
+    <pre><code>gh issue create --title "Claims Service: REST API" --body "DTOs and controller exposing the claim filing and approval workflow over HTTP."
+git checkout -b feat/claims-rest-api
+
+git add services/claims-service/src/main/java/com/movetrackops/claims/dto/ services/claims-service/src/main/java/com/movetrackops/claims/web/ services/claims-service/src/main/java/com/movetrackops/claims/service/ClaimApprovalService.java
+git commit -m "feat: add claim REST API with DTOs"
+git push -u origin feat/claims-rest-api</code></pre>
+  </div>
+
+  <div class="step" id="step10">
+    <div class="step-header">
+      <span class="step-num">STEP 10</span>
+      <span class="step-title">Claims Service — integration tests for the REST API</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>ClaimControllerTest</code> — a genuine HTTP-layer test, different depth
+      from Step 8's plain-Java unit test. Full testing-layers comparison and the two real Spring Boot 4.1
+      package-move gotchas hit here on
+      <a href="tech/java-spring.html#testing-layers">Java, Spring &amp; Maven → Testing layers</a>.</p>
+    <ul>
+      <li>3 tests: file a claim (200), missing <code>claimantName</code> (400 — proves Step 9's <code>@Valid</code> works end-to-end), get a claim (200)</li>
+      <li>Sidestepped Jackson 3.x's namespace change by writing request bodies as raw JSON text blocks instead of serializing via <code>ObjectMapper</code></li>
+    </ul>
+    <pre><code>git add services/claims-service/src/test/java/com/movetrackops/claims/web/
+git commit -m "test: add integration tests for claim REST API"
+git push
+
+gh pr create --title "Claims Service: REST API" --body "Closes #5" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/8" target="_blank">#8</a> — closes PR #3 (Steps 9–10).</p>
+  </div>
+
+  <div class="step" id="step11">
+    <div class="step-header">
+      <span class="step-num">STEP 11</span>
+      <span class="step-title">Claims Service — containerize</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> multi-stage Dockerfile + fix the port collision flagged back in Step 6.
+      Concept detail (why two stages, where Docker's storage actually lives, <code>COPY</code> vs.
+      <code>COPY --from=</code>) on
+      <a href="tech/docker.html#multi-stage">Docker &amp; Compose → Multi-stage builds</a>.</p>
+    <ul>
+      <li><code>server.port=8081</code> in <code>application.properties</code> — no longer collides with Move &amp; Entitlement's default 8080</li>
+      <li><code>.dockerignore</code>, <code>Dockerfile</code> (JDK build stage → JRE run stage)</li>
+    </ul>
+    <div class="box gotcha">
+      <div class="box-title">Real process mistake — wrong branch</div>
+      This started on <code>feat/claims-rest-api</code> (PR #3's branch, still open) instead of its own new
+      branch — caught before committing. Finished/merged PR #3 first, then properly opened
+      <code>feat/claims-containerize</code> before committing this step's files.
+    </div>
+    <pre><code>gh issue create --title "Claims Service: containerize" --body "Multi-stage Dockerfile, .dockerignore, and a dedicated port to avoid colliding with Move & Entitlement."
+git checkout -b feat/claims-containerize
+
+git add services/claims-service/src/main/resources/application.properties services/claims-service/.dockerignore services/claims-service/Dockerfile
+git commit -m "feat: containerize claims-service with multi-stage Dockerfile"
+git push -u origin feat/claims-containerize</code></pre>
+    <p>Verified with <code>docker build -t claims-service .</code> — all 7 layers built clean.</p>
+  </div>
+
+  <div class="step" id="step12">
+    <div class="step-header">
+      <span class="step-num">STEP 12</span>
+      <span class="step-title">Claims Service — wired into docker-compose.yml</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> get the container actually talking to Postgres. The real new concept —
+      container-to-container networking by service name, not <code>localhost</code> — fully explained on
+      <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.</p>
+    <pre><code>  claims-service:
+    build: ./services/claims-service
+    container_name: movetrack-claims-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/claims_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - postgres</code></pre>
+    <p>Verified: <code>docker compose up -d --build</code> → <code>docker compose ps</code> (container Up,
+      port published) → <code>docker compose logs claims-service</code> — clean boot, and the Hibernate log
+      line itself proved the fix: <code>Database JDBC URL [jdbc:postgresql://postgres:5432/claims_db]</code>,
+      not <code>localhost</code>.</p>
+    <pre><code>git add docker-compose.yml
+git commit -m "feat: wire claims-service into docker-compose"
+git push
+
+gh pr create --title "Claims Service: containerize" --body "Closes #7" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/10" target="_blank">#10</a> —
+      closes PR #4. <strong>This completes Phase 2 (Claims Service) entirely</strong> — 4 PRs, Steps 3–12.</p>
+  </div>
+
+  <h2 id="phase1-continued">Phase 1 (continued) — Move &amp; Entitlement Service</h2>
+  <p class="pill">Resumed after Phase 2 finished. Domain model work starts at Step 13.</p>
+
+  <div class="step" id="step13">
+    <div class="step-header">
+      <span class="step-num">STEP 13</span>
+      <span class="step-title">Move &amp; Entitlement Service — domain model core</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> first real domain code for this service — only the skeleton + DB (Steps 1–2)
+      existed before. Same entity/repository pattern as Claims' Step 5; see
+      <a href="tech/java-spring.html#layers">Java, Spring &amp; Maven → Layers</a> if that needs a refresher.</p>
+    <ul>
+      <li><code>Rank</code> enum — E1–E9, O1–O10, a representative subset of real JTR pay grades, not exhaustive</li>
+      <li><code>MoveRequest</code> entity + <code>MoveRequestRepository</code> — no entitlement/weight field yet, that needs a JTR weight-allowance lookup table that doesn't exist until a later step</li>
+    </ul>
+    <pre><code>gh issue create --title "Move & Entitlement Service: domain model" --body "MoveRequest entity, Rank enum, and repository."
+git checkout -b feat/moveent-domain-model
+
+git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/ services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/
+git commit -m "feat: add move request entity and rank enum"
+git push -u origin feat/moveent-domain-model</code></pre>
+  </div>
+
+  <!-- Future steps get appended here, one .step block each, never batched. -->
+
+</main>
+</div>
+</body>
+</html>

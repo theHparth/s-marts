@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Architecture &amp; Progress</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .arch-wrap { display: flex; gap: 24px; align-items: flex-start; }
+  .arch-diagram-col { flex: 1; min-width: 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: #fbfdfc; }
+  .arch-panel-col { width: 340px; flex-shrink: 0; position: sticky; top: 20px; }
+  .detail-panel { border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); min-height: 260px; }
+  .detail-panel h3 { margin: 0 0 4px 0; color: var(--accent-dark); }
+  .detail-panel .dp-tech { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+  .detail-panel .dp-status { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 5px; margin-bottom: 10px; }
+  .detail-panel dl { margin: 0; }
+  .detail-panel dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-top: 12px; }
+  .detail-panel dd { margin: 3px 0 0 0; font-size: 13.5px; color: var(--text); }
+  .detail-panel .dp-steps .dp-step-line { display: block; margin: 4px 0; line-height: 1.4; }
+  .detail-panel .dp-hint { color: var(--text-dim); font-size: 13px; }
+  .node { cursor: pointer; }
+  .node.dim { opacity: 0.28; }
+  .node.hl rect { filter: drop-shadow(0 0 3px rgba(26,127,55,0.45)); }
+  .edge { transition: opacity 0.15s; }
+  .edge.dim { opacity: 0.12; }
+  .edge.hl { stroke: #1a7f37 !important; stroke-width: 2.4 !important; }
+  .edge.hl-text { fill: #146428 !important; font-weight: 700; }
+  .clear-btn { display: inline-block; margin-top: 10px; font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text-dim); cursor: pointer; }
+  .clear-btn:hover { color: var(--accent-dark); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="architecture.html" class="active">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="tech/git.html">Git &amp; GitHub</a>
+  <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="tech/docker.html">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="interview.html">All Interview Questions</a>
+</nav>
+
+<main style="max-width: 1400px;">
+  <h1>Architecture &amp; Progress</h1>
+  <p class="subtitle">
+    Click any component below — its connections highlight, and the panel on the right shows what it
+    actually does: ports, inputs/outputs, why it exists, and exactly which Steps built it (or will).
+    Same single page, updated in place after every step.
+  </p>
+
+  <div class="arch-wrap">
+    <div class="arch-diagram-col">
+      <svg id="arch-svg" viewBox="0 0 1160 700" role="img" aria-label="Interactive MoveTrack Ops architecture diagram" style="width:100%; height:auto; font-family:'Segoe UI',Arial,sans-serif; display:block;">
+
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#9aa39f"/>
+          </marker>
+        </defs>
+
+        <rect x="15" y="15" width="1130" height="640" rx="10" fill="none" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="6 4"/>
+        <text x="30" y="35" font-size="11" fill="#5b6663">Target: Kubernetes on AWS (Terraform + Ansible + Jenkins CI) — Phase 15, not started</text>
+
+        <!-- ===== EDGES (drawn first, under nodes) ===== -->
+        <g id="edges">
+          <line class="edge" data-edge data-from="dashboard" data-to="gateway" x1="580" y1="105" x2="580" y2="128" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="dashboard" data-to="gateway" x="592" y="120" font-size="10.5" fill="#5b6663">REST + WebSocket</text>
+
+          <line class="edge" data-edge data-from="gateway" data-to="moveent" x1="500" y1="176" x2="150" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="gateway" data-to="claims" x1="530" y1="176" x2="365" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="gateway" data-to="compliance" x1="580" y1="176" x2="580" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="gateway" data-to="soap" x1="630" y1="176" x2="795" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="gateway" data-to="goingest" x1="660" y1="176" x2="1010" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="soap" data-to="moveent" x1="795" y1="296" x2="225" y2="256" stroke="#9aa39f" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="moveent" data-to="postgres" x1="130" y1="296" x2="130" y2="378" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="moveent" data-to="postgres" x="138" y="340" font-size="10.5" fill="#5b6663">JPA</text>
+
+          <line class="edge" data-edge data-from="claims" data-to="postgres" x1="365" y1="296" x2="215" y2="378" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="claims" data-to="postgres" x="270" y="340" font-size="10.5" fill="#5b6663">JPA</text>
+
+          <line class="edge" data-edge data-from="moveent" data-to="rabbitmq" x1="180" y1="296" x2="720" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="claims" data-to="rabbitmq" x1="420" y1="296" x2="750" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="compliance" data-to="rabbitmq" x1="630" y1="296" x2="780" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="compliance" data-to="mongodb" x1="580" y1="296" x2="475" y2="378" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="moveent" data-to="redis" x1="220" y1="296" x2="470" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+          <line class="edge" data-edge data-from="claims" data-to="redis" x1="410" y1="296" x2="540" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="goingest" data-to="kafka" x1="1030" y1="296" x2="1030" y2="378" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="goingest" data-to="kafka" x="1038" y="340" font-size="10.5" fill="#5b6663">publishes</text>
+
+          <line class="edge" data-edge data-from="kafka" data-to="ml" x1="1030" y1="448" x2="1030" y2="478" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="kafka" data-to="ml" x="1038" y="466" font-size="10.5" fill="#5b6663">consumes</text>
+        </g>
+
+        <!-- ===== NODES ===== -->
+        <g class="node" data-node="dashboard">
+          <rect x="380" y="50" width="400" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="580" y="71" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2523">React + Redux Dashboard (TypeScript)</text>
+          <text x="580" y="87" text-anchor="middle" font-size="11" fill="#1f2523">embeds Svelte micro-widget</text>
+          <text x="580" y="99" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="gateway">
+          <rect x="480" y="130" width="200" height="46" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="580" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2523">Nginx / API Gateway</text>
+          <text x="580" y="169" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="moveent">
+          <rect x="35" y="216" width="190" height="80" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="130" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Move &amp; Entitlement</text>
+          <text x="130" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Java / Spring Boot</text>
+          <text x="130" y="268" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">Steps 1-2, 13 done</text>
+          <text x="130" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">entitlement calc not started</text>
+        </g>
+
+        <g class="node" data-node="claims">
+          <rect x="270" y="216" width="190" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+          <text x="365" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Claims Service</text>
+          <text x="365" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Java / Spring Boot</text>
+          <text x="365" y="268" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 3-12 done</text>
+          <text x="365" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">containerized, running</text>
+        </g>
+
+        <g class="node" data-node="compliance">
+          <rect x="485" y="216" width="190" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="580" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Compliance / Findings</text>
+          <text x="580" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Python / FastAPI</text>
+          <text x="580" y="268" text-anchor="middle" font-size="10" fill="#1f2523">ingests Trivy + ZAP scans</text>
+          <text x="580" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="soap">
+          <rect x="700" y="216" width="190" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="795" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">SOAP Legacy Adapter</text>
+          <text x="795" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Java / Spring-WS</text>
+          <text x="795" y="268" text-anchor="middle" font-size="10" fill="#1f2523">calls Move&amp;Ent's REST</text>
+          <text x="795" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="goingest">
+          <rect x="915" y="216" width="230" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="1030" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
+          <text x="1030" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Go</text>
+          <text x="1030" y="268" text-anchor="middle" font-size="10" fill="#1f2523">raw UDP/TCP + WireGuard</text>
+          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="postgres">
+          <rect x="35" y="380" width="190" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="130" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">PostgreSQL (shared)</text>
+          <text x="130" y="413" text-anchor="middle" font-size="10" fill="#1f2523">move_entitlement_db</text>
+          <text x="130" y="425" text-anchor="middle" font-size="10" fill="#1f2523">claims_db</text>
+          <text x="130" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">container running</text>
+        </g>
+
+        <g class="node" data-node="mongodb">
+          <rect x="380" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="475" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">MongoDB</text>
+          <text x="475" y="419" text-anchor="middle" font-size="10" fill="#1f2523">written by: Compliance</text>
+          <text x="475" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+
+        <g class="node" data-node="rabbitmq">
+          <rect x="690" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="785" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">RabbitMQ</text>
+          <text x="785" y="413" text-anchor="middle" font-size="10" fill="#1f2523">from: Move&amp;Ent, Claims,</text>
+          <text x="785" y="425" text-anchor="middle" font-size="10" fill="#1f2523">Compliance (business events)</text>
+          <text x="785" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="kafka">
+          <rect x="915" y="380" width="230" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="1030" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Kafka</text>
+          <text x="1030" y="413" text-anchor="middle" font-size="10" fill="#1f2523">topic: shipment.tracking</text>
+          <text x="1030" y="425" text-anchor="middle" font-size="10" fill="#1f2523">from: Go Ingestion</text>
+          <text x="1030" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="ml">
+          <rect x="915" y="480" width="230" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="1030" y="502" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Claims Triage ML</text>
+          <text x="1030" y="516" text-anchor="middle" font-size="10" fill="#1f2523">Python / scikit-learn</text>
+          <text x="1030" y="528" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <g class="node" data-node="redis">
+          <rect x="470" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="565" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Redis</text>
+          <text x="565" y="419" text-anchor="middle" font-size="10" fill="#1f2523">used by: Move&amp;Ent, Claims</text>
+          <text x="565" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+        </g>
+
+        <!-- legend -->
+        <rect x="330" y="618" width="14" height="14" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="350" y="629" font-size="11" fill="#1f2523">Not started</text>
+        <rect x="470" y="618" width="14" height="14" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+        <text x="490" y="629" font-size="11" fill="#1f2523">In progress</text>
+        <rect x="610" y="618" width="14" height="14" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+        <text x="630" y="629" font-size="11" fill="#1f2523">Done</text>
+        <text x="750" y="629" font-size="11" fill="#5b6663">Dashed edge = planned, not wired up yet</text>
+      </svg>
+    </div>
+
+    <div class="arch-panel-col">
+      <div class="detail-panel" id="detail-panel">
+        <p class="dp-hint">Click any component in the diagram to see its ports, inputs/outputs, why it exists, and which Steps built it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="box why" style="margin-top:20px;">
+    <div class="box-title">Port collision — fixed in Step 11</div>
+    Move &amp; Entitlement and Claims Service both defaulted to Spring Boot's standard port
+    (<code>8080</code>). Fixed by giving Claims Service <code>server.port=8081</code> when it was
+    containerized — Move &amp; Entitlement still needs the same treatment whenever it's containerized too.
+  </div>
+
+  <h2>Phase-by-phase status</h2>
+  <p>Coarser than individual Steps, but this is where cross-phase dependencies actually live —
+    each row notes what it needs from an earlier phase, and what later phases will need from it.</p>
+  <table>
+    <tr><th>#</th><th>Phase</th><th>Status</th><th>Depends on / feeds</th></tr>
+    <tr><td>1</td><td><a href="steps.html#phase1">Move &amp; Entitlement Service</a></td><td class="mark">In progress (Steps 1-2 done)</td><td>Feeds: Phase 9 (WebSocket needs its REST API), Phase 7 (SOAP Adapter calls its REST API)</td></tr>
+    <tr><td>2</td><td><a href="steps.html#phase2">Claims Service</a></td><td class="mark">In progress (Steps 3-5 done, 6 in progress)</td><td>Feeds: Phase 8 (ML trains on claims data), Phase 9 (WebSocket)</td></tr>
+    <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>Not started</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
+    <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
+    <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>Not started</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
+    <tr><td>6</td><td>Go Ingestion Service (REST)</td><td>Not started</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
+    <tr><td>7</td><td>SOAP Legacy Adapter</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
+    <tr><td>8</td><td>Claims triage ML + Redis</td><td>Not started</td><td>Needs: Phase 2's claim data to train on</td></tr>
+    <tr><td>9</td><td>WebSocket live feed</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
+    <tr><td>10</td><td>Kafka</td><td>Not started</td><td>Needs: Phase 6 (Go service to publish to it). Feeds: Phase 8's ML pipeline, Phase 9's live feed</td></tr>
+    <tr><td>11</td><td>Svelte micro-widget</td><td>Not started</td><td>Needs: Phase 3 (embeds into the React shell)</td></tr>
+    <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
+    <tr><td>13</td><td>Raw sockets + WireGuard + failover</td><td>Not started</td><td>Extends Phase 6's Go service directly, not a separate service</td></tr>
+    <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>Not started</td><td>Needs: Phase 8's production model to compare against</td></tr>
+    <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>Not started</td><td>Needs: all services to exist first (nothing to deploy yet)</td></tr>
+    <tr><td>16</td><td>k6/Locust load test</td><td>Not started</td><td>Needs: Phase 15 (verifies autoscaling actually works)</td></tr>
+  </table>
+
+  <footer class="page-footer">MoveTrack Ops — updated at every PR-completion checkpoint, alongside the rest of the docs.</footer>
+</main>
+</div>
+
+<script>
+(function () {
+  var nodeData = {
+    dashboard: {
+      name: "React + Redux Dashboard", tech: "TypeScript, embeds a Svelte micro-widget", status: "not-started",
+      port: "TBD — typically 3000 for a React dev server, not yet decided",
+      input: "User interactions in the browser", output: "REST calls + a WebSocket connection to the API Gateway",
+      why: "Primary UI for movers, TSP coordinators, and claims adjusters — the one screen everyone actually uses.",
+      steps: []
+    },
+    gateway: {
+      name: "Nginx / API Gateway", tech: "Nginx, TLS termination", status: "not-started",
+      port: "TBD — typically 80/443 in front of everything, not yet decided",
+      input: "HTTP + WebSocket traffic from the dashboard", output: "Proxied requests routed to whichever backend service owns that path",
+      why: "Single entry point — one place for TLS, routing, and rate limiting instead of exposing 5 services directly.",
+      steps: []
+    },
+    moveent: {
+      name: "Move & Entitlement Service", tech: "Java 25 / Spring Boot 4", status: "in-progress",
+      port: "8080 (Spring Boot default — not yet customized)",
+      input: "A move request (once the REST API exists) — origin, destination, rank", output: "Calculated entitlement (JTR weight allowance), writes to move_entitlement_db",
+      why: "Calculates what the government pays for a move based on rank, and logs change-control approval for any change to the weight-allowance rules.",
+      steps: [
+        {n:"Step 1", t:"Service skeleton generated", href:"steps.html#step1", done:true},
+        {n:"Step 2", t:"Wired to local Postgres", href:"steps.html#step2", done:true},
+        {n:"Step 13", t:"MoveRequest entity + Rank enum + repository", href:"steps.html#step13", done:true},
+        {n:"Step 14", t:"WeightAllowance entity + repository + JTR seed data", href:null, done:false},
+        {n:"Step 15", t:"EntitlementCalculationService (business logic)", href:null, done:false},
+        {n:"Step 16", t:"ChangeControlRecord entity + repository", href:null, done:false},
+        {n:"Step 17", t:"Change-control logging service", href:null, done:false},
+        {n:"Step 18", t:"Unit tests — entitlement calc + change control", href:null, done:false},
+        {n:"Step 19", t:"REST API — MoveController + DTOs", href:null, done:false},
+        {n:"Step 20", t:"Integration tests for the REST API", href:null, done:false},
+        {n:"Step 21", t:"Containerize", href:null, done:false}
+      ]
+    },
+    claims: {
+      name: "Claims Service", tech: "Java 25 / Spring Boot 4", status: "done",
+      port: "8081 (fixed in Step 11 — no longer collides with Move & Entitlement's 8080)",
+      input: "A filed claim — description, claimed amount, via POST /api/claims", output: "Approval decision after adjuster + (if above threshold) supervisor review, writes to claims_db",
+      why: "Two-step approval workflow for compensating a service member when the movers damage or lose something.",
+      steps: [
+        {n:"Step 3", t:"Service skeleton generated", href:"steps.html#step3", done:true},
+        {n:"Step 4", t:"Its own database (claims_db) via Postgres init script", href:"steps.html#step4", done:true},
+        {n:"Step 5", t:"Claim entity, ClaimStatus enum, ClaimRepository", href:"steps.html#step5", done:true},
+        {n:"Step 6", t:"Approval-threshold configuration", href:"steps.html#step6", done:true},
+        {n:"Step 7", t:"ClaimApprovalService business logic", href:"steps.html#step7", done:true},
+        {n:"Step 8", t:"Unit tests for approval logic", href:"steps.html#step8", done:true},
+        {n:"Step 9", t:"REST API — ClaimController + DTOs", href:"steps.html#step9", done:true},
+        {n:"Step 10", t:"Integration tests for the REST API", href:"steps.html#step10", done:true},
+        {n:"Step 11", t:"Multi-stage Dockerfile, port fix (8081)", href:"steps.html#step11", done:true},
+        {n:"Step 12", t:"Wired into docker-compose.yml, verified running", href:"steps.html#step12", done:true}
+      ]
+    },
+    compliance: {
+      name: "Compliance / Findings Service", tech: "Python / FastAPI", status: "not-started",
+      port: "TBD", input: "Trivy + OWASP ZAP scan output from the Jenkins pipeline (Phase 5)",
+      output: "Stored findings in MongoDB, publishes finding.detected events to RabbitMQ",
+      why: "Blocks the build on an unresolved critical security finding — the platform's own DevSecOps gate.",
+      steps: []
+    },
+    soap: {
+      name: "SOAP Legacy Adapter", tech: "Java / Spring-WS", status: "not-started",
+      port: "TBD", input: "SOAP/XML requests from a simulated legacy system",
+      output: "Translated REST/JSON calls into Move & Entitlement's own API",
+      why: "Demonstrates real SOA protocol translation at a system boundary — answers the job posting's SOAP/XML requirement.",
+      steps: []
+    },
+    goingest: {
+      name: "Shipment Ingestion Service", tech: "Go", status: "not-started",
+      port: "TBD — will need a raw UDP and a raw TCP port for device traffic, plus a REST port",
+      input: "Carrier tracking device pings — raw UDP (frequent, lightweight) and raw TCP (occasional, higher-reliability) over a WireGuard tunnel",
+      output: "Normalized events published to Kafka (shipment.tracking topic)",
+      why: "Go's goroutines hold many concurrent, mostly-idle device connections far more cheaply than a JVM thread-per-request model — the language choice and this service's whole reason to exist are the same fact.",
+      steps: []
+    },
+    postgres: {
+      name: "PostgreSQL (shared container)", tech: "postgres:17-alpine, Docker Compose", status: "in-progress",
+      port: "5432 (real, confirmed — docker-compose.yml)",
+      input: "JPA/Hibernate writes from Move & Entitlement and Claims Service",
+      output: "Two isolated databases: move_entitlement_db, claims_db — one container, database-per-service",
+      why: "Relational data with real invariants (entitlement math, claims approval state) fits a relational database; database-per-service keeps the two services' schemas independent even though they share infrastructure.",
+      steps: [
+        {n:"Step 2", t:"Container + move_entitlement_db created", href:"steps.html#step2", done:true},
+        {n:"Step 4", t:"claims_db added via init script", href:"steps.html#step4", done:true}
+      ]
+    },
+    mongodb: {
+      name: "MongoDB", tech: "Document store", status: "not-started",
+      port: "TBD", input: "Raw Trivy/ZAP scan findings from the Compliance Service",
+      output: "Queryable finding documents", why: "Scan results are semi-structured/variable-shape — a document store fits better than forcing them into relational columns.",
+      steps: []
+    },
+    redis: {
+      name: "Redis", tech: "In-memory cache", status: "not-started",
+      port: "TBD", input: "Entitlement/weight-table lookups from Move & Entitlement and Claims",
+      output: "Cached responses; also rate-limits the public intake endpoint",
+      why: "A hot-path cache for data that's read far more often than it changes.",
+      steps: []
+    },
+    rabbitmq: {
+      name: "RabbitMQ", tech: "Message broker", status: "not-started",
+      port: "TBD (default 5672)", input: "move.created, claim.filed, finding.detected events from Move & Entitlement, Claims, and Compliance",
+      output: "Routed events to whichever service subscribes", why: "Business/domain events that need routing and occasional replay — a traditional queue fits better here than Kafka's durable-log model.",
+      steps: []
+    },
+    kafka: {
+      name: "Kafka", tech: "Distributed log, topic: shipment.tracking", status: "not-started",
+      port: "TBD (default 9092)", input: "High-volume telemetry published by the Go Ingestion Service",
+      output: "Consumed by the WebSocket gateway (live dashboard feed) and the Claims Triage ML path",
+      why: "Shipment tracking is high-volume and benefits from a durable, ordered, replayable log — genuinely a different traffic shape than RabbitMQ's business events.",
+      steps: []
+    },
+    ml: {
+      name: "Claims Triage ML", tech: "Python / scikit-learn (production)", status: "not-started",
+      port: "N/A — not a network service, a scheduled/batch scoring job",
+      input: "Claims data from Kafka/Claims Service", output: "A triage classification feeding the claims workflow",
+      why: "Small, fast, right-sized model for a tabular classification task — compared against PyTorch/TensorFlow in a separate research track (Phase 14) before choosing this as the deployed one.",
+      steps: []
+    }
+  };
+
+  var svg = document.getElementById('arch-svg');
+  var nodes = svg.querySelectorAll('.node');
+  var edges = svg.querySelectorAll('.edge');
+  var panel = document.getElementById('detail-panel');
+
+  function statusLabel(s) {
+    if (s === 'done') return { text: 'Done', bg: '#eaf5ee', color: '#0f8a6b' };
+    if (s === 'in-progress') return { text: 'In progress', bg: '#fdf3e0', color: '#b7791f' };
+    return { text: 'Not started', bg: '#f7f9f8', color: '#5b6663' };
+  }
+
+  function clearHighlight() {
+    nodes.forEach(function (n) { n.classList.remove('hl', 'dim'); });
+    edges.forEach(function (e) { e.classList.remove('hl', 'dim'); });
+  }
+
+  function renderPanel(id) {
+    var d = nodeData[id];
+    if (!d) return;
+    var st = statusLabel(d.status);
+    var stepsHtml = '';
+    if (d.steps && d.steps.length) {
+      stepsHtml = '<dt>Built by</dt><dd class="dp-steps">' + d.steps.map(function (s) {
+        var label = (s.done ? '✓ ' : '○ ') + s.n + ' — ' + s.t;
+        return s.href ? '<a class="dp-step-line" href="' + s.href + '">' + label + '</a>' : '<span class="dp-step-line" style="color:var(--text-dim)">' + label + '</span>';
+      }).join('') + '</dd>';
+    } else {
+      stepsHtml = '<dt>Built by</dt><dd style="color:var(--text-dim)">No Steps started yet for this component.</dd>';
+    }
+    panel.innerHTML =
+      '<h3>' + d.name + '</h3>' +
+      '<div class="dp-tech">' + d.tech + '</div>' +
+      '<span class="dp-status" style="background:' + st.bg + ';color:' + st.color + '">' + st.text + '</span>' +
+      '<dl>' +
+        '<dt>Local port</dt><dd>' + d.port + '</dd>' +
+        '<dt>Input</dt><dd>' + d.input + '</dd>' +
+        '<dt>Output</dt><dd>' + d.output + '</dd>' +
+        '<dt>Why it exists</dt><dd>' + d.why + '</dd>' +
+        stepsHtml +
+      '</dl>' +
+      '<div class="clear-btn" id="clear-btn">Clear selection</div>';
+    document.getElementById('clear-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      clearHighlight();
+      panel.innerHTML = '<p class="dp-hint">Click any component in the diagram to see its ports, inputs/outputs, why it exists, and which Steps built it.</p>';
+    });
+  }
+
+  function selectNode(id) {
+    clearHighlight();
+    var connected = {};
+    connected[id] = true;
+    edges.forEach(function (e) {
+      var from = e.getAttribute('data-from');
+      var to = e.getAttribute('data-to');
+      if (from === id || to === id) {
+        e.classList.add('hl');
+        connected[from] = true;
+        connected[to] = true;
+      } else {
+        e.classList.add('dim');
+      }
+    });
+    nodes.forEach(function (n) {
+      var nid = n.getAttribute('data-node');
+      if (connected[nid]) n.classList.add('hl');
+      else n.classList.add('dim');
+    });
+    renderPanel(id);
+  }
+
+  nodes.forEach(function (n) {
+    n.addEventListener('click', function (e) {
+      e.stopPropagation();
+      selectNode(n.getAttribute('data-node'));
+    });
+  });
+
+  svg.addEventListener('click', function () {
+    clearHighlight();
+    panel.innerHTML = '<p class="dp-hint">Click any component in the diagram to see its ports, inputs/outputs, why it exists, and which Steps built it.</p>';
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Java, Spring &amp; Maven</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html" class="active">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Java, Spring Boot &amp; Maven</h1>
+  <p class="subtitle">Fundamentals first. Covers every Java/Spring/Maven service in this project (Move &amp; Entitlement, Claims, the SOAP Legacy Adapter). For when each piece was actually introduced, see the <a href="../steps.html">Steps page</a> — this page is organized by concept, not by timeline.</p>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>Java</strong></td><td>The programming language — compiled to bytecode, run by the JVM (Java Virtual Machine).</td></tr>
+    <tr><td><strong>Maven</strong></td><td>The build tool — reads a <code>pom.xml</code> file to know what dependencies to download, how to compile, test, and package the project into a runnable artifact (a <code>.jar</code>).</td></tr>
+    <tr><td><strong>Spring Boot</strong></td><td>A framework built on top of plain Spring — auto-configures a working web app/service with sensible defaults, so you're not hand-wiring every component.</td></tr>
+    <tr><td><strong>Spring Initializr</strong></td><td>A project generator (web UI or API at start.spring.io) that produces a ready-to-build Maven project skeleton with the dependencies you pick already wired into <code>pom.xml</code>.</td></tr>
+  </table>
+
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    Maven = the contractor that fetches materials and assembles the house. Spring Boot = a pre-fabricated
+    house frame with plumbing and wiring already roughed in, so you're finishing rooms instead of laying a
+    foundation from raw lumber every time.
+  </div>
+
+  <h2 id="spring-initializr">Generating a new service (Spring Initializr)</h2>
+
+  <h3 id="initializr-curl">Spring Initializr, via curl</h3>
+  <ul>
+    <li><strong>What it does:</strong> hits Spring's own project-generator API and downloads a zipped,
+      ready-to-build Maven project with the chosen dependencies already declared in <code>pom.xml</code>.</li>
+    <li><strong>Windows gotcha:</strong> PowerShell aliases plain <code>curl</code> to
+      <code>Invoke-WebRequest</code>, which does not understand <code>-d</code> the way real curl does — use
+      <code>curl.exe</code> explicitly to get the actual curl binary that ships with Windows 10+.</li>
+    <li><a href="https://docs.spring.io/initializr/docs/current/reference/html/" target="_blank">Official docs: Spring Initializr</a></li>
+  </ul>
+
+  <p>Reusable pattern for every Java service in this project — swap the artifact/package name per service:</p>
+  <pre><code>curl.exe https://start.spring.io/starter.zip `
+  -d dependencies=&lt;comma-separated deps&gt; `
+  -d type=maven-project `
+  -d language=java `
+  -d javaVersion=21 `
+  -d groupId=com.movetrackops `
+  -d artifactId=&lt;service-name&gt; `
+  -d name=&lt;service-name&gt; `
+  -d packageName=com.movetrackops.&lt;servicepackage&gt; `
+  -o &lt;service-name&gt;.zip
+
+Expand-Archive -Path &lt;service-name&gt;.zip -DestinationPath . -Force
+Remove-Item &lt;service-name&gt;.zip</code></pre>
+
+  <div class="box why">
+    <div class="box-title">How we use it in this project</div>
+    Every Java microservice (Move &amp; Entitlement, Claims, the SOAP Legacy Adapter) starts from this same
+    generator call, living in its own <code>services/&lt;service-name&gt;/</code> folder in the monorepo —
+    only the dependency list, <code>artifactId</code>, and <code>packageName</code> change per service.
+    Move &amp; Entitlement used <code>dependencies=web,data-jpa,postgresql,validation,lombok</code>.
+  </div>
+
+  <h3 id="initializr-deps">Dependencies, and why each one</h3>
+  <table>
+    <tr><th>Dependency</th><th>What it adds</th><th>Why this service needs it</th></tr>
+    <tr><td><code>web</code></td><td>Spring MVC + an embedded Tomcat server</td><td>Exposes REST endpoints (<code>POST /move-requests</code>, etc.) without deploying to a separate app server</td></tr>
+    <tr><td><code>data-jpa</code></td><td>Spring Data JPA + Hibernate (ORM)</td><td>Maps Java classes (<code>MoveRequest</code>, <code>Entitlement</code>) to Postgres tables without hand-written SQL for basic CRUD</td></tr>
+    <tr><td><code>postgresql</code></td><td>The JDBC driver for Postgres</td><td>The actual wire protocol Hibernate uses to talk to the database — JPA is an abstraction, this is what makes the real connection</td></tr>
+    <tr><td><code>validation</code></td><td>Jakarta Bean Validation (<code>@NotNull</code>, <code>@Min</code>, etc.)</td><td>Rejects a malformed move-request payload (e.g. negative weight) before it ever reaches business logic</td></tr>
+    <tr><td><code>lombok</code></td><td>Compile-time annotation processor (<code>@Getter</code>, <code>@Builder</code>, etc.)</td><td>Cuts out hand-written getters/setters/constructors boilerplate on entity/DTO classes</td></tr>
+  </table>
+
+  <h2 id="project-structure">Project structure, once generated</h2>
+  <div class="diagram">
+move-entitlement-service/
+ +-- pom.xml                              &lt;- Maven's manifest: deps, plugins, build config
+ +-- src/
+ |    +-- main/
+ |    |    +-- java/com/movetrackops/moveentitlement/
+ |    |    |    +-- MoveEntitlementServiceApplication.java   &lt;- entry point, main()
+ |    |    +-- resources/
+ |    |         +-- application.properties                   &lt;- DB connection, port, etc.
+ |    +-- test/
+ |         +-- java/com/movetrackops/moveentitlement/         &lt;- JUnit tests mirror main's package structure
+ +-- target/                              &lt;- build output (gitignored, regenerated every build)
+  </div>
+
+  <h3 id="pom-xml"><code>pom.xml</code></h3>
+  <ul>
+    <li><strong>What it is:</strong> Maven's project descriptor — XML file declaring the artifact's
+      identity (<code>groupId</code>/<code>artifactId</code>/<code>version</code>), its dependencies, the
+      Java version to compile against, and any build plugins.</li>
+    <li><strong>Best practice:</strong> pin dependency versions through <code>spring-boot-starter-parent</code>
+      (already set up by Initializr) rather than hardcoding versions per-dependency — one version bump in
+      the parent keeps every Spring dependency compatible together.</li>
+    <li><a href="https://maven.apache.org/guides/introduction/introduction-to-the-pom.html" target="_blank">Official docs: Introduction to the POM</a></li>
+  </ul>
+
+  <h3 id="maven-basics">Maven basics — commands used throughout</h3>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>mvn clean install</code></td><td>Deletes old build output, compiles, runs tests, packages into a <code>.jar</code> in <code>target/</code></td></tr>
+    <tr><td><code>mvn test</code></td><td>Runs JUnit tests only, no packaging</td></tr>
+    <tr><td><code>mvn spring-boot:run</code></td><td>Runs the app directly without building a jar first — fastest loop for local dev</td></tr>
+    <tr><td><code>./mvnw</code></td><td>The Maven Wrapper — runs Maven using a pinned version downloaded automatically, so you don't need Maven installed globally or version-matched across machines</td></tr>
+  </table>
+
+  <div class="box why">
+    <div class="box-title">Why the Maven Wrapper (<code>mvnw</code>) matters</div>
+    Spring Initializr generates <code>mvnw</code>/<code>mvnw.cmd</code> automatically. Using
+    <code>.\mvnw.cmd clean install</code> instead of a global <code>mvn</code> install means Jenkins (later
+    in the roadmap) builds with the exact same Maven version as your laptop — a classic "works on my
+    machine" gap this closes for free.
+  </div>
+
+  <h2 id="annotations">Annotations</h2>
+  <ul>
+    <li><strong>What they are:</strong> metadata tags (<code>@Something</code>) attached to a class,
+      method, or field. Unlike a Python decorator, an annotation doesn't execute or wrap anything by
+      itself — it's inert data that other tools (the compiler, Spring's startup process, Lombok) scan for
+      and react to.</li>
+    <li><strong>Where they show up already:</strong> <code>@SpringBootApplication</code> (marks the one
+      entry-point class Spring's bootstrap code looks for), <code>@SpringBootTest</code> (tells the test
+      runner to boot the whole app for this test), <code>@Test</code> (marks a method as a JUnit test).</li>
+  </ul>
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    A Python decorator is a verb — it does something the moment that line runs. A Java annotation is a
+    label — it does nothing by itself, it just gets read later by whatever's looking for it.
+  </div>
+
+  <h2 id="maven-scopes">Maven dependency scopes</h2>
+  <table>
+    <tr><th>Scope</th><th>Available when...</th><th>Example in this project</th></tr>
+    <tr><td><code>compile</code> (default)</td><td>Compiling <em>and</em> running — the normal case</td><td><code>spring-boot-starter-data-jpa</code></td></tr>
+    <tr><td><code>runtime</code></td><td>Running only, not needed to compile — our code never directly references its classes</td><td>The Postgres JDBC driver — Hibernate looks it up at runtime</td></tr>
+    <tr><td><code>test</code></td><td>Compiling and running tests only — never shipped in the final packaged app</td><td>The auto-added <code>-test</code> starters</td></tr>
+    <tr><td><code>optional=true</code></td><td>(Not a scope, a flag) — available to this project, but not automatically passed to anything that later depends on this one</td><td>Lombok — purely an internal tool, not something a consumer of this service needs</td></tr>
+  </table>
+
+  <h2 id="generated-project-walkthrough">Generated project walkthrough</h2>
+  <p>What Spring Initializr actually produces before any real code is written:</p>
+  <table>
+    <tr><th>File</th><th>What it is</th></tr>
+    <tr><td><code>MoveEntitlementServiceApplication.java</code></td><td>The entry point. <code>public static void main</code> is required by Java for any runnable program; <code>SpringApplication.run(...)</code> starts the embedded server and wires up the whole app in one call — roughly comparable to <code>uvicorn.run(app)</code> in FastAPI, but bundling server startup and dependency-wiring together.</td></tr>
+    <tr><td><code>application.properties</code></td><td>Flat <code>key=value</code> configuration file — starts with just <code>spring.application.name=...</code>, grows to hold the database connection once that's added. Comparable to a <code>.env</code> file; Spring also supports a YAML variant (<code>application.yml</code>) for nested config, not used here.</td></tr>
+    <tr><td><code>MoveEntitlementServiceApplicationTests.java</code></td><td>One auto-generated smoke test, <code>contextLoads()</code>, with an empty body. <code>@SpringBootTest</code> forces the entire app to actually start for this test — the empty body means the only thing being verified is "did startup succeed at all." Trivial today, becomes meaningful once real config (a DB connection) exists to break.</td></tr>
+  </table>
+
+  <div class="box gotcha">
+    <div class="box-title">Spring Boot 4 renamed some starters — don't be thrown by older tutorials</div>
+    This project is on <strong>Spring Boot 4.1.0</strong> (declared in <code>pom.xml</code>'s
+    <code>&lt;parent&gt;</code>). Most tutorials/StackOverflow answers online are written against Spring
+    Boot 3.x and use different artifact names — most notably <code>spring-boot-starter-web</code> is now
+    <code>spring-boot-starter-webmvc</code> (disambiguating it from the reactive <code>-webflux</code>
+    starter), and the old single <code>spring-boot-starter-test</code> is now split into per-feature test
+    starters (<code>-data-jpa-test</code>, <code>-validation-test</code>, <code>-webmvc-test</code>) matched
+    to whatever production starters you actually picked.
+  </div>
+
+  <h2 id="datasource-config">Datasource configuration</h2>
+  <p>What <code>application.properties</code> actually needs to connect to Postgres — see
+    <a href="../steps.html#step2">Steps → Step 2</a> for how the Docker side of this was set up.</p>
+  <pre><code>spring.datasource.url=jdbc:postgresql://localhost:5432/move_entitlement_db
+spring.datasource.username=movetrack
+spring.datasource.password=localdevpassword
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true</code></pre>
+  <table>
+    <tr><th>Property</th><th>What it does</th></tr>
+    <tr><td><code>spring.datasource.url</code></td><td>A JDBC URL — protocol (<code>jdbc:postgresql:</code>), host, port, database name. Everything Hibernate/HikariCP needs to open a connection.</td></tr>
+    <tr><td><code>spring.datasource.username</code> / <code>.password</code></td><td>Must match the <code>POSTGRES_USER</code> / <code>POSTGRES_PASSWORD</code> the Docker container was actually started with — a mismatch here fails at authentication, not at the network level (see the interview Q&amp;A on <a href="../steps.html#qa-diagnose-refused-vs-auth">Steps → Step 2</a> for how those two failure modes look different).</td></tr>
+    <tr><td><code>spring.jpa.hibernate.ddl-auto=update</code></td><td>Hibernate creates/updates tables automatically from <code>@Entity</code> classes. Convenient for local dev — never used this way in a real deployed environment, where a migration tool (Flyway/Liquibase) owns schema changes instead. Not yet needed here.</td></tr>
+    <tr><td><code>spring.jpa.show-sql=true</code></td><td>Prints every generated SQL statement to the console — useful while learning to see what Hibernate is actually doing, usually turned off (or routed to a real logger) once that's no longer needed.</td></tr>
+  </table>
+
+  <h2 id="layers">Layers — DTO vs. entity vs. repository vs. service vs. config</h2>
+  <table>
+    <tr><th>Layer</th><th>Annotation</th><th>Holds</th><th>Real-life equivalent</th></tr>
+    <tr><td>DTO</td><td>plain class + <code>@NotBlank</code> etc.</td><td>What crosses the wire — request in, response out</td><td>The intake form / the receipt</td></tr>
+    <tr><td>Entity</td><td><code>@Entity</code></td><td>Data — one row per instance</td><td>The claim paperwork itself</td></tr>
+    <tr><td>Repository</td><td>extends <code>JpaRepository</code></td><td>Fetch/save one entity, no logic</td><td>The filing cabinet + clerk</td></tr>
+    <tr><td>Service</td><td><code>@Service</code></td><td>Business rules, uses repositories</td><td>The adjuster following the rulebook</td></tr>
+    <tr><td>Config</td><td><code>@ConfigurationProperties</code></td><td>Values that shape behavior without touching code</td><td>The sticky-note threshold on the adjuster's desk</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    DTO = what the outside world sees. Entity = the thing itself. Repository = how you fetch/save the
+    thing. Service = what you're allowed to do with the thing. Config = the numbers the Service reads to
+    make that decision.
+  </div>
+  <div class="box why">
+    <div class="box-title">Why a DTO, not the Entity, over the wire</div>
+    A JPA entity's shape is coupled to the database schema — renaming a column becomes a breaking API
+    change if entities are exposed directly, and lazy-loaded fields can serialize badly. A DTO is a
+    separate, deliberate contract: only what a client needs to send/receive, independent of how the data is
+    actually stored.
+  </div>
+
+  <h2 id="rest-controller">REST controller basics</h2>
+  <table>
+    <tr><th>Annotation</th><th>What it does</th></tr>
+    <tr><td><code>@RestController</code></td><td><code>@Controller</code> + <code>@ResponseBody</code> — return values serialize straight to JSON instead of resolving as a view name</td></tr>
+    <tr><td><code>@RequestMapping("/api/claims")</code></td><td>Base path shared by every endpoint in the class</td></tr>
+    <tr><td><code>@PostMapping</code> / <code>@GetMapping</code></td><td>HTTP-method-specific shortcuts for <code>@RequestMapping</code></td></tr>
+    <tr><td><code>@Valid @RequestBody</code></td><td>Deserializes JSON into the DTO <em>and</em> runs its Bean Validation annotations — a failing <code>@NotBlank</code>/<code>@Positive</code> returns <code>400 Bad Request</code> automatically, no error-handling code needed</td></tr>
+    <tr><td><code>@PathVariable</code></td><td>Pulls a value out of the URL itself, e.g. the <code>{id}</code> in <code>/api/claims/{id}</code></td></tr>
+  </table>
+
+  <h2 id="testing-layers">Testing layers — how deep does each test go</h2>
+  <table>
+    <tr><th>Annotation</th><th>What it loads</th><th>Used for</th></tr>
+    <tr><td>Plain JUnit + <code>@Mock</code></td><td>Nothing — no Spring at all</td><td>Pure business logic, e.g. <code>ClaimApprovalServiceTest</code> — fastest, most isolated</td></tr>
+    <tr><td><code>@WebMvcTest(Controller.class)</code></td><td>Only the web layer — controllers, Jackson, validation</td><td>Testing a controller's HTTP behavior without booting the whole app or touching a database</td></tr>
+    <tr><td><code>@SpringBootTest</code></td><td>The entire application context</td><td>The generated smoke test (<code>contextLoads()</code>) — proves the whole app, including the real database connection, actually starts</td></tr>
+  </table>
+  <p>Each is a deliberate trade-off between speed and how much is actually exercised — reach for the
+    narrowest one that still tests what you actually care about.</p>
+
+  <div class="box gotcha">
+    <div class="box-title">Spring Boot 4.1 moved things — don't trust older tutorials blindly</div>
+    Two real, confirmed package changes hit while writing <code>ClaimControllerTest</code>:
+    <ul>
+      <li><strong>Jackson itself is now version 3.x</strong>, which renamed its base package from
+        <code>com.fasterxml.jackson</code> to <code>tools.jackson</code> (confirmed from a
+        <code>JacksonAutoConfiguration</code> condition-evaluation log naming
+        <code>tools.jackson.databind.json.JsonMapper</code>). A test using the classic
+        <code>com.fasterxml.jackson.databind.ObjectMapper</code> import fails to compile. Simplest fix:
+        avoid the dependency entirely — write request bodies as raw JSON text blocks
+        (<code>"""..."""</code>) instead of serializing a DTO.</li>
+      <li><strong><code>@WebMvcTest</code> moved packages</strong> — old Boot 3.x import
+        <code>org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest</code> no longer resolves;
+        current path is <code>org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest</code>. Found
+        by cross-referencing a sibling class name already seen in an earlier stack trace, rather than
+        guessing — same reorganization pattern as <code>spring-boot-starter-webmvc</code> (renamed from
+        <code>-web</code>).</li>
+      <li><strong><code>@MockBean</code> → <code>@MockitoBean</code></strong> — the older annotation
+        (package <code>org.springframework.boot.test.mock.mockito.MockBean</code>) is superseded by
+        <code>org.springframework.test.context.bean.override.mockito.MockitoBean</code>, which registers a
+        Mockito mock as a real Spring bean in a test context (needed for <code>@WebMvcTest</code>, since
+        <code>MockMvc</code> routes through actual Spring wiring — different from plain <code>@Mock</code>,
+        which involves no Spring at all).</li>
+    </ul>
+  </div>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-spring-vs-springboot">
+    <div class="q">What's the difference between Spring and Spring Boot?</div>
+    <div class="a">Spring is the underlying framework (dependency injection, MVC, data access abstractions)
+      — powerful but historically required a lot of manual XML/Java config to wire together. Spring Boot is
+      an opinionated layer on top: auto-configuration, an embedded server, and starter dependencies
+      (<code>spring-boot-starter-web</code>, etc.) that pull in a coherent, working set of versions so you
+      get a running app with minimal config.</div>
+  </div>
+  <div class="qa" id="qa-jpa-vs-jdbc">
+    <div class="q">Why JPA/Hibernate instead of writing raw SQL with JDBC directly?</div>
+    <div class="a">JPA maps Java objects to rows so most CRUD never needs hand-written SQL, which is faster
+      to write and less error-prone for straightforward access patterns. The tradeoff is less control over
+      the exact query — for a genuinely complex or performance-critical query, dropping to a native query or
+      raw JDBC for that one case is still normal and expected, not a sign JPA was the wrong choice overall.</div>
+  </div>
+  <div class="qa" id="qa-dto-vs-entity">
+    <div class="q">Why not just return the JPA entity directly from a REST endpoint instead of mapping to a DTO?</div>
+    <div class="a">It couples your public API shape to your database schema — a column rename in the
+      entity becomes a breaking API change for every client. JPA entities can also have lazy-loaded fields
+      that serialize unpredictably. A DTO is a deliberate, separate contract: only what a client actually
+      needs, independent of how the data happens to be stored.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+</body>
+</html>
