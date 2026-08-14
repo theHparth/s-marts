@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — React, Redux &amp; TypeScript</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html" class="active">React, Redux &amp; TypeScript</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>React, Redux &amp; TypeScript</h1>
+  <p class="subtitle">Fundamentals + how the dashboard actually uses each one. For when each piece was introduced, see the <a href="../steps.html">Steps page</a>.</p>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>React</strong></td><td>A library for building UI out of reusable, self-contained components — you describe what the UI should look like for a given state, React handles updating the actual page when that state changes.</td></tr>
+    <tr><td><strong>TypeScript</strong></td><td>JavaScript with an optional type system layered on top — catches a whole category of bugs (wrong shape of data, typos in property names) at compile time instead of at runtime.</td></tr>
+    <tr><td><strong>Vite</strong></td><td>The build tool + dev server — fast because it serves native ES modules directly during development instead of bundling everything upfront first.</td></tr>
+    <tr><td><strong>Redux</strong></td><td>A single, centralized store for state that many different components need to share, instead of manually passing data down through many layers ("prop drilling").</td></tr>
+    <tr><td><strong>Redux Toolkit</strong></td><td>The modern, official way to write Redux — replaces old hand-written action types/creators/reducers with a few helper functions doing the same job in far less code.</td></tr>
+    <tr><td><strong>React Router</strong></td><td>Client-side routing — swaps what's displayed as the URL changes, without a full page reload from the server.</td></tr>
+    <tr><td><strong>Vitest</strong></td><td>The test runner, built to integrate with Vite directly — same fast dev-server machinery, near-instant test startup.</td></tr>
+  </table>
+
+  <h2 id="scaffold">Generating the project</h2>
+  <pre><code>npm create vite@latest dashboard -- --template react-ts
+cd dashboard
+npm install
+npm install @reduxjs/toolkit react-redux</code></pre>
+  <ul>
+    <li><code>npm create vite@latest</code> runs Vite's generator without installing it globally — same spirit as using <code>curl</code> for Spring Initializr, a one-time scaffold.</li>
+    <li><code>--template react-ts</code> picks the React + TypeScript flavor — Vite supports many others (plain JS, Vue, Svelte — relevant later, Phase 11's micro-widget).</li>
+  </ul>
+
+  <h2 id="hooks">React hooks used so far</h2>
+  <table>
+    <tr><th>Hook</th><th>What it does</th><th>Example</th></tr>
+    <tr><td><code>useState</code></td><td>Gives a component its own local, changeable value. Calling the setter re-renders the component with the new value.</td><td><code>const [name, setName] = useState('')</code></td></tr>
+    <tr><td><code>useDispatch</code></td><td>Returns the function used to actually trigger a Redux action or thunk.</td><td><code>const dispatch = useDispatch&lt;AppDispatch&gt;()</code></td></tr>
+    <tr><td><code>useSelector</code></td><td>Reads a value out of the Redux store; re-renders the component automatically whenever that specific value changes.</td><td><code>useSelector((state: RootState) => state.moves)</code></td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">Best way to remember</div>
+    <code>useState</code> = this component's own private memory. <code>useSelector</code> = reading from the
+    shared memory everyone can see. <code>useDispatch</code> = asking to change the shared memory (you never
+    edit the store directly, only ever through a dispatched action).
+  </div>
+
+  <h2 id="redux-concepts">Redux Toolkit concepts</h2>
+  <table>
+    <tr><th>Concept</th><th>What it is</th></tr>
+    <tr><td><code>configureStore</code></td><td>Builds the actual store object from a map of reducers — one entry per feature slice.</td></tr>
+    <tr><td>Slice (<code>createSlice</code>)</td><td>One self-contained piece of the store — its own state shape plus the logic that updates it. Generates the reducer and matching actions together.</td></tr>
+    <tr><td><code>createAsyncThunk</code></td><td>Wraps an async function (an API call) so it automatically fires <code>pending</code>/<code>fulfilled</code>/<code>rejected</code> actions as the promise progresses — no manual dispatching needed.</td></tr>
+    <tr><td><code>extraReducers</code></td><td>Where a slice handles actions that came from <em>outside</em> itself — e.g. the three automatic thunk actions, as opposed to <code>reducers</code> for actions the slice defines itself.</td></tr>
+    <tr><td><code>&lt;Provider store={store}&gt;</code></td><td>Makes the store available to every component underneath it in the tree — without it, no component can reach the store at all.</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why reducers can "mutate" state directly</div>
+    Normally illegal in Redux — state must be immutable. Redux Toolkit uses a library called Immer
+    internally: code that <em>looks</em> like direct mutation (<code>state.status = 'loading'</code>)
+    actually produces a brand-new immutable state object behind the scenes. A deliberate convenience, not
+    an exception to the rule.
+  </div>
+
+  <h2 id="typescript-generics">TypeScript generics</h2>
+  <pre><code>async function request&lt;T&gt;(url: string, options?: RequestInit): Promise&lt;T&gt; {
+  const response = await fetch(url, options);
+  return response.json() as Promise&lt;T&gt;;
+}</code></pre>
+  <ul>
+    <li><code>T</code> is a placeholder type decided by whoever <em>calls</em> the function, not by the function itself.</li>
+    <li><code>request&lt;MoveRequestResponse&gt;(...)</code> and <code>request&lt;ClaimResponse&gt;(...)</code> — same function, different concrete type each call.</li>
+    <li><code>unknown</code> vs <code>any</code>: <code>any</code> turns off type-checking entirely; <code>unknown</code> still forces narrowing before most operations are allowed on it.</li>
+  </ul>
+
+  <h2 id="routing">React Router basics</h2>
+  <table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><code>&lt;BrowserRouter&gt;</code></td><td>Wraps the app, turns on routing using the browser's real URL bar.</td></tr>
+    <tr><td><code>&lt;Link to="/moves"&gt;</code></td><td>Renders as a real <code>&lt;a&gt;</code>, but intercepts the click — swaps the page without a full reload. Use instead of a plain <code>&lt;a href&gt;</code> inside the app.</td></tr>
+    <tr><td><code>&lt;Routes&gt;</code> / <code>&lt;Route path="..." element={...}&gt;</code></td><td>Declares which component renders for which URL path.</td></tr>
+  </table>
+
+  <h2 id="forms">Form handling patterns used</h2>
+  <ul>
+    <li><code>e.preventDefault()</code> — stops the browser's default form-submit behavior (a full page reload/navigation), which would otherwise happen before any of our JavaScript runs.</li>
+    <li><code>{condition &amp;&amp; &lt;jsx /&gt;}</code> — common React pattern: renders the JSX only when <code>condition</code> is truthy, nothing otherwise.</li>
+  </ul>
+
+  <h2 id="testing">Testing — Vitest + React Testing Library</h2>
+  <pre><code>npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom</code></pre>
+  <ul>
+    <li><code>-D</code> = dev dependency — needed to develop/test, not shipped to real users (contrast with <code>react</code>/<code>react-redux</code>, real runtime dependencies).</li>
+    <li><code>jsdom</code> simulates a browser DOM inside Node, since tests run in Node, not an actual browser.</li>
+    <li><strong>React Testing Library</strong> tests components the way a user would interact with them — finding a button by its visible text, not by reaching into internals.</li>
+  </ul>
+  <pre><code>/// &lt;reference types="vitest/config" /&gt;
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+  },
+})</code></pre>
+  <div class="box gotcha">
+    <div class="box-title">jest-dom matchers (<code>toBeInTheDocument()</code>) need an explicit setup file</div>
+    Installing <code>@testing-library/jest-dom</code> alone isn't enough — its extra assertions only get
+    registered (both at runtime and for TypeScript's types) if the package is actually imported somewhere
+    Vitest loads before running tests. Fix: a setup file containing just
+    <code>import '@testing-library/jest-dom';</code>, referenced via <code>test.setupFiles</code> in
+    <code>vite.config.ts</code>. Global once set up — individual test files don't need to import it themselves.
+  </div>
+  <p>Test files use <code>render()</code> to mount a component into the simulated DOM, and
+    <code>screen.getByPlaceholderText(...)</code>/<code>getByRole(...)</code> to find elements by what a
+    real user would see. A component using <code>useSelector</code>/<code>useDispatch</code> needs a real
+    <code>&lt;Provider&gt;</code> wrapped around it in the test too — usually a small throwaway store built
+    just for that test, separate from the app's real one.</p>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-redux-why">
+    <div class="q">Why use Redux instead of just React's built-in state?</div>
+    <div class="a">React's <code>useState</code> is local to one component — sharing that value with a
+      distant, unrelated component means manually passing it down through every layer in between ("prop
+      drilling"), which gets unmanageable fast. Redux gives any component direct access to shared state
+      without that chain.</div>
+  </div>
+  <div class="qa" id="qa-vitest-vs-jest">
+    <div class="q">Why Vitest instead of Jest, the more well-known test runner?</div>
+    <div class="a">Vitest is built specifically to integrate with Vite — it reuses the same fast dev-server
+      machinery, so tests start almost instantly, and understands TypeScript/JSX with zero extra config.
+      Jest predates Vite and needs additional configuration glue to work with a Vite project properly.</div>
+  </div>
+  <div class="qa" id="qa-thunk-why">
+    <div class="q">Why does an async API call need <code>createAsyncThunk</code> instead of a plain reducer?</div>
+    <div class="a">Redux reducers must be synchronous, pure functions — no waiting, no side effects.
+      An API call is inherently asynchronous. <code>createAsyncThunk</code> bridges the gap: give it a
+      function returning a <code>Promise</code>, and it automatically dispatches <code>pending</code>/
+      <code>fulfilled</code>/<code>rejected</code> actions as that promise resolves, so the reducer only
+      ever handles plain, synchronous action objects.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

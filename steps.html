@@ -18,6 +18,8 @@
   <a href="tech/git.html">Git &amp; GitHub</a>
   <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
   <a href="tech/docker.html">Docker &amp; Compose</a>
+  <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
 </nav>
@@ -190,7 +192,7 @@ git branch -M main</code></pre>
   </div>
 
   <h2 id="phase1">Phase 1 — Move &amp; Entitlement Service</h2>
-  <p class="pill">5 PRs planned: <strong>PR #1 ✓ merged</strong> Steps 1–2 (skeleton + local DB) · <strong>PR #2</strong> Step 13+ (domain model, in progress) · <strong>PR #3</strong> REST API · <strong>PR #4</strong> change control · <strong>PR #5</strong> containerize</p>
+  <p class="pill">4 PRs (consolidated from the original 5-PR guess, same way Claims ended up): <strong>PR #1 ✓ merged</strong> Steps 1–2 (skeleton + local DB) · <strong>PR #2 ✓ merged</strong> Steps 13–18 (domain model + business logic + change control) · <strong>PR #3 ✓ merged</strong> Steps 19–20 (REST API) · <strong>PR #4 ✓ merged</strong> Step 21 (containerize) — <strong>Phase 1 complete</strong></p>
   <div class="box gotcha">
     <div class="box-title">Note — step numbers for PRs #2–5 not pre-assigned</div>
     Originally planned as Steps 3–14. Phase 2 (Claims Service) started before this phase's PR #2, and its
@@ -791,7 +793,7 @@ git pull</code></pre>
   </div>
 
   <h2 id="phase1-continued">Phase 1 (continued) — Move &amp; Entitlement Service</h2>
-  <p class="pill">Resumed after Phase 2 finished. Domain model work starts at Step 13.</p>
+  <p class="pill">Resumed after Phase 2 finished. Domain model work starts at Step 13 — see the pill at the top of this phase's original section above for the full PR breakdown.</p>
 
   <div class="step" id="step13">
     <div class="step-header">
@@ -814,9 +816,408 @@ git commit -m "feat: add move request entity and rank enum"
 git push -u origin feat/moveent-domain-model</code></pre>
   </div>
 
+  <div class="step" id="step14">
+    <div class="step-header">
+      <span class="step-num">STEP 14</span>
+      <span class="step-title">Move &amp; Entitlement Service — weight allowance + JTR seed data</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>WeightAllowance</code> entity/repository plus representative JTR
+      weight-by-rank figures, seeded via <code>data.sql</code> — a different mechanism from Claims'
+      Postgres-level database creation. Full explanation, including why it needs
+      <code>ON CONFLICT DO NOTHING</code>, on
+      <a href="tech/java-spring.html#sql-seeding">Java, Spring &amp; Maven → Seeding reference data</a>.</p>
+    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/WeightAllowance.java services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/WeightAllowanceRepository.java services/move-entitlement-service/src/main/resources/data.sql services/move-entitlement-service/src/main/resources/application.properties
+git commit -m "feat: add weight allowance entity and JTR seed data"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step15">
+    <div class="step-header">
+      <span class="step-num">STEP 15</span>
+      <span class="step-title">Move &amp; Entitlement Service — EntitlementCalculationService</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> looks up a move request's rank against Step 14's weight-allowance table. Same
+      <code>@Service</code>/constructor-injection/<code>orElseThrow</code> pattern as Claims'
+      <code>ClaimApprovalService</code> — nothing new conceptually.</p>
+    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/service/EntitlementCalculationService.java
+git commit -m "feat: add entitlement calculation service"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step16">
+    <div class="step-header">
+      <span class="step-num">STEP 16</span>
+      <span class="step-title">Move &amp; Entitlement Service — ChangeControlRecord</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> the audit-trail entity — what changed, old/new value, who, when. Same shape
+      as every other entity+repository pair so far.</p>
+    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/ChangeControlRecord.java services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/ChangeControlRecordRepository.java
+git commit -m "feat: add change control record entity and repository"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step17">
+    <div class="step-header">
+      <span class="step-num">STEP 17</span>
+      <span class="step-title">Move &amp; Entitlement Service — change-control logging</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>WeightAllowanceChangeService</code> — the actual feature the deep spec
+      calls out as "adheres to program configuration change control standards." Any change to a
+      weight-allowance number gets logged (old value, new value, who, when) <em>before</em> it's applied.</p>
+    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/service/WeightAllowanceChangeService.java
+git commit -m "feat: add change-control logging for weight allowance updates"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step18">
+    <div class="step-header">
+      <span class="step-num">STEP 18</span>
+      <span class="step-title">Move &amp; Entitlement Service — unit tests, closes PR #2</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>EntitlementCalculationServiceTest</code> +
+      <code>WeightAllowanceChangeServiceTest</code>. First use of Mockito's <code>ArgumentCaptor</code> in
+      this project — proves the change-control record actually logged the right old/new values, not just
+      that <em>something</em> got saved. Full explanation on
+      <a href="tech/java-spring.html#argument-captor">Java, Spring &amp; Maven → ArgumentCaptor</a>.</p>
+    <pre><code>git add services/move-entitlement-service/src/test/java/com/movetrackops/moveentitlement/service/
+git commit -m "test: add unit tests for entitlement calc and change control"
+git push
+
+gh pr create --title "Move & Entitlement Service: domain model and business logic" --body "Closes #11" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/12" target="_blank">#12</a> — closes PR #2 (Steps 13–18).</p>
+  </div>
+
+  <div class="step" id="step19">
+    <div class="step-header">
+      <span class="step-num">STEP 19</span>
+      <span class="step-title">Move &amp; Entitlement Service — REST API</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>MoveRequestController</code> + 2 DTOs — same
+      <code>@RestController</code>/<code>@Valid</code> pattern as Claims' <code>ClaimController</code>
+      (<a href="tech/java-spring.html#rest-controller">Java, Spring &amp; Maven → REST controller basics</a>),
+      nothing new here.</p>
+    <pre><code>gh issue create --title "Move & Entitlement Service: REST API" --body "DTOs and controller exposing move request submission and entitlement calculation over HTTP."
+git checkout -b feat/moveent-rest-api
+
+git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/dto/ services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/web/
+git commit -m "feat: add move request REST API"
+git push -u origin feat/moveent-rest-api</code></pre>
+  </div>
+
+  <div class="step" id="step20">
+    <div class="step-header">
+      <span class="step-num">STEP 20</span>
+      <span class="step-title">Move &amp; Entitlement Service — integration tests, closes PR #3</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>MoveRequestControllerTest</code> — same <code>@WebMvcTest</code> /
+      <code>@MockitoBean</code> / raw-JSON-text-block pattern as Claims' Step 10, same reasons (Jackson 3.x
+      namespace change, <code>@WebMvcTest</code> package move) apply here too.</p>
+    <pre><code>git add services/move-entitlement-service/src/test/java/com/movetrackops/moveentitlement/web/
+git commit -m "test: add integration tests for move request REST API"
+git push
+
+gh pr create --title "Move & Entitlement Service: REST API" --body "Closes #12" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/14" target="_blank">#14</a> — closes PR #3.</p>
+  </div>
+
+  <div class="step" id="step21">
+    <div class="step-header">
+      <span class="step-num">STEP 21</span>
+      <span class="step-title">Move &amp; Entitlement Service — containerize, closes PR #4</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> multi-stage Dockerfile + docker-compose wiring — same pattern as Claims'
+      Steps 11–12, combined into one step here.</p>
+
+    <div class="box gotcha">
+      <div class="box-title">A third, different kind of port conflict</div>
+      <code>docker compose up</code> failed on port 8080 — but not from our own two services colliding
+      (Claims already moved to 8081) or another project's container (Step 2's incident). <code>docker
+      ps</code> showed nothing of ours holding 8080 either — a completely unrelated, non-Docker process on
+      the host had it. Fixed by just picking a different port (<code>8082</code>) rather than hunting down
+      what the host process was. Full comparison of all three port-conflict variants hit in this project on
+      <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.
+    </div>
+
+    <div class="box gotcha">
+      <div class="box-title">Real process mistake — a fix committed after its PR already merged</div>
+      The <code>server.port=8082</code> fix above was added <em>after</em> the containerize PR's commit was
+      already made, so it never made it into that merge and sat uncommitted on <code>main</code> —
+      caught by <code>git status</code> before starting the next work, not before it happened. Fixed with a
+      small separate PR rather than trying to force a direct commit onto protected <code>main</code>.
+    </div>
+
+    <pre><code>gh issue create --title "Move & Entitlement Service: containerize" --body "Multi-stage Dockerfile and docker-compose wiring."
+git checkout -b feat/moveent-containerize
+
+git add services/move-entitlement-service/.dockerignore services/move-entitlement-service/Dockerfile docker-compose.yml
+git commit -m "feat: containerize move-entitlement-service"
+git push -u origin feat/moveent-containerize
+
+gh pr create --title "Move & Entitlement Service: containerize" --body "Closes #13" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/16" target="_blank">#16</a>.
+      Port fix merged separately as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/18" target="_blank">#18</a>.
+      <strong>This completes Phase 1 (Move &amp; Entitlement Service) entirely</strong> — 4 PRs, Steps 1–2, 13–21.
+      All three containers (<code>postgres</code>, <code>claims-service</code>, <code>move-entitlement-service</code>)
+      now run together via <code>docker compose up</code>.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-uncommitted-fix">
+      <div class="q">A mid-step fix landed after the PR's commit — how did you catch it, and how did you land it?</div>
+      <div class="a"><code>git status</code> before starting the next piece of work, as a habit, not just
+        when something looks wrong — it showed a modified file sitting uncommitted on <code>main</code>
+        that shouldn't have been there. Since the original PR was already merged and the branch deleted,
+        reopening it wasn't an option — a small, separately-scoped follow-up PR (its own issue, branch, and
+        merge) is the honest way to land a fix after the fact, same process as any other change.</div>
+    </div>
+  </div>
+
+  <h2 id="phase3">Phase 3 — React/Redux Dashboard</h2>
+  <p class="pill">10 steps (22–31), 3 PRs. First non-JVM stack in this project — Node.js/npm checked before first use, per the standing rule.</p>
+
+  <div class="step" id="step22">
+    <div class="step-header">
+      <span class="step-num">STEP 22</span>
+      <span class="step-title">Dashboard — Vite + React + TypeScript scaffold</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> generate the frontend project skeleton. Full concept reference — what Vite/
+      React/TypeScript/Redux Toolkit each are, the scaffold command — on
+      <a href="tech/react-redux.html#scaffold">React, Redux &amp; TypeScript → Generating the project</a>.</p>
+    <pre><code>node --version
+npm --version
+npm install -g npm@latest
+
+gh issue create --title "React Dashboard: project skeleton" --body "Vite + React + TypeScript scaffold with Redux Toolkit added."
+git checkout main
+git pull
+git checkout -b feat/dashboard-skeleton
+
+mkdir frontend
+cd frontend
+npm create vite@latest dashboard -- --template react-ts
+cd dashboard
+npm install
+npm install @reduxjs/toolkit react-redux
+
+git add frontend/dashboard
+git commit -m "feat: generate vite react-ts dashboard skeleton with redux toolkit"
+git push -u origin feat/dashboard-skeleton</code></pre>
+    <p class="pill">npm was stale for the Node version installed (9.8.1 vs. Node 24's expected 10.x/11.x) — updated with <code>npm install -g npm@latest</code> before scaffolding anything, per the standing "check tooling" rule.</p>
+  </div>
+
+  <div class="step" id="step23">
+    <div class="step-header">
+      <span class="step-num">STEP 23</span>
+      <span class="step-title">Dashboard — Redux store setup</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> wire up the Redux store and connect it to React via <code>&lt;Provider&gt;</code>.
+      Full explanation on
+      <a href="tech/react-redux.html#redux-concepts">React, Redux &amp; TypeScript → Redux Toolkit concepts</a>.</p>
+    <pre><code>git add frontend/dashboard/src/app/ frontend/dashboard/src/main.tsx
+git commit -m "feat: add redux store and wire provider"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step24">
+    <div class="step-header">
+      <span class="step-num">STEP 24</span>
+      <span class="step-title">Dashboard — API client</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> a typed <code>fetch</code> wrapper for both backend services. TypeScript
+      generics explained on
+      <a href="tech/react-redux.html#typescript-generics">React, Redux &amp; TypeScript → TypeScript generics</a>.</p>
+    <div class="box why">
+      <div class="box-title"><code>localhost</code>, not a Docker service name — opposite of Step 12</div>
+      These calls run in the <strong>browser</strong>, outside Docker's network entirely — a service name
+      like <code>postgres</code> only resolves inside Docker's private network. The browser has to hit the
+      ports published to the host (<code>8081</code>, <code>8082</code>).
+    </div>
+    <pre><code>git add frontend/dashboard/src/api/
+git commit -m "feat: add API client for move-entitlement and claims services"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step25">
+    <div class="step-header">
+      <span class="step-num">STEP 25</span>
+      <span class="step-title">Dashboard — Redux slices for moves + claims</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>movesSlice</code> + <code>claimsSlice</code>, using
+      <code>createAsyncThunk</code> to wrap the API calls. Full breakdown on
+      <a href="tech/react-redux.html#redux-concepts">React, Redux &amp; TypeScript → Redux Toolkit concepts</a>.</p>
+    <pre><code>git add frontend/dashboard/src/features/ frontend/dashboard/src/app/store.ts
+git commit -m "feat: add redux slices for moves and claims"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step26">
+    <div class="step-header">
+      <span class="step-num">STEP 26</span>
+      <span class="step-title">Dashboard — routing + page layout</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> <code>react-router-dom</code> wired up, two placeholder pages. Full reference
+      on <a href="tech/react-redux.html#routing">React, Redux &amp; TypeScript → React Router basics</a>.</p>
+    <pre><code>cd frontend/dashboard
+npm install react-router-dom
+
+git add frontend/dashboard/package.json frontend/dashboard/package-lock.json frontend/dashboard/src/App.tsx frontend/dashboard/src/pages/
+git commit -m "feat: add routing and page layout"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step27">
+    <div class="step-header">
+      <span class="step-num">STEP 27</span>
+      <span class="step-title">Dashboard — Moves page, real form</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> a working form using <code>useState</code>/<code>useDispatch</code>/
+      <code>useSelector</code> — first real usage of all three hooks, reference on
+      <a href="tech/react-redux.html#hooks">React, Redux &amp; TypeScript → React hooks</a>.</p>
+    <pre><code>git add frontend/dashboard/src/pages/MovesPage.tsx
+git commit -m "feat: build moves page with entitlement submission"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step28">
+    <div class="step-header">
+      <span class="step-num">STEP 28</span>
+      <span class="step-title">Dashboard — Claims page, real form</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> same pattern as Step 27, applied to claims — no new concepts.</p>
+    <pre><code>git add frontend/dashboard/src/pages/ClaimsPage.tsx
+git commit -m "feat: build claims page with claim filing"
+git push</code></pre>
+  </div>
+
+  <div class="step" id="step29">
+    <div class="step-header">
+      <span class="step-num">STEP 29</span>
+      <span class="step-title">Dashboard — component test, closes PR #2</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> first frontend test — Vitest + React Testing Library. Full reference,
+      including the setup-file gotcha below, on
+      <a href="tech/react-redux.html#testing">React, Redux &amp; TypeScript → Testing</a>.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real error: <code>toBeInTheDocument</code> not recognized by TypeScript</div>
+      Installing <code>@testing-library/jest-dom</code> alone doesn't register its matchers — needs an
+      explicit setup file (<code>import '@testing-library/jest-dom';</code>) referenced via
+      <code>test.setupFiles</code> in <code>vite.config.ts</code>. Without it, neither the runtime
+      assertion nor its TypeScript type exists yet.
+    </div>
+    <pre><code>npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+
+git add frontend/dashboard/src/test/setup.ts frontend/dashboard/vite.config.ts
+git commit -m "fix: register jest-dom matchers via vitest setup file"
+git push
+
+git add frontend/dashboard/vite.config.ts frontend/dashboard/package.json frontend/dashboard/package-lock.json frontend/dashboard/src/pages/MovesPage.test.tsx
+git commit -m "test: add component test for moves page"
+git push
+
+gh pr create --title "React Dashboard: skeleton, Redux, API integration, pages" --body "Closes #19" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/20" target="_blank">#20</a> — closes PR #2 (Steps 22–29).</p>
+  </div>
+
+  <div class="step" id="step30">
+    <div class="step-header">
+      <span class="step-num">STEP 30</span>
+      <span class="step-title">Dashboard — containerize, new branch</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> multi-stage Dockerfile — Node build stage, Nginx run stage. Genuinely
+      different shape from the Java Dockerfiles; full breakdown on
+      <a href="tech/docker.html#node-nginx-stage">Docker &amp; Compose → The Node/Nginx variant</a>.</p>
+    <pre><code>gh issue create --title "React Dashboard: containerize" --body "Multi-stage Dockerfile: Node build stage, Nginx serves the static output."
+git checkout -b feat/dashboard-containerize
+
+git add frontend/dashboard/.dockerignore frontend/dashboard/Dockerfile
+git commit -m "feat: containerize dashboard with multi-stage build"
+git push -u origin feat/dashboard-containerize</code></pre>
+  </div>
+
+  <div class="step" id="step31">
+    <div class="step-header">
+      <span class="step-num">STEP 31</span>
+      <span class="step-title">Dashboard — wired into docker-compose.yml, closes PR #3</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> the last piece — get the dashboard container actually running alongside the
+      3 backend containers.</p>
+
+    <div class="box gotcha">
+      <div class="box-title">Real process mistake — docker-compose.yml edit committed on protected main</div>
+      Same category of mistake as Step 21's port fix, caught the same way: <code>git branch</code> showed
+      the edit happened while sitting on <code>main</code> instead of <code>feat/dashboard-containerize</code>.
+      <code>git push</code> was correctly rejected by branch protection (<code>GH013: Repository rule
+      violations... Changes must be made through a pull request</code>) — proof the ruleset from Step 0
+      actually works. Fixed by moving the commit to the right branch instead of forcing anything onto main:
+      <pre><code>git checkout feat/dashboard-containerize
+git cherry-pick &lt;commit-hash&gt;
+git push -u origin feat/dashboard-containerize
+
+git checkout main
+git reset --hard origin/main</code></pre>
+      <code>cherry-pick</code> copies the commit's changes onto the correct branch;
+      <code>reset --hard origin/main</code> is safe here specifically because the content already lives
+      safely on the other branch and the working tree was clean — nothing lost.
+    </div>
+
+    <pre><code>docker compose up -d --build
+docker compose ps
+
+git add docker-compose.yml
+git commit -m "feat: wire dashboard into docker-compose"
+git push
+
+gh pr create --title "React Dashboard: containerize" --body "Closes #20" --base main
+gh pr merge --squash --delete-branch
+git checkout main
+git pull</code></pre>
+    <p><strong>This completes Phase 3 entirely</strong> — 3 PRs, Steps 22–31. All 4 containers
+      (<code>postgres</code>, <code>claims-service</code>, <code>move-entitlement-service</code>,
+      <code>dashboard</code>) run together; <code>http://localhost:3000</code> serves the real dashboard.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-branch-protection-caught-it">
+      <div class="q">A commit landed on the wrong branch and got rejected by branch protection — was that a problem?</div>
+      <div class="a">The opposite — it's exactly what branch protection is for. The commit itself wasn't
+        lost (still sitting safely in local history), and the rejection is what surfaced the mistake
+        immediately instead of it silently landing on <code>main</code> unreviewed. <code>cherry-pick</code>
+        moved it to the correct branch without redoing any work.</div>
+    </div>
+  </div>
+
   <!-- Future steps get appended here, one .step block each, never batched. -->
 
 </main>
 </div>
+<script src="assets/page-nav.js"></script>
 </body>
 </html>

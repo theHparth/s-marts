@@ -18,6 +18,8 @@
   <a href="tech/git.html">Git &amp; GitHub</a>
   <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
   <a href="tech/docker.html">Docker &amp; Compose</a>
+  <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
 </nav>
@@ -147,6 +149,25 @@
   </div>
   <p class="pill">↳ <a href="steps.html#qa-unnecessary-stubbing">Steps → Step 8</a></p>
 
+  <div class="qa">
+    <div class="q">A mid-step fix landed after the PR's commit — how did you catch it, and how did you land it?</div>
+    <div class="a"><code>git status</code> before starting the next piece of work, as a habit, not just
+      when something looks wrong — it showed a modified file sitting uncommitted on <code>main</code>
+      that shouldn't have been there. Since the original PR was already merged and the branch deleted,
+      reopening it wasn't an option — a small, separately-scoped follow-up PR (its own issue, branch, and
+      merge) is the honest way to land a fix after the fact, same process as any other change.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-uncommitted-fix">Steps → Step 21</a></p>
+
+  <div class="qa">
+    <div class="q">A commit landed on the wrong branch and got rejected by branch protection — was that a problem?</div>
+    <div class="a">The opposite — it's exactly what branch protection is for. The commit itself wasn't
+      lost (still sitting safely in local history), and the rejection is what surfaced the mistake
+      immediately instead of it silently landing on <code>main</code> unreviewed. <code>cherry-pick</code>
+      moved it to the correct branch without redoing any work.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-branch-protection-caught-it">Steps → Step 31</a></p>
+
   <h2 id="from-git">From Git &amp; GitHub</h2>
 
   <div class="qa">
@@ -207,6 +228,25 @@
   <p class="pill">↳ <a href="tech/java-spring.html#qa-spring-vs-springboot">Java, Spring &amp; Maven</a></p>
 
   <div class="qa">
+    <div class="q">Why does <code>data.sql</code> need <code>ON CONFLICT DO NOTHING</code> but a Docker Postgres init script doesn't?</div>
+    <div class="a">They run at different frequencies. A Docker <code>/docker-entrypoint-initdb.d</code>
+      script only runs once, on a genuinely empty data volume — never again after that. Spring's
+      <code>data.sql</code> runs on <em>every</em> application startup by design, so a plain
+      <code>INSERT</code> would hit a duplicate-key error on the second restart. <code>ON CONFLICT DO
+      NOTHING</code> makes it safe to re-run — insert if missing, silently skip if already there.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/java-spring.html#qa-data-sql-idempotent">Java, Spring &amp; Maven</a></p>
+
+  <div class="qa">
+    <div class="q">What does <code>ArgumentCaptor</code> prove that a plain <code>verify(mock).method()</code> doesn't?</div>
+    <div class="a"><code>verify(...)</code> alone only proves a method got called — not what it was called
+      <em>with</em>. <code>ArgumentCaptor</code> grabs the actual argument passed in, so a test can assert
+      on its contents — e.g. proving a change-control log entry recorded the correct old and new values,
+      not just that <em>some</em> record got saved.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/java-spring.html#qa-argument-captor">Java, Spring &amp; Maven</a></p>
+
+  <div class="qa">
     <div class="q">Why JPA/Hibernate instead of writing raw SQL with JDBC directly?</div>
     <div class="a">JPA maps Java objects to rows so most CRUD never needs hand-written SQL, which is faster
       to write and less error-prone for straightforward access patterns. The tradeoff is less control over
@@ -263,8 +303,38 @@
   </div>
   <p class="pill">↳ <a href="tech/docker.html#qa-localhost-vs-service-name">Docker &amp; Compose</a></p>
 
+  <h2 id="from-react-redux">From React, Redux &amp; TypeScript</h2>
+
+  <div class="qa">
+    <div class="q">Why use Redux instead of just React's built-in state?</div>
+    <div class="a">React's <code>useState</code> is local to one component — sharing that value with a
+      distant, unrelated component means manually passing it down through every layer in between ("prop
+      drilling"), which gets unmanageable fast. Redux gives any component direct access to shared state
+      without that chain.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/react-redux.html#qa-redux-why">React, Redux &amp; TypeScript</a></p>
+
+  <div class="qa">
+    <div class="q">Why Vitest instead of Jest, the more well-known test runner?</div>
+    <div class="a">Vitest is built specifically to integrate with Vite — it reuses the same fast dev-server
+      machinery, so tests start almost instantly, and understands TypeScript/JSX with zero extra config.
+      Jest predates Vite and needs additional configuration glue to work with a Vite project properly.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/react-redux.html#qa-vitest-vs-jest">React, Redux &amp; TypeScript</a></p>
+
+  <div class="qa">
+    <div class="q">Why does an async API call need <code>createAsyncThunk</code> instead of a plain reducer?</div>
+    <div class="a">Redux reducers must be synchronous, pure functions — no waiting, no side effects.
+      An API call is inherently asynchronous. <code>createAsyncThunk</code> bridges the gap: give it a
+      function returning a <code>Promise</code>, and it automatically dispatches <code>pending</code>/
+      <code>fulfilled</code>/<code>rejected</code> actions as that promise resolves, so the reducer only
+      ever handles plain, synchronous action objects.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/react-redux.html#qa-thunk-why">React, Redux &amp; TypeScript</a></p>
+
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>
 </div>
+<script src="assets/page-nav.js"></script>
 </body>
 </html>

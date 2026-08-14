@@ -18,6 +18,8 @@
   <a href="git.html">Git &amp; GitHub</a>
   <a href="java-spring.html">Java, Spring &amp; Maven</a>
   <a href="docker.html" class="active">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
 </nav>
@@ -98,6 +100,45 @@ ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
   <p><code>.dockerignore</code> (same idea as <code>.gitignore</code>) keeps <code>target/</code>, IDE
     files, and <code>.git/</code> out of the build context entirely, so they're never even candidates for
     the <code>COPY</code> in stage 1.</p>
+
+  <h3 id="node-nginx-stage">The Node/Nginx variant — a static frontend, not a running process</h3>
+  <pre><code>FROM node:24-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine AS run
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80</code></pre>
+  <p>Same multi-stage idea as the Java services, applied to a different kind of artifact:</p>
+  <ul>
+    <li><code>COPY package*.json ./</code> → <code>RUN npm install</code> → <code>COPY . .</code> is the
+      same layer-caching trick as <code>pom.xml</code>/<code>mvnw dependency:go-offline</code> — copy just
+      the dependency manifest first so the install step is cached and skipped when only source changes,
+      not the manifest.</li>
+    <li><strong>What <code>COPY . .</code> actually does:</strong> first <code>.</code> = source = the
+      build context on the host (everything in the folder you ran <code>docker build</code> from); second
+      <code>.</code> = destination = the current <code>WORKDIR</code> inside the image
+      (<code>/app</code>). It re-copies <code>package.json</code> too (harmless, identical bytes) along
+      with everything else that wasn't copied yet.</li>
+    <li><strong>Why stage 2 is Nginx, not a JRE:</strong> <code>npm run build</code> produces only static
+      files (HTML/CSS/JS) — there's no running program left, unlike a Spring Boot jar. Nginx's only job is
+      serving those files to a browser over HTTP.</li>
+    <li><strong>Why <code>/usr/share/nginx/html</code> specifically:</strong> Nginx's own default document
+      root, baked into the official <code>nginx</code> image with zero config from us — documented
+      directly on that image's Docker Hub page as the intended "drop your static site here" location.
+      General habit: an official image's Docker Hub page almost always documents this kind of default path.</li>
+  </ul>
+  <div class="box why">
+    <div class="box-title"><code>EXPOSE</code> is documentation, not an action</div>
+    <code>EXPOSE 80</code> does <strong>not</strong> publish the port or make it reachable from the host —
+    it's purely metadata, telling anyone reading the Dockerfile which port the container's process listens
+    on internally. The actual publish step is <code>docker-compose.yml</code>'s <code>ports:</code> line
+    (e.g. <code>"3000:80"</code>) — <code>EXPOSE</code> documents, <code>ports:</code> publishes. Two
+    different jobs that look related.
+  </div>
 
   <h2 id="compose-file">The compose file</h2>
   <p>This project's <code>docker-compose.yml</code> lives at the repo root (not inside any service folder) since it's meant to eventually orchestrate every backend service, not just one:</p>
@@ -203,6 +244,18 @@ volumes:
     boot because of this, that's the point to add one, not before.
   </div>
 
+  <h3>Three different kinds of port conflict, seen across this project</h3>
+  <table>
+    <tr><th>Cause</th><th>Where it happened</th><th>Fix</th></tr>
+    <tr><td>Another project's leftover container</td><td>Step 2 — Case Tracking Application's Postgres held 5432</td><td><code>docker stop</code> the other project's container</td></tr>
+    <tr><td>Two of <em>our own</em> services defaulting to the same port</td><td>Move &amp; Entitlement and Claims both defaulting to 8080</td><td>Give each service its own <code>server.port</code></td></tr>
+    <tr><td>A completely unrelated, non-Docker process on the host</td><td>Step 21 — something outside Docker entirely already had 8080</td><td><code>docker ps</code> shows nothing using it → it's not a container; just pick a different port rather than hunting down the host process</td></tr>
+  </table>
+  <p>The error message looks similar in all three (<code>port is already allocated</code> / <code>bind:
+    ... Only one usage of each socket address</code>), but the diagnostic path differs — <code>docker
+    ps</code>/<code>docker compose ps</code> first to see if it's one of ours, and if nothing shows up
+    there, it's a host-level process outside Docker's visibility entirely.</p>
+
   <h2 id="env-files">Keeping secrets out of git</h2>
   <ul>
     <li><strong>What:</strong> real values live in <code>.env</code> (gitignored — covered by the root
@@ -301,5 +354,6 @@ volumes:
   <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
 </main>
 </div>
+<script src="../assets/page-nav.js"></script>
 </body>
 </html>

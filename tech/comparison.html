@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Cross-Tech Comparison</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="comparison.html" class="active">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Cross-Tech Comparison</h1>
+  <p class="subtitle">
+    Every stack this project uses, side by side, answering the same questions each time: what runs it, how
+    dependencies are managed, how the API is built, where data lives, how tests work, and how data actually
+    moves end to end. Each per-technology page (Git, Java/Spring, Docker, React/Redux) is the deep reference;
+    this page is the quick side-by-side for comparing them. A new column gets added here the first time a new
+    stack is introduced — Python/FastAPI (Phase 8) lands once that phase is finished and confirmed.
+  </p>
+
+  <h2 id="stack-overview">Stack overview</h2>
+  <table>
+    <tr>
+      <th>Question</th>
+      <th>Java / Spring Boot</th>
+      <th>React / Redux / TypeScript</th>
+    </tr>
+    <tr>
+      <td><strong>Used for</strong></td>
+      <td>Move &amp; Entitlement Service, Claims Service — the backend REST APIs</td>
+      <td>The Dashboard — the browser-side single-page app</td>
+    </tr>
+    <tr>
+      <td><strong>Server / runtime</strong></td>
+      <td>Apache Tomcat, embedded inside the app itself by Spring Boot — no separate server install. Started
+        via <code>mvn spring-boot:run</code> in dev, or <code>java -jar app.jar</code> running the packaged
+        executable JAR in prod/Docker.</td>
+      <td>Vite's dev server (<code>npm run dev</code>) during development, hot-reloading on save. In
+        prod/Docker, <code>npm run build</code> compiles to static files, and <strong>Nginx</strong> (a
+        separate, general-purpose web server) serves them — React itself never runs a server.</td>
+    </tr>
+    <tr>
+      <td><strong>Dependency file</strong></td>
+      <td><code>pom.xml</code> — declarative XML listing every library and its version. <code>mvn</code>
+        resolves and downloads them into <code>~/.m2</code>.</td>
+      <td><code>package.json</code> (+ the auto-generated lockfile <code>package-lock.json</code> for exact
+        versions). <code>npm install</code> resolves and downloads into <code>node_modules/</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>API framework</strong></td>
+      <td>Spring Web MVC (<code>spring-boot-starter-webmvc</code>). Routes are Java methods annotated
+        <code>@GetMapping</code>/<code>@PostMapping</code> inside an <code>@RestController</code> class. JSON
+        conversion is automatic, handled by Jackson.</td>
+      <td>Not a server — a <em>client</em>. Calls the Java services' REST APIs using the browser's built-in
+        <code>fetch</code>, wrapped in a small typed <code>request&lt;T&gt;</code> helper, dispatched from
+        Redux Toolkit <code>createAsyncThunk</code> actions.</td>
+    </tr>
+    <tr>
+      <td><strong>Database / data store</strong></td>
+      <td>PostgreSQL, accessed through Spring Data JPA/Hibernate — <code>@Entity</code> classes map to tables,
+        <code>JpaRepository</code> interfaces give CRUD methods with no SQL written by hand.</td>
+      <td>None directly. The Redux store holds a client-side, in-memory copy of whatever the REST APIs
+        returned — the actual source of truth is still Postgres, reached indirectly through the Java
+        services.</td>
+    </tr>
+    <tr>
+      <td><strong>Testing framework</strong></td>
+      <td>JUnit 5 + Mockito. <code>@Mock</code>/<code>MockitoExtension</code> for plain unit tests,
+        <code>@WebMvcTest</code> + <code>@MockitoBean</code> for controller slice tests, <code>@SpringBootTest</code>
+        for full-context integration tests.</td>
+      <td>Vitest (the Vite-native test runner) + React Testing Library for rendering components in tests and
+        querying them the way a user would (by visible text/role, not internal implementation detail).</td>
+    </tr>
+    <tr>
+      <td><strong>Data exchange / import-export flow</strong></td>
+      <td>Client sends JSON → Jackson deserializes it into a <code>@RequestBody</code> DTO → Controller hands
+        it to a Service → Service maps it to/from an <code>@Entity</code> and persists via JPA → Jackson
+        serializes the response DTO back to JSON on the way out.</td>
+      <td>User action → thunk calls <code>fetch</code> → JSON response comes back → a TypeScript
+        <code>interface</code> gives that JSON a compile-time-checked shape → <code>extraReducers</code>
+        writes it into the Redux store → connected components re-render automatically via
+        <code>useSelector</code>.</td>
+    </tr>
+  </table>
+
+  <div class="box why">
+    <div class="box-title">Why this page exists separately from the per-technology pages</div>
+    The Git/Java-Spring/Docker/React-Redux pages are deep references for one stack at a time — good for
+    looking something up while working in that stack. This page answers a different question: "how does
+    Java's version of X compare to React's version of X" — the shape interviewers actually ask about, and the
+    shape that's easy to forget once each stack's page is read in isolation.
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — grows by one column every time a new stack is introduced. See the individual technology pages for the full depth behind each column.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

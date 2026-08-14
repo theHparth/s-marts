@@ -41,6 +41,8 @@
   <a href="tech/git.html">Git &amp; GitHub</a>
   <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
   <a href="tech/docker.html">Docker &amp; Compose</a>
+  <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
 </nav>
@@ -53,6 +55,7 @@
     Same single page, updated in place after every step.
   </p>
 
+  <h2 id="diagram">System diagram</h2>
   <div class="arch-wrap">
     <div class="arch-diagram-col">
       <svg id="arch-svg" viewBox="0 0 1160 700" role="img" aria-label="Interactive MoveTrack Ops architecture diagram" style="width:100%; height:auto; font-family:'Segoe UI',Arial,sans-serif; display:block;">
@@ -103,10 +106,10 @@
 
         <!-- ===== NODES ===== -->
         <g class="node" data-node="dashboard">
-          <rect x="380" y="50" width="400" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <rect x="380" y="50" width="400" height="55" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="580" y="71" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2523">React + Redux Dashboard (TypeScript)</text>
-          <text x="580" y="87" text-anchor="middle" font-size="11" fill="#1f2523">embeds Svelte micro-widget</text>
-          <text x="580" y="99" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <text x="580" y="87" text-anchor="middle" font-size="11" fill="#1f2523">Svelte micro-widget not embedded yet (Phase 11)</text>
+          <text x="580" y="99" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 22-31 done, running</text>
         </g>
 
         <g class="node" data-node="gateway">
@@ -116,11 +119,11 @@
         </g>
 
         <g class="node" data-node="moveent">
-          <rect x="35" y="216" width="190" height="80" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <rect x="35" y="216" width="190" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="130" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Move &amp; Entitlement</text>
           <text x="130" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Java / Spring Boot</text>
-          <text x="130" y="268" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">Steps 1-2, 13 done</text>
-          <text x="130" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">entitlement calc not started</text>
+          <text x="130" y="268" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 1-2, 13-21 done</text>
+          <text x="130" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">containerized, running</text>
         </g>
 
         <g class="node" data-node="claims">
@@ -156,11 +159,11 @@
         </g>
 
         <g class="node" data-node="postgres">
-          <rect x="35" y="380" width="190" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <rect x="35" y="380" width="190" height="68" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="130" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">PostgreSQL (shared)</text>
           <text x="130" y="413" text-anchor="middle" font-size="10" fill="#1f2523">move_entitlement_db</text>
           <text x="130" y="425" text-anchor="middle" font-size="10" fill="#1f2523">claims_db</text>
-          <text x="130" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">container running</text>
+          <text x="130" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">serving 2 services</text>
         </g>
 
         <g class="node" data-node="mongodb">
@@ -188,10 +191,10 @@
         </g>
 
         <g class="node" data-node="ml">
-          <rect x="915" y="480" width="230" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <rect x="915" y="480" width="230" height="55" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
           <text x="1030" y="502" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Claims Triage ML</text>
-          <text x="1030" y="516" text-anchor="middle" font-size="10" fill="#1f2523">Python / scikit-learn</text>
-          <text x="1030" y="528" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <text x="1030" y="516" text-anchor="middle" font-size="10" fill="#1f2523">Python / FastAPI / scikit-learn</text>
+          <text x="1030" y="528" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">Step 32 done, in progress</text>
         </g>
 
         <g class="node" data-node="redis">
@@ -227,26 +230,31 @@
   </div>
 
   <h2>Phase-by-phase status</h2>
-  <p>Coarser than individual Steps, but this is where cross-phase dependencies actually live —
-    each row notes what it needs from an earlier phase, and what later phases will need from it.</p>
+  <p>Step ranges below are estimates, not fixed commitments — each phase's exact Steps still get
+    drafted for real when that phase is actually reached (same rule as always); ranges shift as actual
+    phases come in above/below their guess, same way Phase 1 landed at 11 Steps against an earlier ~14
+    guess. Phase 8 was pulled forward out of numeric order (right after Phase 3, skipping 4–7 for now),
+    so Phases 4–7's old sequential Step numbers no longer hold — their ranges below are marked
+    <strong>TBD</strong> until each is actually reached, same fix used earlier when Phase 2 collided with
+    Phase 1's pre-assigned numbers. Running total is provisional until 4–7 are re-numbered.</p>
   <table>
-    <tr><th>#</th><th>Phase</th><th>Status</th><th>Depends on / feeds</th></tr>
-    <tr><td>1</td><td><a href="steps.html#phase1">Move &amp; Entitlement Service</a></td><td class="mark">In progress (Steps 1-2 done)</td><td>Feeds: Phase 9 (WebSocket needs its REST API), Phase 7 (SOAP Adapter calls its REST API)</td></tr>
-    <tr><td>2</td><td><a href="steps.html#phase2">Claims Service</a></td><td class="mark">In progress (Steps 3-5 done, 6 in progress)</td><td>Feeds: Phase 8 (ML trains on claims data), Phase 9 (WebSocket)</td></tr>
-    <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>Not started</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
-    <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
-    <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>Not started</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
-    <tr><td>6</td><td>Go Ingestion Service (REST)</td><td>Not started</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
-    <tr><td>7</td><td>SOAP Legacy Adapter</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
-    <tr><td>8</td><td>Claims triage ML + Redis</td><td>Not started</td><td>Needs: Phase 2's claim data to train on</td></tr>
-    <tr><td>9</td><td>WebSocket live feed</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
-    <tr><td>10</td><td>Kafka</td><td>Not started</td><td>Needs: Phase 6 (Go service to publish to it). Feeds: Phase 8's ML pipeline, Phase 9's live feed</td></tr>
-    <tr><td>11</td><td>Svelte micro-widget</td><td>Not started</td><td>Needs: Phase 3 (embeds into the React shell)</td></tr>
-    <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
-    <tr><td>13</td><td>Raw sockets + WireGuard + failover</td><td>Not started</td><td>Extends Phase 6's Go service directly, not a separate service</td></tr>
-    <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>Not started</td><td>Needs: Phase 8's production model to compare against</td></tr>
-    <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>Not started</td><td>Needs: all services to exist first (nothing to deploy yet)</td></tr>
-    <tr><td>16</td><td>k6/Locust load test</td><td>Not started</td><td>Needs: Phase 15 (verifies autoscaling actually works)</td></tr>
+    <tr><th>#</th><th>Phase</th><th>Steps</th><th>Total</th><th>Status</th><th>Depends on / feeds</th></tr>
+    <tr><td>1</td><td><a href="steps.html#phase1">Move &amp; Entitlement Service</a></td><td>1–2, 13–21</td><td>11</td><td class="mark">Done</td><td>Feeds: Phase 9 (WebSocket needs its REST API), Phase 7 (SOAP Adapter calls its REST API)</td></tr>
+    <tr><td>2</td><td><a href="steps.html#phase2">Claims Service</a></td><td>3–12</td><td>10</td><td class="mark">Done</td><td>Feeds: Phase 8 (ML trains on claims data), Phase 9 (WebSocket)</td></tr>
+    <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>22–31</td><td>10</td><td class="mark">Done</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
+    <tr><td>8</td><td>Claims triage ML + Redis</td><td>32–40</td><td>9</td><td class="prog">In progress (Step 32 done)</td><td>Needs: Phase 2's claim data to train on. Pulled forward ahead of Phases 4–7.</td></tr>
+    <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>TBD</td><td>~18</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
+    <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>TBD</td><td>~10</td><td>Not started</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
+    <tr><td>6</td><td>Go Ingestion Service (REST)</td><td>TBD</td><td>~12</td><td>Not started</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
+    <tr><td>7</td><td>SOAP Legacy Adapter</td><td>TBD</td><td>~8</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
+    <tr><td>9</td><td>WebSocket live feed</td><td>TBD</td><td>~6</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
+    <tr><td>10</td><td>Kafka</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 6 (Go service to publish to it). Feeds: Phase 8's ML pipeline, Phase 9's live feed</td></tr>
+    <tr><td>11</td><td>Svelte micro-widget</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 3 (embeds into the React shell)</td></tr>
+    <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>TBD</td><td>~4</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
+    <tr><td>13</td><td>Raw sockets + WireGuard + failover</td><td>TBD</td><td>~12</td><td>Not started</td><td>Extends Phase 6's Go service directly, not a separate service</td></tr>
+    <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 8's production model to compare against</td></tr>
+    <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>TBD</td><td>~30</td><td>Not started</td><td>Needs: all services to exist first (nothing to deploy yet)</td></tr>
+    <tr><td>16</td><td>k6/Locust load test</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 15 (verifies autoscaling actually works)</td></tr>
   </table>
 
   <footer class="page-footer">MoveTrack Ops — updated at every PR-completion checkpoint, alongside the rest of the docs.</footer>
@@ -257,11 +265,22 @@
 (function () {
   var nodeData = {
     dashboard: {
-      name: "React + Redux Dashboard", tech: "TypeScript, embeds a Svelte micro-widget", status: "not-started",
-      port: "TBD — typically 3000 for a React dev server, not yet decided",
-      input: "User interactions in the browser", output: "REST calls + a WebSocket connection to the API Gateway",
+      name: "React + Redux Dashboard", tech: "TypeScript, Svelte micro-widget not embedded yet", status: "done",
+      port: "3000 host → 80 container (Nginx). 5173 for local npm run dev.",
+      input: "User interactions in the browser", output: "REST calls to Move & Entitlement (8082) and Claims (8081) directly — no gateway yet (Phase not started)",
       why: "Primary UI for movers, TSP coordinators, and claims adjusters — the one screen everyone actually uses.",
-      steps: []
+      steps: [
+        {n:"Step 22", t:"Vite + React + TypeScript scaffold, Redux Toolkit installed", href:"steps.html#step22", done:true},
+        {n:"Step 23", t:"Redux store setup (configureStore, Provider)", href:"steps.html#step23", done:true},
+        {n:"Step 24", t:"API client for Move & Entitlement + Claims REST APIs", href:"steps.html#step24", done:true},
+        {n:"Step 25", t:"Redux slices for moves + claims (async thunks)", href:"steps.html#step25", done:true},
+        {n:"Step 26", t:"Routing + basic page layout", href:"steps.html#step26", done:true},
+        {n:"Step 27", t:"Moves page — submit + view entitlement", href:"steps.html#step27", done:true},
+        {n:"Step 28", t:"Claims page — file + view claims", href:"steps.html#step28", done:true},
+        {n:"Step 29", t:"Component tests (Vitest + React Testing Library)", href:"steps.html#step29", done:true},
+        {n:"Step 30", t:"Containerize (Vite build + Nginx)", href:"steps.html#step30", done:true},
+        {n:"Step 31", t:"Wired into docker-compose.yml", href:"steps.html#step31", done:true}
+      ]
     },
     gateway: {
       name: "Nginx / API Gateway", tech: "Nginx, TLS termination", status: "not-started",
@@ -271,22 +290,22 @@
       steps: []
     },
     moveent: {
-      name: "Move & Entitlement Service", tech: "Java 25 / Spring Boot 4", status: "in-progress",
-      port: "8080 (Spring Boot default — not yet customized)",
-      input: "A move request (once the REST API exists) — origin, destination, rank", output: "Calculated entitlement (JTR weight allowance), writes to move_entitlement_db",
+      name: "Move & Entitlement Service", tech: "Java 25 / Spring Boot 4", status: "done",
+      port: "8082 (fixed in Step 21 — a completely unrelated host process, not Docker, already had 8080)",
+      input: "A move request via POST /api/move-requests — origin, destination, rank", output: "Calculated entitlement (JTR weight allowance), writes to move_entitlement_db",
       why: "Calculates what the government pays for a move based on rank, and logs change-control approval for any change to the weight-allowance rules.",
       steps: [
         {n:"Step 1", t:"Service skeleton generated", href:"steps.html#step1", done:true},
         {n:"Step 2", t:"Wired to local Postgres", href:"steps.html#step2", done:true},
         {n:"Step 13", t:"MoveRequest entity + Rank enum + repository", href:"steps.html#step13", done:true},
-        {n:"Step 14", t:"WeightAllowance entity + repository + JTR seed data", href:null, done:false},
-        {n:"Step 15", t:"EntitlementCalculationService (business logic)", href:null, done:false},
-        {n:"Step 16", t:"ChangeControlRecord entity + repository", href:null, done:false},
-        {n:"Step 17", t:"Change-control logging service", href:null, done:false},
-        {n:"Step 18", t:"Unit tests — entitlement calc + change control", href:null, done:false},
-        {n:"Step 19", t:"REST API — MoveController + DTOs", href:null, done:false},
-        {n:"Step 20", t:"Integration tests for the REST API", href:null, done:false},
-        {n:"Step 21", t:"Containerize", href:null, done:false}
+        {n:"Step 14", t:"WeightAllowance entity + repository + JTR seed data", href:"steps.html#step14", done:true},
+        {n:"Step 15", t:"EntitlementCalculationService (business logic)", href:"steps.html#step15", done:true},
+        {n:"Step 16", t:"ChangeControlRecord entity + repository", href:"steps.html#step16", done:true},
+        {n:"Step 17", t:"Change-control logging service", href:"steps.html#step17", done:true},
+        {n:"Step 18", t:"Unit tests — entitlement calc + change control", href:"steps.html#step18", done:true},
+        {n:"Step 19", t:"REST API — MoveController + DTOs", href:"steps.html#step19", done:true},
+        {n:"Step 20", t:"Integration tests for the REST API", href:"steps.html#step20", done:true},
+        {n:"Step 21", t:"Containerize, port fix to 8082", href:"steps.html#step21", done:true}
       ]
     },
     claims: {
@@ -330,7 +349,7 @@
       steps: []
     },
     postgres: {
-      name: "PostgreSQL (shared container)", tech: "postgres:17-alpine, Docker Compose", status: "in-progress",
+      name: "PostgreSQL (shared container)", tech: "postgres:17-alpine, Docker Compose", status: "done",
       port: "5432 (real, confirmed — docker-compose.yml)",
       input: "JPA/Hibernate writes from Move & Entitlement and Claims Service",
       output: "Two isolated databases: move_entitlement_db, claims_db — one container, database-per-service",
@@ -367,11 +386,22 @@
       steps: []
     },
     ml: {
-      name: "Claims Triage ML", tech: "Python / scikit-learn (production)", status: "not-started",
-      port: "N/A — not a network service, a scheduled/batch scoring job",
-      input: "Claims data from Kafka/Claims Service", output: "A triage classification feeding the claims workflow",
+      name: "Claims Triage ML", tech: "Python / FastAPI / scikit-learn (production)", status: "in-progress",
+      port: "TBD — will be a real FastAPI network service (revised from the original batch-job guess), not yet assigned",
+      input: "Claim features (amount, description) via a future /predict endpoint; consumes real-time claims from Kafka once Phase 10 exists",
+      output: "A triage classification/priority for the claims workflow",
       why: "Small, fast, right-sized model for a tabular classification task — compared against PyTorch/TensorFlow in a separate research track (Phase 14) before choosing this as the deployed one.",
-      steps: []
+      steps: [
+        {n:"Step 32", t:"Python venv + requirements.txt (scikit-learn, pandas, FastAPI, Redis client)", href:null, done:true},
+        {n:"Step 33", t:"Small representative training dataset", href:null, done:false},
+        {n:"Step 34", t:"Train the scikit-learn classifier, save model to disk", href:null, done:false},
+        {n:"Step 35", t:"FastAPI service — /predict endpoint", href:null, done:false},
+        {n:"Step 36", t:"Redis caching layer for predictions", href:null, done:false},
+        {n:"Step 37", t:"Unit tests (pytest) for prediction logic", href:null, done:false},
+        {n:"Step 38", t:"API integration tests (FastAPI TestClient)", href:null, done:false},
+        {n:"Step 39", t:"Containerize (Python/FastAPI Dockerfile)", href:null, done:false},
+        {n:"Step 40", t:"Wired into docker-compose.yml (+ Redis service)", href:null, done:false}
+      ]
     }
   };
 
@@ -459,6 +489,7 @@
   });
 })();
 </script>
+<script src="assets/page-nav.js"></script>
 
 </body>
 </html>

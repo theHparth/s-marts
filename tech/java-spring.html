@@ -18,6 +18,8 @@
   <a href="git.html">Git &amp; GitHub</a>
   <a href="java-spring.html" class="active">Java, Spring &amp; Maven</a>
   <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
 </nav>
@@ -192,6 +194,38 @@ spring.jpa.show-sql=true</code></pre>
     <tr><td><code>spring.jpa.show-sql=true</code></td><td>Prints every generated SQL statement to the console — useful while learning to see what Hibernate is actually doing, usually turned off (or routed to a real logger) once that's no longer needed.</td></tr>
   </table>
 
+  <h2 id="sql-seeding">Seeding reference data with <code>data.sql</code></h2>
+  <p>How Move &amp; Entitlement's JTR weight-allowance table gets populated — different mechanism from
+    Claims' <code>claims_db</code> creation (<a href="docker.html#multi-database-init">Docker &amp; Compose
+    → Multiple databases, one container</a>, a Postgres-level init script that runs once). This one is
+    Spring-level, and runs on <em>every</em> startup.</p>
+  <pre><code>spring.sql.init.mode=always
+spring.jpa.defer-datasource-initialization=true</code></pre>
+  <table>
+    <tr><th>Property</th><th>Why it's needed</th></tr>
+    <tr><td><code>spring.sql.init.mode=always</code></td><td>Spring Boot only auto-runs <code>src/main/resources/data.sql</code> for embedded databases by default — this forces it to run against a real external Postgres too.</td></tr>
+    <tr><td><code>spring.jpa.defer-datasource-initialization=true</code></td><td>Without this, <code>data.sql</code> runs <em>before</em> Hibernate creates the tables (<code>ddl-auto=update</code>), failing with "table does not exist." This flips the order.</td></tr>
+  </table>
+  <div class="box gotcha">
+    <div class="box-title"><code>data.sql</code> runs on every restart — make it idempotent</div>
+    Unlike a Docker init script (only runs once, on a genuinely empty volume — see Step 4), Spring's
+    <code>data.sql</code> runs on <em>every</em> application startup. A plain <code>INSERT</code> would
+    crash the second time the app starts with a duplicate-key error. Fixed with Postgres's upsert syntax:
+    <code>ON CONFLICT (rank) DO NOTHING</code> — requires a <code>unique</code> constraint on that column
+    (<code>@Column(unique = true)</code> on the entity) for Postgres to know what "conflict" even means.
+  </div>
+
+  <h2 id="argument-captor">Mockito's <code>ArgumentCaptor</code></h2>
+  <p>A step further than a plain stub. <code>when(...).thenReturn(...)</code> controls what a mock gives
+    back; <code>ArgumentCaptor</code> instead <strong>captures what was actually passed in</strong> to a
+    mocked method call, so the test can assert on it afterward.</p>
+  <pre><code>ArgumentCaptor&lt;ChangeControlRecord&gt; captor = ArgumentCaptor.forClass(ChangeControlRecord.class);
+verify(changeControlRecordRepository).save(captor.capture());
+assertThat(captor.getValue().getOldValue()).isEqualTo("7000");</code></pre>
+  <p>Used to prove <code>WeightAllowanceChangeService</code> actually logged the <em>correct</em> old/new
+    values — a plain <code>verify(...).save(any())</code> would only prove <code>save()</code> got called
+    at all, not that what it saved was right.</p>
+
   <h2 id="layers">Layers — DTO vs. entity vs. repository vs. service vs. config</h2>
   <table>
     <tr><th>Layer</th><th>Annotation</th><th>Holds</th><th>Real-life equivalent</th></tr>
@@ -270,6 +304,21 @@ spring.jpa.show-sql=true</code></pre>
       (<code>spring-boot-starter-web</code>, etc.) that pull in a coherent, working set of versions so you
       get a running app with minimal config.</div>
   </div>
+  <div class="qa" id="qa-data-sql-idempotent">
+    <div class="q">Why does <code>data.sql</code> need <code>ON CONFLICT DO NOTHING</code> but a Docker Postgres init script doesn't?</div>
+    <div class="a">They run at different frequencies. A Docker <code>/docker-entrypoint-initdb.d</code>
+      script only runs once, on a genuinely empty data volume — never again after that. Spring's
+      <code>data.sql</code> runs on <em>every</em> application startup by design, so a plain
+      <code>INSERT</code> would hit a duplicate-key error on the second restart. <code>ON CONFLICT DO
+      NOTHING</code> makes it safe to re-run — insert if missing, silently skip if already there.</div>
+  </div>
+  <div class="qa" id="qa-argument-captor">
+    <div class="q">What does <code>ArgumentCaptor</code> prove that a plain <code>verify(mock).method()</code> doesn't?</div>
+    <div class="a"><code>verify(...)</code> alone only proves a method got called — not what it was called
+      <em>with</em>. <code>ArgumentCaptor</code> grabs the actual argument passed in, so a test can assert
+      on its contents — e.g. proving a change-control log entry recorded the correct old and new values,
+      not just that <em>some</em> record got saved.</div>
+  </div>
   <div class="qa" id="qa-jpa-vs-jdbc">
     <div class="q">Why JPA/Hibernate instead of writing raw SQL with JDBC directly?</div>
     <div class="a">JPA maps Java objects to rows so most CRUD never needs hand-written SQL, which is faster
@@ -288,5 +337,6 @@ spring.jpa.show-sql=true</code></pre>
   <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
 </main>
 </div>
+<script src="../assets/page-nav.js"></script>
 </body>
 </html>
