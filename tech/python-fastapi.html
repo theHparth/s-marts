@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Python, FastAPI &amp; scikit-learn</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html" class="active">Python, FastAPI &amp; scikit-learn</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+</nav>
+
+<main>
+  <h1>Python, FastAPI &amp; scikit-learn <span class="tag">Phase 8</span></h1>
+  <p class="subtitle">
+    Fundamentals + how this project actually uses it. For when each piece was introduced, see the
+    <a href="../steps.html#phase8">Steps page → Phase 8</a>. This page was written as pre-study material
+    before Phase 8's steps were actually built — content will be corrected/confirmed once the real code
+    exists and gets tested.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 8 (Claims Triage ML) is in progress. Everything on this page reflects the <em>planned</em>
+    implementation given in the Step 33-40 instructions — read it now to get familiar with the tools before
+    writing code, then it gets corrected/confirmed against what actually got built and tested.
+  </div>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>Python</strong></td><td>An interpreted, dynamically-typed language — no compile step, code runs directly. First non-JVM, non-Node stack in this project.</td></tr>
+    <tr><td><strong>venv</strong></td><td>Python's built-in per-project dependency isolation — same purpose as <code>node_modules</code> per npm project, just a different mechanism (an isolated Python interpreter copy, not a folder of packages).</td></tr>
+    <tr><td><strong>pip</strong></td><td>Python's package installer — same role as <code>npm</code>/Maven, installs from PyPI (Python's package registry).</td></tr>
+    <tr><td><strong>pandas</strong></td><td>A library for tabular data — loads CSVs into a DataFrame (a table object) you can filter/transform/query.</td></tr>
+    <tr><td><strong>scikit-learn</strong></td><td>The standard library for classical (non-deep-learning) ML — classification, regression, clustering on tabular data.</td></tr>
+    <tr><td><strong>FastAPI</strong></td><td>A Python web framework for building APIs — defines routes, validates requests, similar role to Spring's <code>@RestController</code>.</td></tr>
+    <tr><td><strong>Uvicorn</strong></td><td>The ASGI server that actually runs a FastAPI app and listens on a port — FastAPI itself doesn't bundle a server.</td></tr>
+    <tr><td><strong>Pydantic</strong></td><td>Defines typed request/response shapes using Python type hints — same concept as a Java DTO or a TypeScript interface.</td></tr>
+    <tr><td><strong>Redis</strong></td><td>An in-memory key-value store, used here to cache prediction results.</td></tr>
+    <tr><td><strong>pytest</strong></td><td>Python's standard test runner — same role as JUnit (Java) or Vitest (TypeScript).</td></tr>
+  </table>
+
+  <h2 id="venv">Virtual environments &amp; <code>requirements.txt</code></h2>
+  <p>Every Python project should isolate its own dependencies so two projects on the same machine can use
+    different (even conflicting) library versions without stepping on each other.</p>
+  <pre><code># create an isolated environment, once per project
+python -m venv venv
+
+# activate it (Windows)
+venv\Scripts\activate
+
+# install a package into the active venv only
+pip install fastapi
+
+# freeze exact installed versions into a file others can reproduce
+pip freeze &gt; requirements.txt
+
+# recreate the same environment elsewhere
+pip install -r requirements.txt</code></pre>
+  <div class="box why">
+    <div class="box-title">Same idea as <code>node_modules</code>/<code>pom.xml</code>, different mechanics</div>
+    npm isolates by putting packages in a project-local <code>node_modules</code> folder. Maven uses a
+    shared <code>~/.m2</code> cache keyed by exact version per <code>pom.xml</code>. Python's <code>venv</code>
+    does it differently again — it creates an entire isolated copy of the Python interpreter and its
+    package directory inside the <code>venv/</code> folder, and <code>activate</code> points your shell's
+    <code>python</code>/<code>pip</code> commands at that copy instead of the system-wide install. Three
+    different mechanisms, same underlying goal: this project's dependencies don't leak into or get
+    clobbered by any other project's.
+  </div>
+  <p><code>requirements.txt</code> is the Python equivalent of <code>package.json</code>'s dependency list or
+    <code>pom.xml</code>'s <code>&lt;dependencies&gt;</code> block — a plain text file, one
+    <code>package==version</code> per line, regenerated with <code>pip freeze &gt; requirements.txt</code>
+    after installing something new.</p>
+  <p><code>venv/</code> itself is never committed to git — same treatment as <code>node_modules/</code>, listed
+    in <code>.gitignore</code>. Only <code>requirements.txt</code> is tracked; anyone cloning the repo runs
+    <code>pip install -r requirements.txt</code> to reproduce it.</p>
+
+  <h2 id="pandas">pandas — loading and shaping tabular data</h2>
+  <p>A DataFrame is pandas' table object — rows and named columns, like a spreadsheet or a SQL result set held
+    in memory.</p>
+  <pre><code>import pandas as pd
+
+df = pd.read_csv("data/claims_sample.csv")
+X = df[["claim_amount", "days_since_incident", "claim_type", "description_length"]]
+y = df["priority"]</code></pre>
+  <table>
+    <tr><th>pandas</th><th>Closest equivalent</th></tr>
+    <tr><td><code>pd.read_csv(path)</code></td><td>Reading a ResultSet / a CSV parsed into a Java <code>List&lt;Row&gt;</code></td></tr>
+    <tr><td><code>df["col"]</code></td><td>Selecting one column — like a SQL <code>SELECT col</code></td></tr>
+    <tr><td><code>df[["a","b"]]</code></td><td>Selecting several columns at once</td></tr>
+  </table>
+
+  <h2 id="sklearn-pipeline">scikit-learn — building a classification pipeline</h2>
+  <p>The goal: turn labeled historical examples (features → a known priority) into a reusable trained object
+    that can predict the priority for a <em>new</em>, unseen claim.</p>
+  <table>
+    <tr><th>Concept</th><th>What it does</th><th>Analogy</th></tr>
+    <tr><td><code>ColumnTransformer</code> + <code>OneHotEncoder</code></td><td>Converts a text category (<code>claim_type</code>) into numeric 0/1 columns the model can use</td><td>Same idea as a Java enum → int mapping, automated</td></tr>
+    <tr><td><code>Pipeline</code></td><td>Chains preprocessing + model into one object so both always run together, in order</td><td>Like a Spring <code>@Configuration</code> wiring beans in sequence</td></tr>
+    <tr><td><code>train_test_split</code></td><td>Splits data into a training portion and a held-out testing portion</td><td>Not grading yourself on questions you already saw the answers to</td></tr>
+    <tr><td><code>RandomForestClassifier</code></td><td>The actual model — an ensemble of decision trees voting on the answer</td><td>Right-sized for small tabular data, unlike a neural network</td></tr>
+    <tr><td><code>.fit(X, y)</code></td><td>Trains the model on the training split</td><td>Calling <code>.build()</code> on a builder — produces the trained object</td></tr>
+    <tr><td><code>.predict(X)</code></td><td>Runs the trained model on new data</td><td>Calling a method — feed input, get output</td></tr>
+    <tr><td><code>joblib.dump</code> / <code>joblib.load</code></td><td>Serializes the trained pipeline to a file and loads it back later</td><td>Same purpose as a compiled <code>.jar</code> — a reusable built artifact, no retraining needed every run</td></tr>
+  </table>
+  <pre><code>from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+import joblib
+
+preprocessor = ColumnTransformer(
+    transformers=[("category", OneHotEncoder(handle_unknown="ignore"), ["claim_type"])],
+    remainder="passthrough",
+)
+pipeline = Pipeline(steps=[
+    ("preprocess", preprocessor),
+    ("classify", RandomForestClassifier(n_estimators=100, random_state=42)),
+])
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+pipeline.fit(X_train, y_train)
+
+joblib.dump(pipeline, "model/triage_model.joblib")
+# later, anywhere:
+model = joblib.load("model/triage_model.joblib")
+model.predict(new_row)</code></pre>
+  <div class="box why">
+    <div class="box-title">Why scikit-learn, not PyTorch/TensorFlow</div>
+    This is a small, tabular classification problem — a handful of numeric/categorical columns predicting
+    one of three labels. scikit-learn is the right-sized tool for that. PyTorch/TensorFlow are built for
+    neural networks on unstructured data (images, text, audio) — that comparison is deliberately explored
+    later, in Phase 14's research track, as a "would a heavier model actually do better here" experiment.
+  </div>
+
+  <h2 id="fastapi-basics">FastAPI — defining the API</h2>
+  <p>Two pieces work together, same split you already know from Spring Boot bundling Tomcat — except FastAPI
+    does <em>not</em> bundle a server:</p>
+  <table>
+    <tr><th>Piece</th><th>Role</th></tr>
+    <tr><td><strong>FastAPI</strong></td><td>Defines the app and its routes — like <code>@RestController</code> + <code>@GetMapping</code>/<code>@PostMapping</code></td></tr>
+    <tr><td><strong>Uvicorn</strong></td><td>The server that actually runs the app and listens on a port — you run this yourself, unlike Spring Boot's bundled Tomcat</td></tr>
+  </table>
+  <pre><code>from fastapi import FastAPI
+
+app = FastAPI(title="Claims Triage ML Service")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/predict")
+def predict(features: ClaimFeatures):
+    ...</code></pre>
+  <pre><code># run it
+uvicorn app.main:app --reload --port 8000</code></pre>
+  <div class="box tip">
+    <div class="box-title">Auto-generated docs — a real FastAPI selling point</div>
+    Visiting <code>http://localhost:8000/docs</code> shows an interactive Swagger UI generated automatically
+    from the route definitions and Pydantic models below — no extra annotations or separate doc-writing step.
+  </div>
+
+  <h2 id="pydantic">Pydantic — typed request/response shapes</h2>
+  <p>Same concept as a Java DTO or a TypeScript <code>interface</code> — a typed shape for data crossing a
+    boundary — just expressed as a Python class with type hints. FastAPI uses it to auto-validate incoming
+    JSON and reject bad requests with a <code>422</code> before your code even runs.</p>
+  <pre><code>from pydantic import BaseModel, Field
+from typing import Literal
+
+class ClaimFeatures(BaseModel):
+    claim_amount: float = Field(..., gt=0)
+    days_since_incident: int = Field(..., ge=0)
+    claim_type: Literal["household_goods", "vehicle_damage", "personal_property", "temporary_lodging"]
+    description_length: int = Field(..., ge=0)</code></pre>
+  <table>
+    <tr><th>Concept</th><th>Java DTO</th><th>TypeScript interface</th><th>Pydantic</th></tr>
+    <tr><td>Defines a shape</td><td><code>class ClaimDto</code></td><td><code>interface Claim</code></td><td><code>class ClaimFeatures(BaseModel)</code></td></tr>
+    <tr><td>Validates on the way in</td><td>Bean Validation annotations</td><td>Compile-time only, no runtime check</td><td>Built in — runs at request time, not just compile time</td></tr>
+  </table>
+
+  <h2 id="redis-caching">Redis — caching predictions</h2>
+  <p>An in-memory key-value store. Here it caches prediction results so an identical request doesn't re-run
+    the model every time — a cache key is a hash of the request's feature values, so the same input always
+    maps to the same key.</p>
+  <pre><code>import hashlib, json, os, redis
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+
+def cache_key(features: dict) -> str:
+    payload = json.dumps(features, sort_keys=True)
+    return "triage:" + hashlib.sha256(payload.encode()).hexdigest()
+
+client.set(cache_key(features), priority, ex=300)   # ex = TTL in seconds
+client.get(cache_key(features))                       # None if missing/expired</code></pre>
+  <div class="box why">
+    <div class="box-title"><code>REDIS_HOST</code> default <code>localhost</code> — same networking rule as Postgres</div>
+    Reaching Redis from your host machine (or a standalone test container) uses <code>localhost</code> plus
+    its published port. Once wired into <code>docker-compose.yml</code>, the FastAPI container reaches Redis
+    by <strong>service name</strong> (<code>redis</code>) instead — the exact same container-networking
+    mechanism already used for <code>SPRING_DATASOURCE_URL</code> pointing at <code>postgres</code> rather
+    than <code>localhost</code>.
+  </div>
+
+  <h2 id="pytest-testclient">Testing — pytest and FastAPI's TestClient</h2>
+  <p>pytest is Python's test runner — the same underlying concept as JUnit and Vitest, a third toolchain's
+    mechanics:</p>
+  <table>
+    <tr><th>Concept</th><th>JUnit</th><th>Vitest</th><th>pytest</th></tr>
+    <tr><td>Test discovery</td><td><code>@Test</code>-annotated methods</td><td>files named <code>*.test.ts</code></td><td>functions named <code>test_*</code> in files named <code>test_*.py</code> — no annotation needed</td></tr>
+    <tr><td>Assertion</td><td><code>assertEquals(a, b)</code></td><td><code>expect(a).toBe(b)</code></td><td>plain <code>assert a == b</code></td></tr>
+    <tr><td>Run command</td><td><code>mvn test</code></td><td><code>npm test</code></td><td><code>pytest</code></td></tr>
+  </table>
+  <p>FastAPI's <code>TestClient</code> is the same "slice test" idea as Spring's <code>@WebMvcTest</code> or
+    React Testing Library — spin the app up in-process, send fake requests, assert on the response, no real
+    network socket involved.</p>
+  <pre><code>from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_predict_happy_path():
+    response = client.post("/predict", json={
+        "claim_amount": 9500, "days_since_incident": 70,
+        "claim_type": "vehicle_damage", "description_length": 200,
+    })
+    assert response.status_code == 200
+    assert response.json()["priority"] in ("low", "medium", "high")</code></pre>
+
+  <h2 id="python-dockerfile">Containerizing a Python service — why no multi-stage build</h2>
+  <p>Java's JDK→JRE and Node's build→Nginx Dockerfiles both use multi-stage builds to keep a heavy build
+    toolchain out of the final runtime image. Python doesn't have that same split for a project like this
+    one:</p>
+  <pre><code>FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+  <div class="box why">
+    <div class="box-title">Multi-stage is a tool for a specific problem, not a universal rule</div>
+    <code>pip install</code> downloads prebuilt wheels for scikit-learn/pandas — no compiler needed, unlike
+    Maven compiling <code>.java</code> into <code>.class</code> files or Vite bundling TypeScript into static
+    JS. There's no separate "compiled artifact" a second stage would need to copy out. One
+    <code>python:3.12-slim</code> stage is genuinely correct here — worth stating explicitly if asked "why no
+    multi-stage" in an interview.
+  </div>
+  <p><code>requirements.txt</code> is copied and installed before <code>COPY . .</code> — the same
+    manifest-first layer-caching trick already used for <code>pom.xml</code> (Maven) and <code>package.json</code>
+    (npm): dependencies only reinstall when <code>requirements.txt</code> actually changes, not on every code
+    edit.</p>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-python-why-no-multistage">
+    <div class="q">Why doesn't the Python service use a multi-stage Docker build like the Java and Node services do?</div>
+    <div class="a">Multi-stage builds exist to keep a heavy build toolchain out of the final runtime image —
+      the JDK vs JRE split, or Vite's build tooling vs the static output Nginx serves. Python's dependencies
+      install as prebuilt wheels with no compilation step, so there's no separate "build artifact" a second
+      stage would need to extract. A single <code>python:3.12-slim</code> stage is the correct choice here,
+      not a shortcut.</div>
+  </div>
+  <div class="qa" id="qa-python-pipeline-purpose">
+    <div class="q">What does wrapping preprocessing and the classifier in a scikit-learn <code>Pipeline</code> actually buy you?</div>
+    <div class="a">It guarantees the exact same preprocessing (the <code>OneHotEncoder</code> for
+      <code>claim_type</code>) runs identically at training time and at prediction time, and lets the whole
+      thing be saved/loaded as one <code>joblib</code> artifact instead of having to remember to apply
+      preprocessing by hand before every prediction.</div>
+  </div>
+  <div class="qa" id="qa-python-redis-why">
+    <div class="q">Why cache predictions in Redis instead of just recomputing them every time?</div>
+    <div class="a">The model call itself is cheap here, but the pattern matters more than the raw speed —
+      identical requests (e.g. a retry, or the same claim re-checked) shouldn't pay compute cost twice. It's
+      a standard latency/cost-reduction pattern, and a real interview talking point about caching
+      idempotent, deterministic operations.</div>
+  </div>
+  <div class="qa" id="qa-python-pytest-vs-others">
+    <div class="q">How does pytest compare to the testing tools used elsewhere in this project?</div>
+    <div class="a">Same underlying concept as JUnit (Java) and Vitest (TypeScript) — write a function, assert
+      on the result, a runner discovers and executes them. pytest's discovery is purely convention-based
+      (files/functions named <code>test_*</code>), with no annotations needed, unlike JUnit's
+      <code>@Test</code>.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html#phase8">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

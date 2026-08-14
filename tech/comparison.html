@@ -19,6 +19,7 @@
   <a href="java-spring.html">Java, Spring &amp; Maven</a>
   <a href="docker.html">Docker &amp; Compose</a>
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="comparison.html" class="active">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -29,9 +30,10 @@
   <p class="subtitle">
     Every stack this project uses, side by side, answering the same questions each time: what runs it, how
     dependencies are managed, how the API is built, where data lives, how tests work, and how data actually
-    moves end to end. Each per-technology page (Git, Java/Spring, Docker, React/Redux) is the deep reference;
-    this page is the quick side-by-side for comparing them. A new column gets added here the first time a new
-    stack is introduced — Python/FastAPI (Phase 8) lands once that phase is finished and confirmed.
+    moves end to end. Each per-technology page (Git, Java/Spring, Docker, React/Redux, Python/FastAPI) is the
+    deep reference; this page is the quick side-by-side for comparing them. A new column gets added the first
+    time a new stack is introduced. The Python/FastAPI column is marked <strong>Planned</strong> — Phase 8 is
+    still in progress, so it reflects the planned implementation, not yet-confirmed real code.
   </p>
 
   <h2 id="stack-overview">Stack overview</h2>
@@ -40,11 +42,13 @@
       <th>Question</th>
       <th>Java / Spring Boot</th>
       <th>React / Redux / TypeScript</th>
+      <th>Python / FastAPI <span class="tag" style="margin-left:0;">Planned</span></th>
     </tr>
     <tr>
       <td><strong>Used for</strong></td>
       <td>Move &amp; Entitlement Service, Claims Service — the backend REST APIs</td>
       <td>The Dashboard — the browser-side single-page app</td>
+      <td>Claims Triage ML — a prediction API for claim priority</td>
     </tr>
     <tr>
       <td><strong>Server / runtime</strong></td>
@@ -54,6 +58,8 @@
       <td>Vite's dev server (<code>npm run dev</code>) during development, hot-reloading on save. In
         prod/Docker, <code>npm run build</code> compiles to static files, and <strong>Nginx</strong> (a
         separate, general-purpose web server) serves them — React itself never runs a server.</td>
+      <td><strong>Uvicorn</strong> — FastAPI does not bundle a server the way Spring Boot bundles Tomcat; you
+        run Uvicorn yourself (<code>uvicorn app.main:app</code>) to actually listen on a port.</td>
     </tr>
     <tr>
       <td><strong>Dependency file</strong></td>
@@ -61,6 +67,9 @@
         resolves and downloads them into <code>~/.m2</code>.</td>
       <td><code>package.json</code> (+ the auto-generated lockfile <code>package-lock.json</code> for exact
         versions). <code>npm install</code> resolves and downloads into <code>node_modules/</code>.</td>
+      <td><code>requirements.txt</code> — a plain <code>package==version</code> list, regenerated with
+        <code>pip freeze &gt; requirements.txt</code>. Installed into an isolated <code>venv/</code>, this
+        project's per-project dependency isolation.</td>
     </tr>
     <tr>
       <td><strong>API framework</strong></td>
@@ -70,6 +79,8 @@
       <td>Not a server — a <em>client</em>. Calls the Java services' REST APIs using the browser's built-in
         <code>fetch</code>, wrapped in a small typed <code>request&lt;T&gt;</code> helper, dispatched from
         Redux Toolkit <code>createAsyncThunk</code> actions.</td>
+      <td>FastAPI. Routes are Python functions decorated <code>@app.get</code>/<code>@app.post</code>. Request
+        validation is automatic, handled by Pydantic models.</td>
     </tr>
     <tr>
       <td><strong>Database / data store</strong></td>
@@ -78,6 +89,8 @@
       <td>None directly. The Redux store holds a client-side, in-memory copy of whatever the REST APIs
         returned — the actual source of truth is still Postgres, reached indirectly through the Java
         services.</td>
+      <td>No database — a trained scikit-learn model (<code>triage_model.joblib</code>, loaded at startup)
+        plus Redis as a prediction cache, not a system of record.</td>
     </tr>
     <tr>
       <td><strong>Testing framework</strong></td>
@@ -86,6 +99,8 @@
         for full-context integration tests.</td>
       <td>Vitest (the Vite-native test runner) + React Testing Library for rendering components in tests and
         querying them the way a user would (by visible text/role, not internal implementation detail).</td>
+      <td>pytest for plain unit tests (discovery by naming convention, no annotations), FastAPI's
+        <code>TestClient</code> for the same "slice test" idea as <code>@WebMvcTest</code>/RTL.</td>
     </tr>
     <tr>
       <td><strong>Data exchange / import-export flow</strong></td>
@@ -96,6 +111,9 @@
         <code>interface</code> gives that JSON a compile-time-checked shape → <code>extraReducers</code>
         writes it into the Redux store → connected components re-render automatically via
         <code>useSelector</code>.</td>
+      <td>Client sends JSON → Pydantic validates and parses it into a typed request object → pandas builds a
+        one-row DataFrame from it → the loaded scikit-learn pipeline predicts a priority → the result is
+        cached in Redis and returned as JSON.</td>
     </tr>
   </table>
 

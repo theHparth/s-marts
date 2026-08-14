@@ -19,6 +19,7 @@
   <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
   <a href="tech/docker.html">Docker &amp; Compose</a>
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -1212,6 +1213,223 @@ git pull</code></pre>
         immediately instead of it silently landing on <code>main</code> unreviewed. <code>cherry-pick</code>
         moved it to the correct branch without redoing any work.</div>
     </div>
+  </div>
+
+  <h2 id="phase8">Phase 8 — Claims Triage ML</h2>
+  <p class="pill">9 steps (32–40), 4 PRs. First Python stack in this project — Python/pip checked before
+    first use, per the standing rule. Tackled out of numeric order, right after Phase 3 (skipping 4–7 for
+    now) — see <a href="../architecture.html#diagram">Architecture</a> for why. Steps 33–40 are written as
+    <strong>pre-study material</strong>, ahead of the actual build — status flips to Done and content gets
+    corrected once each step is really built and tested.</p>
+
+  <div class="step" id="step32">
+    <div class="step-header">
+      <span class="step-num">STEP 32</span>
+      <span class="step-title">Claims Triage ML — Python venv + requirements.txt</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> isolate the service's dependencies the Python way. Full explanation on
+      <a href="tech/python-fastapi.html#venv">Python, FastAPI &amp; scikit-learn → Virtual environments &amp; requirements.txt</a>.</p>
+    <pre><code>mkdir -p services/claims-triage-ml
+cd services/claims-triage-ml
+python -m venv venv
+venv\Scripts\activate
+
+pip install scikit-learn pandas numpy fastapi uvicorn redis
+pip freeze &gt; requirements.txt</code></pre>
+    <p class="pill">First non-JVM, non-Node stack — Python/pip version checked before this step, per the
+      standing "check tooling is current" rule.</p>
+  </div>
+
+  <div class="step" id="step33">
+    <div class="step-header">
+      <span class="step-num">STEP 33</span>
+      <span class="step-title">Claims Triage ML — training dataset</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a small, representative CSV of labeled claims to train on —
+      <code>claim_amount</code>, <code>days_since_incident</code>, <code>claim_type</code>,
+      <code>description_length</code> as features, <code>priority</code> as the label. Concept reference on
+      <a href="tech/python-fastapi.html#pandas">Python, FastAPI &amp; scikit-learn → pandas</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/ml-training-data
+
+# create services/claims-triage-ml/data/claims_sample.csv
+
+git add services/claims-triage-ml/data/claims_sample.csv
+git commit -m "data: add sample training dataset for claims triage model"</code></pre>
+  </div>
+
+  <div class="step" id="step34">
+    <div class="step-header">
+      <span class="step-num">STEP 34</span>
+      <span class="step-title">Claims Triage ML — train the classifier, closes PR A</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a scikit-learn <code>Pipeline</code> (encode + classify) trained on Step 33's
+      data, saved as a reusable artifact. Full breakdown on
+      <a href="tech/python-fastapi.html#sklearn-pipeline">Python, FastAPI &amp; scikit-learn → Building a classification pipeline</a>.</p>
+    <pre><code># write services/claims-triage-ml/train_model.py
+
+python train_model.py
+# expected: prints "Test accuracy: 0.NN", creates model/triage_model.joblib
+
+git add services/claims-triage-ml/train_model.py services/claims-triage-ml/model/triage_model.joblib services/claims-triage-ml/requirements.txt
+git commit -m "feat: train scikit-learn triage classifier and save model artifact"
+git push -u origin feature/ml-training-data
+
+gh issue create --title "Train claims triage classifier" --body "Add a sample training dataset and a scikit-learn pipeline that trains and saves a triage-priority classifier."
+gh pr create --title "Add training dataset and trained triage classifier" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <div class="box tip">
+      <div class="box-title">Portfolio-project shortcut, worth naming as such</div>
+      The trained <code>.joblib</code> file gets committed to git so the service is runnable without a
+      separate training pipeline. A real production setup would push it to a model registry instead — worth
+      saying exactly that if asked about it.
+    </div>
+  </div>
+
+  <div class="step" id="step35">
+    <div class="step-header">
+      <span class="step-num">STEP 35</span>
+      <span class="step-title">Claims Triage ML — FastAPI predict endpoint</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> expose the trained model over a <code>POST /predict</code> endpoint. Full
+      explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>
+      and <a href="tech/python-fastapi.html#pydantic">→ Pydantic</a>.</p>
+    <pre><code>git checkout -b feature/ml-api
+
+# write app/__init__.py, app/schemas.py, app/main.py
+
+uvicorn app.main:app --reload --port 8000
+# verify at http://localhost:8000/docs and via curl POST /predict
+
+git add services/claims-triage-ml/app
+git commit -m "feat: add FastAPI predict endpoint for claims triage"</code></pre>
+  </div>
+
+  <div class="step" id="step36">
+    <div class="step-header">
+      <span class="step-num">STEP 36</span>
+      <span class="step-title">Claims Triage ML — Redis caching, closes PR B</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> cache repeated predictions in Redis. Full explanation on
+      <a href="tech/python-fastapi.html#redis-caching">Python, FastAPI &amp; scikit-learn → Caching predictions</a>.</p>
+    <pre><code># write app/cache.py, update app/main.py to check/set the cache
+
+docker run -d --name redis-dev -p 6379:6379 redis:alpine
+uvicorn app.main:app --reload --port 8000
+# call /predict twice with the same body — second response should show "cached": true
+docker rm -f redis-dev
+
+git add services/claims-triage-ml/app
+git commit -m "feat: cache triage predictions in Redis"
+git push -u origin feature/ml-api
+
+gh issue create --title "Add FastAPI predict endpoint with Redis caching" --body "Expose the trained triage model over a FastAPI /predict endpoint, caching repeated predictions in Redis."
+gh pr create --title "Add FastAPI prediction service and Redis caching" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+  </div>
+
+  <div class="step" id="step37">
+    <div class="step-header">
+      <span class="step-num">STEP 37</span>
+      <span class="step-title">Claims Triage ML — unit tests</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> pytest coverage for the trained model directly. Full explanation on
+      <a href="tech/python-fastapi.html#pytest-testclient">Python, FastAPI &amp; scikit-learn → Testing</a>.</p>
+    <pre><code>git checkout -b feature/ml-tests
+
+# write tests/__init__.py, tests/test_model.py
+
+pytest
+# expected: 2 passed
+
+git add services/claims-triage-ml/tests services/claims-triage-ml/requirements.txt
+git commit -m "test: add unit tests for the triage model"</code></pre>
+  </div>
+
+  <div class="step" id="step38">
+    <div class="step-header">
+      <span class="step-num">STEP 38</span>
+      <span class="step-title">Claims Triage ML — API integration tests, closes PR C</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> FastAPI's <code>TestClient</code> for the <code>/predict</code> endpoint. Same
+      slice-test idea as <code>@WebMvcTest</code>; full explanation on
+      <a href="tech/python-fastapi.html#pytest-testclient">Python, FastAPI &amp; scikit-learn → Testing</a>.</p>
+    <pre><code># write tests/test_api.py — needs redis-dev container running (from Step 36) to pass
+
+pytest
+# expected: 5 passed
+
+git add services/claims-triage-ml/tests services/claims-triage-ml/requirements.txt
+git commit -m "test: add API integration tests for the predict endpoint"
+git push -u origin feature/ml-tests
+
+gh issue create --title "Add tests for triage model and API" --body "Add pytest unit tests for the model and FastAPI TestClient integration tests for the /predict endpoint."
+gh pr create --title "Add unit and integration tests" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+  </div>
+
+  <div class="step" id="step39">
+    <div class="step-header">
+      <span class="step-num">STEP 39</span>
+      <span class="step-title">Claims Triage ML — Dockerfile</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> containerize the service — single-stage, unlike the Java/Node Dockerfiles. Full
+      explanation on
+      <a href="tech/python-fastapi.html#python-dockerfile">Python, FastAPI &amp; scikit-learn → Containerizing a Python service</a>.</p>
+    <pre><code>git checkout -b feature/ml-containerize
+
+# write Dockerfile, .dockerignore
+
+docker build -t claims-triage-ml services/claims-triage-ml
+docker run -p 8000:8000 --name ml-standalone-test claims-triage-ml
+# verify curl http://localhost:8000/health, then:
+docker rm -f ml-standalone-test
+
+git add services/claims-triage-ml/Dockerfile services/claims-triage-ml/.dockerignore
+git commit -m "feat: containerize the claims triage ML service"</code></pre>
+  </div>
+
+  <div class="step" id="step40">
+    <div class="step-header">
+      <span class="step-num">STEP 40</span>
+      <span class="step-title">Claims Triage ML — wired into docker-compose.yml, closes PR D</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> the last piece — <code>claims-triage-ml</code> and <code>redis</code> running
+      alongside the existing 4 containers. <code>REDIS_HOST: redis</code> resolves via Compose's service-name
+      networking — same mechanism as <code>SPRING_DATASOURCE_URL</code> using <code>postgres</code>; see
+      <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.</p>
+    <pre><code># add redis + claims-triage-ml services to docker-compose.yml
+
+docker compose up -d --build
+docker compose ps
+# expect redis and claims-triage-ml both Up
+
+git add docker-compose.yml
+git commit -m "feat: wire claims triage ML service and Redis into docker-compose"
+git push -u origin feature/ml-containerize
+
+gh issue create --title "Containerize and wire claims triage ML into docker-compose" --body "Add a Dockerfile for the ML service and add both it and Redis to the root docker-compose.yml."
+gh pr create --title "Containerize claims triage ML and wire into compose" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>This completes Phase 8</strong> once all 4 PRs are actually merged — 9 steps, 32–40.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

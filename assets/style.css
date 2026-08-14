@@ -298,6 +298,7 @@ tr:nth-child(even) td { background: #f7faf8; }
 
 .step-status.done { background: var(--panel-2); color: var(--accent-2); }
 .step-status.progress { background: var(--warn-bg); color: var(--warn); }
+.step-status.planned { background: var(--panel); color: var(--text-dim); border: 1px dashed var(--border); }
 
 .pill {
   display: inline-block;

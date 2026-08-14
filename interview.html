@@ -19,6 +19,7 @@
   <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
   <a href="tech/docker.html">Docker &amp; Compose</a>
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -331,6 +332,45 @@
       ever handles plain, synchronous action objects.</div>
   </div>
   <p class="pill">↳ <a href="tech/react-redux.html#qa-thunk-why">React, Redux &amp; TypeScript</a></p>
+
+  <h2 id="from-python-fastapi">From Python, FastAPI &amp; scikit-learn <span class="tag" style="margin-left:0;">Planned — Phase 8 in progress</span></h2>
+
+  <div class="qa">
+    <div class="q">Why doesn't the Python service use a multi-stage Docker build like the Java and Node services do?</div>
+    <div class="a">Multi-stage builds exist to keep a heavy build toolchain out of the final runtime image —
+      the JDK vs JRE split, or Vite's build tooling vs the static output Nginx serves. Python's dependencies
+      install as prebuilt wheels with no compilation step, so there's no separate "build artifact" a second
+      stage would need to extract. A single <code>python:3.12-slim</code> stage is the correct choice here,
+      not a shortcut.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-why-no-multistage">Python, FastAPI &amp; scikit-learn</a></p>
+
+  <div class="qa">
+    <div class="q">What does wrapping preprocessing and the classifier in a scikit-learn <code>Pipeline</code> actually buy you?</div>
+    <div class="a">It guarantees the exact same preprocessing (the <code>OneHotEncoder</code> for
+      <code>claim_type</code>) runs identically at training time and at prediction time, and lets the whole
+      thing be saved/loaded as one <code>joblib</code> artifact instead of having to remember to apply
+      preprocessing by hand before every prediction.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-pipeline-purpose">Python, FastAPI &amp; scikit-learn</a></p>
+
+  <div class="qa">
+    <div class="q">Why cache predictions in Redis instead of just recomputing them every time?</div>
+    <div class="a">The model call itself is cheap here, but the pattern matters more than the raw speed —
+      identical requests (e.g. a retry, or the same claim re-checked) shouldn't pay compute cost twice. It's
+      a standard latency/cost-reduction pattern, and a real interview talking point about caching
+      idempotent, deterministic operations.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-redis-why">Python, FastAPI &amp; scikit-learn</a></p>
+
+  <div class="qa">
+    <div class="q">How does pytest compare to the testing tools used elsewhere in this project?</div>
+    <div class="a">Same underlying concept as JUnit (Java) and Vitest (TypeScript) — write a function, assert
+      on the result, a runner discovers and executes them. pytest's discovery is purely convention-based
+      (files/functions named <code>test_*</code>), with no annotations needed, unlike JUnit's
+      <code>@Test</code>.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-pytest-vs-others">Python, FastAPI &amp; scikit-learn</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

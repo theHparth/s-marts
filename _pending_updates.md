@@ -5,10 +5,14 @@ Not linked from any page's sidebar, not part of the polished site.
 
 ---
 
-## Phase 8 (Claims Triage ML) — Steps 33-40, batched to user 2026-08-13
-- Full step batch (dataset, train model, FastAPI /predict, Redis cache, pytest unit tests, TestClient
-  integration tests, Dockerfile, compose wiring) given to user in chat as PRs A-D. Nothing built/confirmed
-  yet — wait for user to report progress/errors before writing steps.html entries.
+## Phase 8 (Claims Triage ML) — full pre-study docs pass written 2026-08-14
+- `steps.html` Steps 32 (done) - 40 (planned), `tech/python-fastapi.html` (new page), 4 Q&A entries on
+  `interview.html`, Python/FastAPI column on `tech/comparison.html` — all written from the planned Step
+  33-40 instructions, marked "Planned" status, per the new phase-start-pre-study cadence.
+- **Still pending:** once the user actually builds Steps 33-40 for real and reports progress/errors/questions,
+  do the lighter follow-up pass — flip "Planned" → "Done" per step, correct any commands/output that differed
+  from the plan, fold in real questions asked while building into python-fastapi.html + interview.html, flip
+  architecture.html's ml node to green.
 
 ## Site-structure requests, confirmed 2026-08-13 — apply during the NEXT full docs pass, not before
 1. **New page: `tech/comparison.html`** — cross-technology comparison table, NOT step-narrative. Columns =
