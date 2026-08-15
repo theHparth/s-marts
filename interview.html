@@ -21,6 +21,7 @@
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
+  <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -28,6 +29,7 @@
   <a href="notes/aws.html">AWS Notes</a>
   <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="notes/linux.html">Linux/Unix Notes</a>
+  <a href="notes/redis.html">Redis Notes</a>
 </nav>
 
 <main>
@@ -270,6 +272,15 @@
   </div>
   <p class="pill">↳ <a href="tech/java-spring.html#qa-dto-vs-entity">Java, Spring &amp; Maven</a></p>
 
+  <div class="qa">
+    <div class="q">You committed to the wrong branch — how do you fix it without losing work?</div>
+    <div class="a"><code>git cherry-pick &lt;commit-hash&gt;</code> onto the correct branch — it copies that
+      commit's changes without removing it from the original branch first, so nothing is at risk until you
+      explicitly clean up the wrong branch afterward with <code>git branch -D</code>. Safe by construction:
+      the copy exists before the original is ever touched.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/git.html#qa-cherry-pick-wrong-branch">Git &amp; GitHub</a></p>
+
   <h2 id="from-docker">From Docker &amp; Compose</h2>
 
   <div class="qa">
@@ -317,6 +328,15 @@
       process starts, reads its own argument list, and configures itself from it.</div>
   </div>
   <p class="pill">↳ <a href="tech/docker.html#qa-cmd-array-is-one-command">Docker &amp; Compose</a></p>
+
+  <div class="qa">
+    <div class="q">How do you confirm an edit to docker-compose.yml actually took effect?</div>
+    <div class="a"><code>docker compose config</code> — it prints the fully resolved compose file, with any
+      environment variables and defaults already interpolated, showing exactly what Compose is going to use.
+      More reliable than assuming a saved edit is correct, especially after a repeated error suggests the
+      "fix" didn't actually change anything.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-docker-compose-config-verify">Docker &amp; Compose</a></p>
 
   <h2 id="from-react-redux">From React, Redux &amp; TypeScript</h2>
 
@@ -404,7 +424,38 @@
   </div>
   <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-pytest-vs-others">Python, FastAPI &amp; scikit-learn</a></p>
 
-  <h2 id="from-go">From Go <span class="tag" style="margin-left:0;">Planned — Phase 6 in progress</span></h2>
+  <h2 id="from-go">From Go</h2>
+
+  <div class="qa">
+    <div class="q">Why does <code>go run main.go</code> fail with "undefined" errors once you add a second file?</div>
+    <div class="a"><code>go run main.go</code> only compiles that one named file — it doesn't know any other
+      <code>.go</code> file in the same directory exists, so anything defined elsewhere in the package (like
+      a <code>connectDB</code> function in <code>db.go</code>) shows as undefined. <code>go run .</code>
+      compiles the whole package/directory together and is the correct command once a package spans more
+      than one file.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-run-main-vs-dot">Go</a></p>
+
+  <div class="qa">
+    <div class="q">Why would a Docker build fail with "go.mod requires go >= X, running go Y"?</div>
+    <div class="a"><code>go.mod</code>'s <code>go</code> directive records a minimum required toolchain
+      version — since Go 1.21, this is strictly enforced, not just informational. If the Docker build stage's
+      base image has an older Go version than what <code>go.mod</code> demands, <code>go mod download</code>
+      refuses to run. The fix is bumping the Dockerfile's build-stage image version to match, not lowering
+      what's in <code>go.mod</code> unless there's a real reason to support an older toolchain.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-mod-version-enforcement">Go</a></p>
+
+  <div class="qa">
+    <div class="q">Why does scanning a TIMESTAMPTZ column into a Go string field panic?</div>
+    <div class="a">The <code>lib/pq</code> driver decodes a <code>TIMESTAMPTZ</code> column into a Go
+      <code>time.Time</code> value, not a string — <code>Scan</code> can't automatically convert
+      <code>time.Time</code> into a <code>*string</code> destination, so it panics with "unsupported Scan."
+      Fix it either by changing the struct field to <code>time.Time</code>, or by casting in the query itself
+      (<code>column::text</code>) so Postgres sends a string instead — the query-cast is the smaller change
+      when the rest of the code already assumes a string.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-scan-timestamp-panic">Go</a></p>
 
   <div class="qa">
     <div class="q">Why does the in-memory version of this service need a <code>sync.Mutex</code>?</div>
@@ -441,6 +492,28 @@
       refuses to compile with an unused import.</div>
   </div>
   <p class="pill">↳ <a href="tech/go.html#qa-go-blank-import">Go</a></p>
+
+  <h2 id="from-jenkins">From Jenkins, Trivy &amp; OWASP ZAP <span class="tag" style="margin-left:0;">Planned — Phase 5 in progress</span></h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between what Trivy and OWASP ZAP each check for?</div>
+    <div class="a">Trivy is SCA (Software Composition Analysis) — it inspects what's installed in an image
+      (OS packages, language dependencies) against known-CVE databases, without running anything. ZAP is DAST
+      (Dynamic Application Security Testing) — it sends real HTTP requests at a live, running application,
+      probing for actual exploitable behavior. Trivy catches "known-vulnerable software we shipped"; ZAP
+      catches "the running app actually misbehaves under attack" — different failure modes, which is why a
+      real gate runs both.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/jenkins.html#qa-jenkins-trivy-vs-zap">Jenkins, Trivy &amp; OWASP ZAP</a></p>
+
+  <div class="qa">
+    <div class="q">How does a Trivy scan actually block a build, not just report findings?</div>
+    <div class="a"><code>--exit-code 1</code> makes Trivy exit non-zero when it finds a vulnerability at or
+      above the specified severity. Since a Jenkins pipeline stage fails when its shell command exits
+      non-zero, this single flag is what turns "print a report" into "stop the pipeline" — the gate isn't a
+      separate mechanism from the scan, it's one flag away from being purely informational.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/jenkins.html#qa-jenkins-exit-code-gate">Jenkins, Trivy &amp; OWASP ZAP</a></p>
 
   <h2 id="from-sql-notes">From SQL Notes</h2>
 
@@ -567,6 +640,43 @@
       query over a text file than either of the other two.</div>
   </div>
   <p class="pill">↳ <a href="notes/linux.html#qa-linux-when-awk-vs-sed-vs-grep">Linux/Unix Notes</a></p>
+
+  <h2 id="from-redis-notes">From Redis Notes</h2>
+
+  <div class="qa">
+    <div class="q">Why is Redis so much faster than a traditional database?</div>
+    <div class="a">Data lives in RAM, not on disk — RAM access is orders of magnitude faster. Redis also
+      executes commands single-threaded, which avoids the lock-contention overhead a multi-threaded database
+      pays for concurrent access to the same data, at the cost of not parallelizing CPU-bound work across
+      cores for a single instance.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/redis.html#qa-redis-why-fast">Redis Notes</a></p>
+
+  <div class="qa">
+    <div class="q">What's the difference between RDB and AOF persistence?</div>
+    <div class="a">RDB takes periodic full snapshots — compact, fast to restart from, but can lose everything
+      since the last snapshot on a crash. AOF logs every write command and replays it on restart — much less
+      data loss, but a larger file and slower restart. They can run together: RDB for fast recovery, AOF for
+      minimal loss.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/redis.html#qa-redis-rdb-vs-aof">Redis Notes</a></p>
+
+  <div class="qa">
+    <div class="q">Is Redis Pub/Sub a reliable message queue?</div>
+    <div class="a">No — it's fire-and-forget. If no client is subscribed when <code>PUBLISH</code> runs, the
+      message is simply lost, with no delivery guarantee or replay. For durable message delivery, use Redis
+      Streams instead, or a dedicated message queue.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/redis.html#qa-redis-pubsub-durability">Redis Notes</a></p>
+
+  <div class="qa">
+    <div class="q">When would you reach for a Sorted Set instead of a plain Set?</div>
+    <div class="a">Whenever ranking or ordering matters — a leaderboard, a priority queue, "top N most
+      recent/highest-scored" queries. A plain Set only tracks unique membership with no order; a Sorted Set
+      keeps every member ordered by its score, so range queries like "top 10" are a single fast command
+      instead of fetching everything and sorting client-side.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/redis.html#qa-redis-when-sorted-set">Redis Notes</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

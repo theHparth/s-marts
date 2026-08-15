@@ -44,6 +44,7 @@
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
+  <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -51,6 +52,7 @@
   <a href="notes/aws.html">AWS Notes</a>
   <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="notes/linux.html">Linux/Unix Notes</a>
+  <a href="notes/redis.html">Redis Notes</a>
 </nav>
 
 <main style="max-width: 1400px;">
@@ -83,6 +85,9 @@
           <line class="edge" data-edge data-from="gateway" data-to="moveent" x1="500" y1="176" x2="150" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
           <line class="edge" data-edge data-from="gateway" data-to="claims" x1="530" y1="176" x2="365" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
           <line class="edge" data-edge data-from="gateway" data-to="compliance" x1="580" y1="176" x2="580" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="jenkins" data-to="compliance" x1="235" y1="500" x2="485" y2="270" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="jenkins" data-to="compliance" x="300" y="400" font-size="10.5" fill="#5b6663">scan findings (Phase 4)</text>
           <line class="edge" data-edge data-from="gateway" data-to="soap" x1="630" y1="176" x2="795" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
           <line class="edge" data-edge data-from="gateway" data-to="goingest" x1="660" y1="176" x2="1010" y2="216" stroke="#9aa39f" stroke-width="1.2" marker-end="url(#arrow)"/>
 
@@ -143,6 +148,13 @@
           <text x="365" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">containerized, running</text>
         </g>
 
+        <g class="node" data-node="jenkins">
+          <rect x="35" y="490" width="200" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="135" y="512" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Jenkins CI/CD</text>
+          <text x="135" y="526" text-anchor="middle" font-size="10" fill="#1f2523">Trivy + OWASP ZAP gate</text>
+          <text x="135" y="540" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Phase 5</text>
+        </g>
+
         <g class="node" data-node="compliance">
           <rect x="485" y="216" width="190" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
           <text x="580" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Compliance / Findings</text>
@@ -160,11 +172,11 @@
         </g>
 
         <g class="node" data-node="goingest">
-          <rect x="915" y="216" width="230" height="80" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <rect x="915" y="216" width="230" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="1030" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
           <text x="1030" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Go — REST first, Phase 6</text>
           <text x="1030" y="268" text-anchor="middle" font-size="10" fill="#1f2523">raw UDP/TCP + WireGuard later (Phase 13)</text>
-          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Steps 41-52</text>
+          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 41-52 done, containerized, running</text>
         </g>
 
         <g class="node" data-node="postgres">
@@ -254,8 +266,8 @@
     <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>22–31</td><td>10</td><td class="mark">Done</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
     <tr><td>8</td><td><a href="steps.html#phase8">Claims triage ML + Redis</a></td><td>32–40</td><td>9</td><td class="mark">Done</td><td>Needs: Phase 2's claim data to train on. Pulled forward ahead of Phases 4–7. Feeds: Phase 10 (Kafka) once that phase exists, for real-time consumption instead of synchronous /predict calls; Phase 14 (ML research track compares against this production model).</td></tr>
     <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>TBD</td><td>~18</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
-    <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>TBD</td><td>~10</td><td>Not started</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
-    <tr><td>6</td><td><a href="steps.html#phase6">Go Ingestion Service (REST)</a></td><td>41–52</td><td>12</td><td class="prog">In progress</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
+    <tr><td>5</td><td><a href="steps.html#phase5">Trivy/ZAP/Jenkins compliance gate</a></td><td>53–62</td><td>10</td><td class="prog">In progress</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
+    <tr><td>6</td><td><a href="steps.html#phase6">Go Ingestion Service (REST)</a></td><td>41–52</td><td>12</td><td class="mark">Done</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
     <tr><td>7</td><td>SOAP Legacy Adapter</td><td>TBD</td><td>~8</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
     <tr><td>9</td><td>WebSocket live feed</td><td>TBD</td><td>~6</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
     <tr><td>10</td><td>Kafka</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 6 (Go service to publish to it). Feeds: Phase 8's ML pipeline, Phase 9's live feed</td></tr>
@@ -336,6 +348,25 @@
         {n:"Step 12", t:"Wired into docker-compose.yml, verified running", href:"steps.html#step12", done:true}
       ]
     },
+    jenkins: {
+      name: "Jenkins CI/CD", tech: "Jenkins + Trivy + OWASP ZAP", status: "in-progress",
+      port: "8080 (Jenkins UI), published to host",
+      input: "Pipeline trigger (manual run for now — no GitHub webhook wired yet), the repo's Jenkinsfile",
+      output: "Trivy image-vulnerability report + ZAP baseline scan report, archived as build artifacts. Feeds Phase 4's Compliance Service once that exists.",
+      why: "The platform's own DevSecOps gate — fails the build on an unresolved critical security finding instead of just reporting it after the fact.",
+      steps: [
+        {n:"Step 53", t:"Jenkins running in Docker, initial setup + admin user", href:null, done:false},
+        {n:"Step 54", t:"Give the Jenkins container access to Docker itself", href:null, done:false},
+        {n:"Step 55", t:"First Jenkinsfile — checkout + a trivial pipeline stage", href:null, done:false},
+        {n:"Step 56", t:"Build stage — docker build the Go service inside the pipeline", href:null, done:false},
+        {n:"Step 57", t:"Trivy stage — scan the built image for vulnerabilities", href:null, done:false},
+        {n:"Step 58", t:"Compliance gate — fail the build on HIGH/CRITICAL findings", href:null, done:false},
+        {n:"Step 59", t:"OWASP ZAP baseline scan stage against a running service", href:null, done:false},
+        {n:"Step 60", t:"Archive Trivy + ZAP reports as Jenkins build artifacts", href:null, done:false},
+        {n:"Step 61", t:"Prove the gate actually fails on a real finding", href:null, done:false},
+        {n:"Step 62", t:"Final end-to-end pipeline run, merge", href:null, done:false}
+      ]
+    },
     compliance: {
       name: "Compliance / Findings Service", tech: "Python / FastAPI", status: "not-started",
       port: "TBD", input: "Trivy + OWASP ZAP scan output from the Jenkins pipeline (Phase 5)",
@@ -351,24 +382,24 @@
       steps: []
     },
     goingest: {
-      name: "Shipment Ingestion Service", tech: "Go", status: "in-progress",
-      port: "8090 (planned) — REST only for now; raw UDP/TCP ports added in Phase 13",
+      name: "Shipment Ingestion Service", tech: "Go", status: "done",
+      port: "8090, published to host — POST/GET /ingest, GET /health",
       input: "Phase 6: REST POST from carriers/simulated devices. Phase 13 later: raw UDP (frequent, lightweight) and raw TCP (occasional, higher-reliability) over a WireGuard tunnel",
-      output: "Phase 6: persisted to its own Postgres database. Phase 10 later: normalized events published to Kafka (shipment.tracking topic) instead/in addition",
+      output: "Phase 6: persisted to its own Postgres database (shipment_ingestion). Phase 10 later: normalized events published to Kafka (shipment.tracking topic) instead/in addition",
       why: "Go's goroutines hold many concurrent, mostly-idle device connections far more cheaply than a JVM thread-per-request model — the language choice and this service's whole reason to exist are the same fact. Built REST-first so the ingestion contract and persistence exist before the harder raw-socket transport is added.",
       steps: [
-        {n:"Step 41", t:"Go toolchain check, module init, project skeleton", href:null, done:false},
-        {n:"Step 42", t:"Ingestion request struct + POST /ingest handler (in-memory)", href:null, done:false},
-        {n:"Step 43", t:"GET /ingest (list in-memory), closes PR A", href:null, done:false},
-        {n:"Step 44", t:"New shipment_ingestion Postgres database + Go driver connection", href:null, done:false},
-        {n:"Step 45", t:"Persist ingested events to Postgres", href:null, done:false},
-        {n:"Step 46", t:"GET /ingest reads from Postgres, closes PR B", href:null, done:false},
-        {n:"Step 47", t:"Unit tests — table-driven Go tests", href:null, done:false},
-        {n:"Step 48", t:"HTTP integration tests (net/http/httptest)", href:null, done:false},
-        {n:"Step 49", t:"Closes PR C", href:null, done:false},
-        {n:"Step 50", t:"Multi-stage Dockerfile — Go build stage, minimal run stage", href:null, done:false},
-        {n:"Step 51", t:"Wired into docker-compose.yml", href:null, done:false},
-        {n:"Step 52", t:"Verify, closes PR D", href:null, done:false}
+        {n:"Step 41", t:"Go toolchain check, module init, project skeleton", href:"steps.html#step41", done:true},
+        {n:"Step 42", t:"Ingestion request struct + POST /ingest handler (in-memory)", href:"steps.html#step42", done:true},
+        {n:"Step 43", t:"GET /ingest (list in-memory), closes PR A", href:"steps.html#step43", done:true},
+        {n:"Step 44", t:"New shipment_ingestion Postgres database + Go driver connection", href:"steps.html#step44", done:true},
+        {n:"Step 45", t:"Persist ingested events to Postgres", href:"steps.html#step45", done:true},
+        {n:"Step 46", t:"GET /ingest reads from Postgres, closes PR B", href:"steps.html#step46", done:true},
+        {n:"Step 47", t:"Unit tests — table-driven Go tests", href:"steps.html#step47", done:true},
+        {n:"Step 48", t:"HTTP integration tests (net/http/httptest)", href:"steps.html#step48", done:true},
+        {n:"Step 49", t:"Closes PR C", href:"steps.html#step49", done:true},
+        {n:"Step 50", t:"Multi-stage Dockerfile — Go build stage, minimal run stage", href:"steps.html#step50", done:true},
+        {n:"Step 51", t:"Wired into docker-compose.yml", href:"steps.html#step51", done:true},
+        {n:"Step 52", t:"Verify, closes PR D", href:"steps.html#step52", done:true}
       ]
     },
     postgres: {

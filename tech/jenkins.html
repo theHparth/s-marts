@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Jenkins, Trivy &amp; OWASP ZAP</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html" class="active">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Jenkins, Trivy &amp; OWASP ZAP <span class="tag">Phase 5</span></h1>
+  <p class="subtitle">
+    Fundamentals + how this project actually uses it. For when each piece was introduced, see the
+    <a href="../steps.html#phase5">Steps page → Phase 5</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 5 (Trivy/ZAP/Jenkins compliance gate) is in progress. Everything on this page reflects the
+    <em>planned</em> implementation — read it now to get familiar with the tools before writing code, then it
+    gets corrected/confirmed once each step is really built and tested.
+  </div>
+
+  <h2 id="overview">What each piece is, in one line</h2>
+  <table>
+    <tr><th>Tool</th><th>What it is</th></tr>
+    <tr><td><strong>Jenkins</strong></td><td>A self-hosted CI/CD automation server — runs a defined sequence of steps (build, test, scan, deploy) every time it's triggered</td></tr>
+    <tr><td><strong>Pipeline</strong></td><td>Jenkins's term for one automated job — defined as code in a <code>Jenkinsfile</code>, not clicked together in a UI</td></tr>
+    <tr><td><strong>Trivy</strong></td><td>A vulnerability scanner for container images (and filesystems, git repos) — checks installed packages against known-CVE databases</td></tr>
+    <tr><td><strong>OWASP ZAP</strong></td><td>A dynamic web application security scanner — sends real requests at a <em>running</em> application looking for actual exploitable issues</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Trivy vs. ZAP — different scan categories, a real interview distinction</div>
+    Trivy is closer to <strong>SCA</strong> (Software Composition Analysis) — it inspects what's
+    <em>installed</em> in an image (OS packages, language dependencies) against CVE databases, without
+    running anything. ZAP is <strong>DAST</strong> (Dynamic Application Security Testing) — it actually sends
+    HTTP requests at a live, running application, probing for real exploitable behavior (SQL injection,
+    XSS, misconfigured headers). Trivy asks "what known-vulnerable things did we ship?" ZAP asks "does the
+    running app actually misbehave when attacked?" — different questions, both worth asking, which is why
+    this phase runs both, not just one.
+  </div>
+
+  <h2 id="jenkins-basics">Jenkins basics — server, jobs, pipelines</h2>
+  <ul>
+    <li>Jenkins itself runs as a long-lived server process (this project runs it in Docker) with a web UI, default port <code>8080</code>.</li>
+    <li>First-run setup requires an <strong>initial admin password</strong>, printed to the container's logs — a one-time unlock step, then you create a real admin account.</li>
+    <li>A <strong>Pipeline job</strong> points Jenkins at a <code>Jenkinsfile</code> — either pasted directly into the job config, or (the more realistic setup) checked out from this project's own git repo.</li>
+  </ul>
+  <div class="box tip">
+    <div class="box-title">Jenkins vs. GitHub Actions — a real comparison, since this project already uses GitHub</div>
+    <table>
+      <tr><th></th><th>Jenkins</th><th>GitHub Actions</th></tr>
+      <tr><td>Hosting</td><td>Self-hosted — you run the server</td><td>Fully managed by GitHub, no server to run</td></tr>
+      <tr><td>Config location</td><td><code>Jenkinsfile</code> in the repo (or pasted into the job)</td><td><code>.github/workflows/*.yml</code> in the repo</td></tr>
+      <tr><td>Trigger</td><td>Manual, polling, or a webhook you configure yourself</td><td>Native GitHub event triggers (push, PR, etc.), zero extra setup</td></tr>
+      <tr><td>Why Jenkins here</td><td colspan="2">Deliberately chosen for this phase specifically because it's still extremely common in real enterprise environments (especially pre-cloud-native shops) — genuinely different skill from GitHub Actions, worth having both on a resume.</td></tr>
+    </table>
+  </div>
+
+  <h2 id="jenkinsfile-syntax">Jenkinsfile — declarative pipeline syntax</h2>
+  <pre><code>pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'docker build -t shipment-ingestion services/shipment-ingestion'
+            }
+        }
+        stage('Scan') {
+            steps {
+                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion'
+            }
+        }
+    }
+}</code></pre>
+  <table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><code>pipeline { }</code></td><td>The whole job, declarative style — the modern, recommended Jenkinsfile syntax over the older "scripted" (raw Groovy) style</td></tr>
+    <tr><td><code>agent any</code></td><td>Run on any available Jenkins worker — this project only has one, so this is effectively "run right here"</td></tr>
+    <tr><td><code>stages { stage('Name') { steps { ... } } }</code></td><td>A pipeline is a sequence of named stages, each with its own steps — the stage names are exactly what shows up in Jenkins's UI as the visual pipeline</td></tr>
+    <tr><td><code>sh '...'</code></td><td>Runs a literal shell command — this is how Jenkins calls out to Docker, Trivy, and every other CLI tool it doesn't have native syntax for</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why the Jenkins container needs access to Docker itself</div>
+    Running <code>docker build</code> <em>inside</em> a pipeline step means the Jenkins container needs to be
+    able to run Docker commands — either by mounting the host's Docker socket
+    (<code>/var/run/docker.sock</code>) into the Jenkins container, or running Docker-in-Docker. This project
+    uses the socket-mount approach — simpler, though it does mean the Jenkins container can control the host's
+    whole Docker daemon, worth naming as a real security tradeoff if asked about it.
+  </div>
+
+  <h2 id="trivy">Trivy — vulnerability scanning</h2>
+  <pre><code>trivy image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion</code></pre>
+  <table>
+    <tr><th>Flag</th><th>What it does</th></tr>
+    <tr><td><code>image</code></td><td>Scan a Docker image (Trivy can also scan filesystems, git repos, Kubernetes clusters)</td></tr>
+    <tr><td><code>--severity HIGH,CRITICAL</code></td><td>Only report/act on these severity levels — filters out LOW/MEDIUM noise</td></tr>
+    <tr><td><code>--exit-code 1</code></td><td>The actual gate mechanism — Trivy exits non-zero if it finds a matching vulnerability, which makes the Jenkins <code>sh</code> step fail, which fails the whole pipeline. Without this flag, Trivy just prints a report and exits 0 regardless of findings.</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">This is the actual "gate" — not a separate concept from the scan itself</div>
+    A lot of the DevSecOps value here isn't Trivy's scan output — it's the fact that <code>--exit-code 1</code>
+    turns "here's a report" into "the build stops." Same underlying idea as a failing unit test blocking a
+    merge — a security finding above the threshold is treated exactly like a broken build, not an
+    FYI to read later.
+  </div>
+
+  <h2 id="zap">OWASP ZAP — dynamic scanning</h2>
+  <p>ZAP needs something actually <em>running</em> to attack — unlike Trivy, which only inspects a static
+    image. The simplest way to run it in a pipeline is ZAP's own "baseline scan" Docker image, pointed at a
+    running service's URL:</p>
+  <pre><code>docker run --network movetrack_ops_default -t zaproxy/zap-stable zap-baseline.py \
+  -t http://dashboard:80 \
+  -r zap-report.html</code></pre>
+  <table>
+    <tr><th>Flag</th><th>What it does</th></tr>
+    <tr><td><code>--network movetrack_ops_default</code></td><td>Puts the ZAP container on the same Docker network as this project's other containers — same container-networking rule as everywhere else, ZAP reaches the dashboard by service name, not <code>localhost</code></td></tr>
+    <tr><td><code>-t http://dashboard:80</code></td><td>The target URL to attack — the dashboard container, by its Compose service name</td></tr>
+    <tr><td><code>-r zap-report.html</code></td><td>Write an HTML report of findings</td></tr>
+  </table>
+  <p>A "baseline" scan is passive/light — it doesn't send genuinely destructive attack payloads, just checks
+    for common misconfigurations and obvious issues. A "full" active scan exists too, but is much slower and
+    more aggressive — baseline is the right default for a CI gate that needs to run on every build.</p>
+
+  <h2 id="archiving">Archiving scan reports</h2>
+  <pre><code>stage('Archive Reports') {
+    steps {
+        archiveArtifacts artifacts: '*-report.html', allowEmptyArchive: true
+    }
+}</code></pre>
+  <p><code>archiveArtifacts</code> saves files from the build workspace as part of that build's permanent
+    record in Jenkins — viewable/downloadable from the build's page in the UI afterward, the same way a
+    GitHub Actions run lets you download build artifacts.</p>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-jenkins-trivy-vs-zap">
+    <div class="q">What's the difference between what Trivy and OWASP ZAP each check for?</div>
+    <div class="a">Trivy is SCA (Software Composition Analysis) — it inspects what's installed in an image
+      (OS packages, language dependencies) against known-CVE databases, without running anything. ZAP is DAST
+      (Dynamic Application Security Testing) — it sends real HTTP requests at a live, running application,
+      probing for actual exploitable behavior. Trivy catches "known-vulnerable software we shipped"; ZAP
+      catches "the running app actually misbehaves under attack" — different failure modes, which is why a
+      real gate runs both.</div>
+  </div>
+  <div class="qa" id="qa-jenkins-exit-code-gate">
+    <div class="q">How does a Trivy scan actually block a build, not just report findings?</div>
+    <div class="a"><code>--exit-code 1</code> makes Trivy exit non-zero when it finds a vulnerability at or
+      above the specified severity. Since a Jenkins pipeline stage fails when its shell command exits
+      non-zero, this single flag is what turns "print a report" into "stop the pipeline" — the gate isn't a
+      separate mechanism from the scan, it's one flag away from being purely informational.</div>
+  </div>
+  <div class="qa" id="qa-jenkins-vs-github-actions">
+    <div class="q">Why use Jenkins here when this project already uses GitHub Actions-style workflows conceptually?</div>
+    <div class="a">This project doesn't actually use GitHub Actions — it uses `gh` CLI for PRs/issues, which
+      is unrelated. Jenkins is deliberately included as its own phase because it's still extremely common in
+      real enterprise environments, especially ones that predate cloud-native CI, and is a genuinely
+      different skill (self-hosted server, Groovy-flavored Jenkinsfile syntax, plugin ecosystem) worth having
+      independent of GitHub-native tooling.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

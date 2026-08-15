@@ -21,6 +21,7 @@
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -28,6 +29,7 @@
   <a href="../notes/aws.html">AWS Notes</a>
   <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
 </nav>
 
 <main>
@@ -356,7 +358,44 @@ gh pr merge --squash --delete-branch
 git checkout main
 git pull</code></pre>
 
+  <h2 id="wrong-branch-recovery">Recovering from a commit on the wrong branch <span class="tag" style="margin-left:0;">not previously documented as its own section — happened 3 times in this project</span></h2>
+  <p>The single most common real mistake across this whole project: forgetting to <code>git checkout -b</code>
+    a new branch before starting a new PR's work, so the new commits land on whatever branch was already
+    checked out instead. Recognizable pattern, same fix every time.</p>
+  <table>
+    <tr><th>Command</th><th>What it tells you</th></tr>
+    <tr><td><code>git branch</code></td><td>Every local branch, <code>*</code> marks the one you're actually on — the first thing to check if something feels off</td></tr>
+    <tr><td><code>git status</code></td><td>What branch you're on, and whether it's ahead/behind its remote — "ahead of origin by N commits" on a branch you didn't mean to be on is the tell</td></tr>
+    <tr><td><code>git log --oneline -5</code></td><td>The last 5 commits, one line each — <code>--oneline</code> makes it fast to eyeball which commit is the misplaced one</td></tr>
+  </table>
+  <div class="diagram">git checkout main
+git pull origin main              # get the latest, including anything already merged
+
+git checkout -b &lt;correct-branch-name&gt;   # the branch that SHOULD have been created
+
+git cherry-pick &lt;commit-hash&gt;     # copies just that one commit onto the correct branch
+
+git push -u origin &lt;correct-branch-name&gt;
+
+git branch -D &lt;wrong-branch-name&gt;  # delete the old branch once its real content is safe elsewhere</div>
+  <div class="box why">
+    <div class="box-title">Why this is safe — nothing is lost, ever</div>
+    <code>cherry-pick</code> <em>copies</em> a commit's changes onto the new branch — it doesn't remove it from
+    the original branch first. Nothing is at risk until the explicit <code>git branch -D</code> at the very
+    end, run only after confirming the correct branch has the content and (usually) has been pushed. Real
+    incidents this exact pattern fixed: Move &amp; Entitlement's Step 21 port-fix commit, the Dashboard's
+    Step 31 containerize commit, and Phase 6's Step 50 Docker/compose commit — all landed on an already-open
+    branch instead of a fresh one, all recovered the same way with zero lost work.
+  </div>
+
   <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-cherry-pick-wrong-branch">
+    <div class="q">You committed to the wrong branch — how do you fix it without losing work?</div>
+    <div class="a"><code>git cherry-pick &lt;commit-hash&gt;</code> onto the correct branch — it copies that
+      commit's changes without removing it from the original branch first, so nothing is at risk until you
+      explicitly clean up the wrong branch afterward with <code>git branch -D</code>. Safe by construction:
+      the copy exists before the original is ever touched.</div>
+  </div>
   <div class="qa" id="qa-staged-vs-committed">
     <div class="q">What's the difference between staged and committed?</div>
     <div class="a">Staged means the file is in the draft area (<code>git add</code> ran), waiting to be

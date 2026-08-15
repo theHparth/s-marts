@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Redis Notes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="../tech/git.html">Git &amp; GitHub</a>
+  <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="../tech/docker.html">Docker &amp; Compose</a>
+  <a href="../tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="../tech/go.html">Go</a>
+  <a href="../tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="../tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="sql.html">SQL Notes</a>
+  <a href="aws.html">AWS Notes</a>
+  <a href="methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="linux.html">Linux/Unix Notes</a>
+  <a href="redis.html" class="active">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Redis <span class="tag">Interview Notes</span></h1>
+  <p class="subtitle">
+    The original notes covered only strings (<code>SET</code>/<code>GET</code>), key expiration, and Docker
+    setup — expanded here to cover every core data type, transactions, pub/sub commands, persistence,
+    replication/clustering, and eviction policies. Language target: <strong>Python</strong>, using the
+    <code>redis-py</code> client — the same library this project already uses in
+    <a href="../tech/python-fastapi.html#redis-caching">Python, FastAPI &amp; scikit-learn → Caching predictions</a>,
+    so every command below has a real, already-working counterpart in this codebase.
+  </p>
+
+  <h2 id="what-is-redis">What Redis actually is</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>What kind of database?</td><td>In-memory key-value store — data lives in RAM, not on disk (with optional disk persistence, see below)</td></tr>
+    <tr><td>Why so fast?</td><td>RAM access is orders of magnitude faster than disk; Redis is also single-threaded for command execution, which avoids lock-contention overhead for most operations</td></tr>
+    <tr><td>What's it usually used for?</td><td>Caching, session storage, rate limiting, leaderboards, pub/sub messaging, real-time counters</td></tr>
+    <tr><td>Redis vs. a "real" database</td><td>Redis is not a system of record for this project — see <a href="../tech/python-fastapi.html#redis-caching">Python notes</a>: it caches predictions, Postgres remains the source of truth</td></tr>
+  </table>
+
+  <h2 id="setup">Connecting to Redis</h2>
+  <p>Kept and cleaned up from the original notes — three ways to reach a Redis instance:</p>
+  <pre><code># 1. Redis running in Docker (this project's approach — see docker-compose.yml)
+docker pull redis
+docker ps
+docker exec -it &lt;container-id&gt; redis-cli
+
+# 2. Native Windows build (zip download, no Docker)
+# github.com/microsoftarchive/redis/releases -> unzip -> open CMD in that folder
+redis-server
+# in a SECOND terminal, same folder:
+redis-cli
+
+# 3. Connect to a Dockerized Redis FROM Windows directly (no docker exec)
+redis-cli -h 127.0.0.1 -p 6379</code></pre>
+  <div class="box tip">
+    <div class="box-title"><code>redis-cli</code> vs. a real client library</div>
+    <code>redis-cli</code> is for humans poking around interactively — exactly like <code>psql</code> for
+    Postgres. An actual application (like this project's FastAPI service) uses a client
+    <strong>library</strong> instead (<code>redis-py</code> for Python) — see the
+    <a href="#python">Python section</a> below.
+  </div>
+
+  <h2 id="strings">Strings — the original notes' commands, plus more</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>PING</code></td><td>Health check — replies <code>PONG</code></td></tr>
+    <tr><td><code>SET name tech</code></td><td>Set a key's value</td></tr>
+    <tr><td><code>GET name</code></td><td>Get a key's value — <code>nil</code> if it doesn't exist</td></tr>
+    <tr><td><code>KEYS *</code></td><td>List every key — <strong>never use in production</strong>, scans the entire keyspace and blocks other commands; use <code>SCAN</code> instead (see below)</td></tr>
+    <tr><td><code>DEL name</code></td><td>Delete a key</td></tr>
+    <tr><td><code>EXISTS name</code></td><td>Returns <code>1</code> if the key exists, <code>0</code> if not</td></tr>
+    <tr><td><code>SET key value EX 300</code></td><td>Set with a 300-second expiration</td></tr>
+    <tr><td><code>INCR counter</code> / <code>DECR counter</code> <span class="tag" style="margin-left:0;">not in original</span></td><td>Atomically increment/decrement an integer value — the basis of Redis rate-limiting and counters</td></tr>
+    <tr><td><code>APPEND key text</code> <span class="tag" style="margin-left:0;">not in original</span></td><td>Append to an existing string value</td></tr>
+    <tr><td><code>SCAN 0</code> <span class="tag" style="margin-left:0;">not in original</span></td><td>Production-safe alternative to <code>KEYS *</code> — iterates the keyspace in small batches instead of one giant blocking scan</td></tr>
+  </table>
+
+  <h2 id="data-types">Every Redis data type — the big gap in the original notes</h2>
+  <p>The original notes only ever used plain strings, and had one incomplete line about hashes. Redis's real
+    power is in the other data types — picking the right one is a real interview/design question.</p>
+  <table>
+    <tr><th>Type</th><th>Shape</th><th>Real use case</th><th>Key commands</th></tr>
+    <tr><td>String</td><td>One value per key</td><td>Cached prediction, session flag, counter</td><td><code>SET</code>, <code>GET</code>, <code>INCR</code></td></tr>
+    <tr><td>List</td><td>Ordered, allows duplicates</td><td>A queue or a recent-activity feed</td><td><code>LPUSH</code>, <code>RPUSH</code>, <code>LRANGE</code>, <code>LPOP</code></td></tr>
+    <tr><td>Set</td><td>Unordered, unique values</td><td>Tags on a post, "has this user done X" checks</td><td><code>SADD</code>, <code>SMEMBERS</code>, <code>SISMEMBER</code></td></tr>
+    <tr><td>Hash</td><td>Field→value map, like one flat object</td><td>A user profile — one Redis key per user, many fields</td><td><code>HSET</code>, <code>HGET</code>, <code>HGETALL</code></td></tr>
+    <tr><td>Sorted Set</td><td>Unique values, each with a score, kept in score order</td><td>Leaderboards, priority queues, "top N" queries</td><td><code>ZADD</code>, <code>ZRANGE</code>, <code>ZSCORE</code></td></tr>
+  </table>
+  <pre><code># List — a queue
+LPUSH queue task1 task2
+LRANGE queue 0 -1        # 0 to -1 = the whole list
+
+# Set — unique tags
+SADD tags python redis docker
+SMEMBERS tags
+SISMEMBER tags python     # 1 (yes, it's a member)
+
+# Hash — one object, many fields (fixes the original notes' incomplete HSET line)
+HSET user:1 name "Parth" age "25"
+HGET user:1 name
+HGETALL user:1
+HINCRBY user:1 age 1       # atomically increment just one field
+
+# Sorted Set — a leaderboard
+ZADD leaderboard 100 alice 90 bob
+ZRANGE leaderboard 0 -1 WITHSCORES     # lowest score first
+ZREVRANGE leaderboard 0 -1 WITHSCORES  # highest score first</code></pre>
+
+  <h2 id="expiration-eviction">Expiration &amp; eviction policies</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>EXPIRE key 60</code></td><td>Set (or reset) a 60-second TTL on an existing key</td></tr>
+    <tr><td><code>TTL key</code></td><td>Seconds remaining — <code>-1</code> means no expiration set, <code>-2</code> means the key doesn't exist</td></tr>
+    <tr><td><code>PERSIST key</code></td><td>Remove a key's expiration, make it permanent again</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Eviction policies — what happens when Redis's memory limit is hit? Not in the original notes.</div>
+    Redis doesn't grow memory forever — <code>maxmemory-policy</code> decides what gets deleted when the
+    configured memory limit is reached:
+    <table>
+      <tr><th>Policy</th><th>Behavior</th></tr>
+      <tr><td><code>noeviction</code></td><td>Reject new writes once full — errors instead of losing data (Redis's default)</td></tr>
+      <tr><td><code>allkeys-lru</code></td><td>Evict the Least Recently Used key, from any key — typical cache behavior</td></tr>
+      <tr><td><code>volatile-lru</code></td><td>Same, but only considers keys that have a TTL set</td></tr>
+      <tr><td><code>allkeys-lfu</code></td><td>Evict the Least Frequently Used key — better than LRU when "popular" and "recent" diverge</td></tr>
+    </table>
+    This project's usage (<a href="../tech/python-fastapi.html#redis-caching">predictions cached with a
+    5-minute TTL</a>) is exactly the <code>volatile-*</code> policies' target case — every key it writes
+    already has an expiration.
+  </div>
+
+  <h2 id="transactions">Transactions — not in the original notes</h2>
+  <pre><code>MULTI
+SET a 1
+INCR a
+EXEC          # runs both commands atomically, back to back
+
+WATCH a       # abort the transaction if "a" changes before EXEC runs
+MULTI
+...
+EXEC</code></pre>
+  <div class="box why">
+    <div class="box-title">Redis transactions aren't like SQL transactions</div>
+    <code>MULTI</code>/<code>EXEC</code> queues commands and runs them without any <em>other</em> client's
+    commands interleaving in between — but there's no rollback if one command in the middle fails logically.
+    <code>WATCH</code> adds optimistic locking: if the watched key changes before <code>EXEC</code>, the whole
+    transaction is aborted, and the client can retry.
+  </div>
+
+  <h2 id="pubsub">Pub/Sub — commands added, concept kept from the original notes</h2>
+  <p>The original notes described pub/sub conceptually ("event driven way of communicating between
+    processes") but had no actual commands. Here they are:</p>
+  <div class="diagram">   Publisher                    Redis                    Subscriber(s)
+      │                        │                              │
+      │── PUBLISH channel msg ─►│                              │
+      │                        │── delivers to every ─────────►│
+      │                        │   current subscriber           │
+      │                        │   of "channel"                 │
+
+Subscribers must already be listening — Redis pub/sub does NOT queue messages for offline subscribers.</div>
+  <pre><code>SUBSCRIBE channel1          # blocks, waiting for messages
+PUBLISH channel1 "hello"    # sent to every current subscriber of channel1</code></pre>
+  <div class="box gotcha">
+    <div class="box-title">Pub/Sub messages are fire-and-forget — not durable</div>
+    If nobody is subscribed when <code>PUBLISH</code> runs, the message is simply gone — Redis pub/sub is not
+    a durable message queue. For "must not lose this message" needs, use Redis Streams (<code>XADD</code>/
+    <code>XREAD</code>) instead, or a dedicated queue like SQS/RabbitMQ (this project's own
+    <a href="../architecture.html">Phase 4</a>, not built yet).
+  </div>
+
+  <h2 id="persistence">Persistence — RDB vs. AOF <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Redis is in-memory, but data can survive a restart two different ways:</p>
+  <table>
+    <tr><th></th><th>RDB (snapshotting)</th><th>AOF (Append-Only File)</th></tr>
+    <tr><td>How it works</td><td>Periodic full snapshot of the dataset written to disk</td><td>Every write command logged to a file, replayed on restart</td></tr>
+    <tr><td>Data loss on crash</td><td>Everything since the last snapshot</td><td>Much less — depends on fsync frequency (can be near-zero)</td></tr>
+    <tr><td>File size</td><td>Compact</td><td>Larger, grows continuously (compacted periodically)</td></tr>
+    <tr><td>Restart speed</td><td>Fast — just load the snapshot</td><td>Slower — replay the whole log</td></tr>
+  </table>
+  <p>Both can be enabled together — RDB for fast restarts/backups, AOF for minimal data loss. This project's
+    use of Redis as a pure cache (Postgres is the real source of truth) means persistence is largely optional
+    here — worth explicitly naming that reasoning if asked why.</p>
+
+  <h2 id="replication-clustering">Replication &amp; clustering <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <table>
+    <tr><th>Concept</th><th>What it solves</th></tr>
+    <tr><td>Master-Replica replication</td><td>One or more read-only replicas copy a master's data — scales reads, provides a failover copy</td></tr>
+    <tr><td>Redis Sentinel</td><td>Monitors master/replicas, automatically promotes a replica to master if the master fails — high availability without manual intervention</td></tr>
+    <tr><td>Redis Cluster</td><td>Shards data across multiple nodes by hashing the key — scales writes and total dataset size beyond one machine's RAM</td></tr>
+  </table>
+
+  <h2 id="python">Python — using Redis from code (<code>redis-py</code>)</h2>
+  <p>The exact library this project's Claims Triage ML service uses — see
+    <a href="../tech/python-fastapi.html#redis-caching">Python, FastAPI &amp; scikit-learn → Caching predictions</a>
+    for the real, running version of this pattern. Every command above has a direct Python method:</p>
+  <pre><code>import redis
+
+r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
+# Strings
+r.set("name", "tech")
+r.get("name")                       # "tech", or None if missing
+r.setex("session:123", 300, "active")  # SET ... EX 300 in one call
+r.incr("counter")
+
+# Lists
+r.lpush("queue", "task1", "task2")
+r.lrange("queue", 0, -1)
+
+# Sets
+r.sadd("tags", "python", "redis")
+r.smembers("tags")
+
+# Hashes
+r.hset("user:1", mapping={"name": "Parth", "age": "25"})
+r.hgetall("user:1")
+
+# Sorted sets
+r.zadd("leaderboard", {"alice": 100, "bob": 90})
+r.zrange("leaderboard", 0, -1, withscores=True)
+
+# Expiration
+r.expire("name", 60)
+r.ttl("name")
+
+# Transactions — a pipeline is redis-py's MULTI/EXEC
+pipe = r.pipeline()
+pipe.set("a", 1)
+pipe.incr("a")
+pipe.execute()
+
+# Pub/Sub
+pubsub = r.pubsub()
+pubsub.subscribe("channel1")
+r.publish("channel1", "hello")</code></pre>
+  <table>
+    <tr><th>Redis command</th><th>redis-py method</th></tr>
+    <tr><td><code>SET</code> / <code>GET</code></td><td><code>r.set()</code> / <code>r.get()</code></td></tr>
+    <tr><td><code>SET key val EX n</code></td><td><code>r.setex(key, n, val)</code> — args reordered, same effect</td></tr>
+    <tr><td><code>HSET key f1 v1 f2 v2</code></td><td><code>r.hset(key, mapping={"f1": "v1", "f2": "v2"})</code></td></tr>
+    <tr><td><code>MULTI</code> / <code>EXEC</code></td><td><code>r.pipeline()</code> then <code>.execute()</code></td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">This project's actual cache key pattern, for reference</div>
+    <code>app/cache.py</code> doesn't cache under a raw key like <code>"name"</code> — it hashes the whole
+    request payload into a deterministic key (<code>hashlib.sha256</code> of the sorted JSON), so identical
+    prediction requests always map to the same Redis key. Worth re-reading
+    <a href="../tech/python-fastapi.html#redis-caching">that section</a> alongside this page — same tool,
+    real production-shaped usage instead of toy examples.
+  </div>
+
+  <h2 id="use-cases">Real use cases — kept from the original notes</h2>
+  <table>
+    <tr><th>Use case</th><th>How Redis fits</th></tr>
+    <tr><td>Session storage</td><td>Store session data as a hash or JSON string, keyed by session ID, with a TTL matching session length — this project's Claims Triage ML cache is architecturally the same pattern applied to predictions instead of sessions</td></tr>
+    <tr><td>Full-page caching</td><td>Cache a whole rendered page's output under a key, serve the cached copy until it expires — avoids re-rendering on every request</td></tr>
+    <tr><td>Pub/Sub</td><td>Event-driven communication between processes — built into Redis with no extra setup, though not durable (see above)</td></tr>
+  </table>
+  <p>See <a href="../notes/aws.html#databases">AWS Notes → Caching &amp; search</a> for the Redis vs.
+    Memcached comparison table (same content applies regardless of cloud provider).</p>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-redis-why-fast">
+    <div class="q">Why is Redis so much faster than a traditional database?</div>
+    <div class="a">Data lives in RAM, not on disk — RAM access is orders of magnitude faster. Redis also
+      executes commands single-threaded, which avoids the lock-contention overhead a multi-threaded database
+      pays for concurrent access to the same data, at the cost of not parallelizing CPU-bound work across
+      cores for a single instance.</div>
+  </div>
+  <div class="qa" id="qa-redis-rdb-vs-aof">
+    <div class="q">What's the difference between RDB and AOF persistence?</div>
+    <div class="a">RDB takes periodic full snapshots — compact, fast to restart from, but can lose everything
+      since the last snapshot on a crash. AOF logs every write command and replays it on restart — much less
+      data loss, but a larger file and slower restart. They can run together: RDB for fast recovery, AOF for
+      minimal loss.</div>
+  </div>
+  <div class="qa" id="qa-redis-pubsub-durability">
+    <div class="q">Is Redis Pub/Sub a reliable message queue?</div>
+    <div class="a">No — it's fire-and-forget. If no client is subscribed when <code>PUBLISH</code> runs, the
+      message is simply lost, with no delivery guarantee or replay. For durable message delivery, use Redis
+      Streams instead, or a dedicated message queue.</div>
+  </div>
+  <div class="qa" id="qa-redis-keys-vs-scan">
+    <div class="q">Why shouldn't you use the KEYS command in production?</div>
+    <div class="a"><code>KEYS *</code> scans the entire keyspace in one blocking operation — on a large
+      dataset this can freeze every other client's commands for the duration. <code>SCAN</code> does the same
+      job incrementally, in small non-blocking batches, and is the production-safe choice.</div>
+  </div>
+  <div class="qa" id="qa-redis-when-sorted-set">
+    <div class="q">When would you reach for a Sorted Set instead of a plain Set?</div>
+    <div class="a">Whenever ranking or ordering matters — a leaderboard, a priority queue, "top N most
+      recent/highest-scored" queries. A plain Set only tracks unique membership with no order; a Sorted Set
+      keeps every member ordered by its score, so range queries like "top 10" are a single fast command
+      instead of fetching everything and sorting client-side.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — general interview reference, not tied to a specific Step. See <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a> for how this project actually uses Redis.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

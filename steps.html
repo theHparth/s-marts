@@ -21,6 +21,7 @@
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
+  <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -28,6 +29,7 @@
   <a href="notes/aws.html">AWS Notes</a>
   <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="notes/linux.html">Linux/Unix Notes</a>
+  <a href="notes/redis.html">Redis Notes</a>
 </nav>
 
 <main>
@@ -1504,14 +1506,16 @@ movetrack_ops-redis-1                redis                      0.0.0.0:6379-&gt
   <h2 id="phase6">Phase 6 — Go Ingestion Service</h2>
   <p class="pill">12 steps (41–52), 4 PRs. First Go stack in this project — Go toolchain checked before first
     use, per the standing rule. Feeds Phase 10 (Kafka) and Phase 13 (raw sockets extend this same service)
-    later. Written as <strong>pre-study material</strong>, ahead of the actual build — status flips to Done
-    and content gets corrected once each step is really built and tested.</p>
+    later. <strong>Complete</strong> — all 4 PRs merged, all 7 containers verified running. This phase hit the
+    most real gotchas of any phase so far — every one of them is documented below and in
+    <a href="tech/go.html">Go</a>/<a href="tech/docker.html">Docker &amp; Compose</a>/<a href="tech/git.html">Git &amp; GitHub</a>,
+    not just fixed and forgotten.</p>
 
   <div class="step" id="step41">
     <div class="step-header">
       <span class="step-num">STEP 41</span>
       <span class="step-title">Shipment Ingestion — Go module init + skeleton HTTP server</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a bare Go module with a working <code>/health</code> endpoint. Full explanation
       on <a href="tech/go.html#modules-commands">Go → Modules &amp; commands</a> and
@@ -1533,13 +1537,22 @@ git add services/shipment-ingestion/go.mod services/shipment-ingestion/main.go
 git commit -m "feat: scaffold Go shipment ingestion service"</code></pre>
     <p class="pill">First non-JVM, non-Node, non-Python stack — Go version checked before this step, per the
       standing "check tooling is current" rule.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>go version</code> not found right after installing</div>
+      <code>winget install --id GoLang.Go -e</code> succeeded, but the same PowerShell window still said
+      <code>go : The term 'go' is not recognized</code> — the installer updates the system PATH, but a
+      terminal opened <em>before</em> the install doesn't see that update. Fixed without closing the window:
+      <pre><code>$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")</code></pre>
+      Same category of issue as the <code>gh</code> CLI install earlier in this project — see
+      <a href="tech/git.html#gh-cli-install">Git &amp; GitHub → GitHub CLI install &amp; auth</a>.
+    </div>
   </div>
 
   <div class="step" id="step42">
     <div class="step-header">
       <span class="step-num">STEP 42</span>
       <span class="step-title">Shipment Ingestion — POST /ingest (in-memory)</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a <code>ShipmentPing</code> struct plus an in-memory-storing handler. Full
       explanation on <a href="tech/go.html#json-structs">Go → Structs as DTOs</a> and
@@ -1554,7 +1567,7 @@ git commit -m "feat: add POST /ingest endpoint with in-memory storage"</code></p
     <div class="step-header">
       <span class="step-num">STEP 43</span>
       <span class="step-title">Shipment Ingestion — GET /ingest, closes PR A</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> list the in-memory pings back out, proving Step 42 actually stored them.</p>
     <pre><code># add handleListIngest to main.go
@@ -1571,13 +1584,21 @@ gh pr create --title "Add Go shipment ingestion service skeleton" --body "Closes
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>405 Method Not Allowed</code> on GET /ingest</div>
+      Posting worked, but <code>GET /ingest</code> returned <code>405</code>, not <code>404</code> — that
+      specific status is the tell: Go's router recognized the path but not that method, meaning
+      <code>mux.HandleFunc("GET /ingest", handleListIngest)</code> simply hadn't been added yet. Once added,
+      the 405 became a 200 immediately. Worth remembering the distinction generally: <code>404</code> = path
+      not registered at all, <code>405</code> = path registered, wrong method.
+    </div>
   </div>
 
   <div class="step" id="step44">
     <div class="step-header">
       <span class="step-num">STEP 44</span>
       <span class="step-title">Shipment Ingestion — new database + Postgres driver</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> its own <code>shipment_ingestion</code> Postgres database, database-per-service
       like the Java services. Full explanation on
@@ -1591,13 +1612,34 @@ go get github.com/lib/pq
 
 git add services/shipment-ingestion/db.go services/shipment-ingestion/go.mod services/shipment-ingestion/go.sum
 git commit -m "feat: add Postgres connection for shipment ingestion"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>go run main.go</code> vs. <code>go run .</code></div>
+      Once <code>db.go</code> existed alongside <code>main.go</code>, running <code>go run main.go</code>
+      failed with <code>undefined: insertPing</code>/<code>connectDB</code>/<code>ensureSchema</code> —
+      <code>go run main.go</code> only compiles that one named file, ignoring every other <code>.go</code>
+      file in the same package. <code>go run .</code> (the dot) compiles the whole package/directory
+      together. Always use <code>go run .</code> once a package has more than one file.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — placeholder Postgres credentials didn't match the real ones</div>
+      The fallback DSN's <code>postgres:postgres</code> was a placeholder — the real credentials (visible in
+      the root <code>.env</code>/compose file) were <code>movetrack</code> / <code>localdevpassword</code>.
+      Connecting with the wrong ones fails with <code>pq: password authentication failed for user "postgres" (28P01)</code>.
+      Then, even with the right credentials, <code>pq: database "shipment_ingestion" does not exist (3D000)</code>
+      — because the multi-database init script only runs once, on a genuinely empty Postgres volume (same
+      rule as <a href="tech/docker.html#multi-database-init">Docker &amp; Compose → Multiple databases, one
+      container</a>), and this project's Postgres had already been running for days. Fixed by creating the
+      database directly against the running container instead of resetting the volume (which would have
+      wiped the other services' real data):
+      <pre><code>docker exec -it movetrack-postgres psql -U movetrack -d move_entitlement_db -c "CREATE DATABASE shipment_ingestion;"</code></pre>
+    </div>
   </div>
 
   <div class="step" id="step45">
     <div class="step-header">
       <span class="step-num">STEP 45</span>
       <span class="step-title">Shipment Ingestion — persist pings to Postgres</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> replace the in-memory slice with a real table. Full breakdown on
       <a href="tech/go.html#database">Go → Database, no ORM</a>.</p>
@@ -1611,7 +1653,7 @@ git commit -m "feat: persist ingested pings to Postgres"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 46</span>
       <span class="step-title">Shipment Ingestion — read pings from Postgres, closes PR B</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> <code>GET /ingest</code> reads real rows back — proof it's persisted, not just
       in-memory (restart the process between POST and GET to confirm).</p>
@@ -1626,13 +1668,23 @@ gh pr create --title "Add Postgres persistence for shipment ingestion" --body "C
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — scanning a <code>TIMESTAMPTZ</code> column into a Go <code>string</code></div>
+      <code>listPings</code>'s original <code>rows.Scan(&amp;p.DeviceID, ..., &amp;p.Timestamp)</code> panicked
+      with <code>unsupported Scan, storing driver.Value type time.Time into type *string</code>. The
+      <code>lib/pq</code> driver decodes a <code>TIMESTAMPTZ</code> column into a Go <code>time.Time</code>,
+      but <code>p.Timestamp</code> is a plain <code>string</code> — <code>Scan</code> can't convert between
+      them automatically. Fixed by casting in the query itself instead of changing the struct:
+      <pre><code>SELECT device_id, latitude, longitude, recorded_at::text FROM shipment_pings ORDER BY id DESC</code></pre>
+      Full explanation on <a href="tech/go.html#database">Go → Database, no ORM</a>.
+    </div>
   </div>
 
   <div class="step" id="step47">
     <div class="step-header">
       <span class="step-num">STEP 47</span>
       <span class="step-title">Shipment Ingestion — unit tests, table-driven</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a <code>validatePing</code> function plus table-driven tests for it. Full
       explanation on <a href="tech/go.html#testing">Go → Testing</a>.</p>
@@ -1652,7 +1704,7 @@ git commit -m "test: add table-driven unit tests for ping validation"</code></pr
     <div class="step-header">
       <span class="step-num">STEP 48</span>
       <span class="step-title">Shipment Ingestion — HTTP integration test</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> <code>net/http/httptest</code> for the handler directly — same slice-test idea
       as <code>@WebMvcTest</code>/RTL/FastAPI's <code>TestClient</code>. Full explanation on
@@ -1663,13 +1715,41 @@ go test ./...
 
 git add services/shipment-ingestion/handlers_test.go
 git commit -m "test: add HTTP integration test for /ingest validation"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — nil pointer panic, validation never gated the database call</div>
+      <code>TestHandleIngest_MissingDeviceID</code> panicked with <code>invalid memory address or nil pointer
+      dereference</code> deep inside <code>database/sql</code>. Cause: <code>handleIngest</code> called
+      <code>insertPing(db, p)</code> directly with no validation step first, so a request missing
+      <code>device_id</code> sailed through to the database call — and in the test, <code>db</code> is
+      <code>nil</code> (only ever set inside <code>main()</code>, which the test never runs). Fixed by calling
+      <code>validatePing(p)</code> and returning <code>400</code> immediately on failure, <em>before</em>
+      <code>insertPing</code> is ever reached — the real fix for "why is this touching the database at all
+      for a request that should be rejected outright."
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — unused <code>"sync"</code> import after removing in-memory storage</div>
+      Once the <code>pings</code>/<code>pingsMu</code> in-memory variables were removed (Postgres fully
+      replaced them by this point), the now-unused <code>"sync"</code> import was left behind, and Go refuses
+      to compile with an unused import. One-line fix — delete the import.
+    </div>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-nil-db-panic-step48">
+      <div class="q">Why did a missing-field test panic instead of returning a clean error?</div>
+      <div class="a">The handler validated nothing before calling the database — a request that should have
+        been rejected with a 400 instead reached <code>insertPing</code>, which used a <code>nil</code>
+        <code>*sql.DB</code> in the test context (only set inside <code>main()</code>). Validating and
+        returning early, before any dependency is touched, is what should have prevented this in the first
+        place — not just in tests, in production too, since an unvalidated request reaching the database
+        layer is the same class of bug either way.</div>
+    </div>
   </div>
 
   <div class="step" id="step49">
     <div class="step-header">
       <span class="step-num">STEP 49</span>
       <span class="step-title">Shipment Ingestion — closes PR C</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <pre><code>git push -u origin feature/go-ingest-tests
 
@@ -1684,7 +1764,7 @@ git pull origin main</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 50</span>
       <span class="step-title">Shipment Ingestion — multi-stage Dockerfile</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a statically-compiled binary in a minimal Alpine image — even leaner than the
       Java Dockerfiles. Full explanation on <a href="tech/go.html#containerizing">Go → Containerizing</a>.</p>
@@ -1697,28 +1777,61 @@ docker build -t shipment-ingestion services/shipment-ingestion
 
 git add services/shipment-ingestion/Dockerfile services/shipment-ingestion/.dockerignore services/shipment-ingestion/go.sum
 git commit -m "feat: containerize the shipment ingestion service"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — Docker's Go build stage was older than <code>go.mod</code> required</div>
+      <code>go mod init</code> back in Step 41 recorded the locally-installed Go version (1.26.5) into
+      <code>go.mod</code>'s <code>go</code> directive — enforced as a strict minimum since Go 1.21. The
+      Dockerfile's build stage used <code>golang:1.23-alpine</code>, older than that minimum, so
+      <code>go mod download</code> failed with
+      <code>go.mod requires go &gt;= 1.26.5 (running go 1.23.12; GOTOOLCHAIN=local)</code>. Fixed by bumping
+      the Dockerfile's first line to <code>FROM golang:1.26-alpine AS build</code>, matching the local
+      toolchain. Worth remembering as a general rule: a Dockerfile's build-stage Go version needs to track
+      whatever <code>go.mod</code> actually demands, not be picked independently.
+    </div>
+    <p>Standalone <code>docker run</code> testing is expected to fail here with a Postgres connection
+      error (<code>dial tcp [::1]:5432: connect: connection refused</code>) — a standalone container has no
+      Postgres reachable at all, same container-networking rule as always. That's not a bug to chase; skip
+      straight to Step 51's real test instead.</p>
   </div>
 
   <div class="step" id="step51">
     <div class="step-header">
       <span class="step-num">STEP 51</span>
       <span class="step-title">Shipment Ingestion — docker-compose wiring</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> add the service to the root compose file — <code>DATABASE_URL</code> pointing
       at the <code>postgres</code> service name, same networking rule as every other service; see
       <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.</p>
-    <pre><code># add shipment-ingestion service to docker-compose.yml
-
-git add docker-compose.yml
+    <pre><code>  shipment-ingestion:
+    build: ./services/shipment-ingestion
+    ports:
+      - "8090:8090"
+    environment:
+      DATABASE_URL: postgres://movetrack:localdevpassword@postgres:5432/shipment_ingestion?sslmode=disable
+    depends_on:
+      - postgres</code></pre>
+    <pre><code>git add docker-compose.yml
 git commit -m "feat: wire shipment ingestion service into docker-compose"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>DATABASE_URL</code> stayed on <code>localhost</code>, and the fix wasn't verified as actually applied</div>
+      The container kept crashing with <code>dial tcp [::1]:5432: connect: connection refused</code> — even
+      after being told to change the host to <code>postgres</code>. The edit had been described but never
+      actually saved to the file before <code>docker compose up --build</code> ran, so the same wrong value
+      (and the same error) came back a second time. Caught by checking the file's real content directly
+      instead of assuming the described fix had taken effect:
+      <pre><code>docker compose config</code></pre>
+      shows the fully resolved compose file — the reliable way to confirm what Compose is <em>actually</em>
+      going to use, not what the file is assumed to say. Full reference on
+      <a href="tech/docker.html#diagnostic-commands">Docker &amp; Compose → Diagnostic commands</a>.
+    </div>
   </div>
 
   <div class="step" id="step52">
     <div class="step-header">
       <span class="step-num">STEP 52</span>
       <span class="step-title">Shipment Ingestion — verify, closes PR D</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <pre><code>docker compose up -d --build
 docker compose ps
@@ -1731,7 +1844,328 @@ gh pr create --title "Containerize shipment ingestion and wire into compose" --b
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
-    <p><strong>This completes Phase 6</strong> once all 4 PRs are actually merged — 12 steps, 41–52.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — Step 50's work landed on the wrong branch, discovered at push time</div>
+      <code>git push -u origin feature/go-ingest-containerize</code> failed with
+      <code>error: src refspec feature/go-ingest-containerize does not match any</code> — that branch never
+      actually existed. <code>git checkout -b feature/go-ingest-containerize</code> from Step 50 had been
+      skipped; the Dockerfile/<code>.dockerignore</code>/compose commit landed on the still-checked-out
+      <code>feature/go-ingest-tests</code> branch instead (PR C had already merged as #38, so this branch's
+      real content was safely elsewhere — it just also had one stray extra commit).
+      Diagnosed with:
+      <pre><code>git branch
+git status
+git log --oneline -5</code></pre>
+      Fixed the same way as Move &amp; Entitlement's Step 21 and the Dashboard's Step 31 — <code>cherry-pick</code>
+      the one stray commit onto a correctly-named fresh branch, then delete the old one. Full breakdown on
+      <a href="tech/git.html#wrong-branch-recovery">Git &amp; GitHub → Recovering from a commit on the wrong branch</a>
+      (this is now the 3rd real incident of this exact mistake — worth internalizing the pattern, not just the fix).
+      <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/go-ingest-containerize
+git cherry-pick &lt;commit-hash&gt;
+git push -u origin feature/go-ingest-containerize
+git branch -D feature/go-ingest-tests</code></pre>
+    </div>
+    <div class="box why">
+      <div class="box-title">Verified — all 7 containers running together</div>
+      <pre><code>NAME                                 SERVICE                    PORTS
+movetrack-claims-service             claims-service             0.0.0.0:8081-&gt;8081/tcp
+movetrack-dashboard                  dashboard                  0.0.0.0:3000-&gt;80/tcp
+movetrack-move-entitlement-service   move-entitlement-service   0.0.0.0:8082-&gt;8082/tcp
+movetrack-postgres                   postgres                   0.0.0.0:5432-&gt;5432/tcp
+movetrack_ops-claims-triage-ml-1     claims-triage-ml           0.0.0.0:8000-&gt;8000/tcp
+movetrack_ops-redis-1                redis                      0.0.0.0:6379-&gt;6379/tcp
+movetrack_ops-shipment-ingestion-1   shipment-ingestion         0.0.0.0:8090-&gt;8090/tcp</code></pre>
+    </div>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-cherry-pick-step52">
+      <div class="q">You committed to the wrong branch — how do you fix it without losing work?</div>
+      <div class="a"><code>git cherry-pick &lt;commit-hash&gt;</code> onto the correct branch — it copies that
+        commit's changes without removing it from the original branch first, so nothing is at risk until you
+        explicitly clean up the wrong branch afterward with <code>git branch -D</code>.</div>
+    </div>
+    <p><strong>This completes Phase 6</strong> — all 4 PRs merged, 12 steps, 41–52. The most gotchas of any
+      phase so far — see the boxes above and <a href="tech/go.html">Go</a>,
+      <a href="tech/docker.html">Docker &amp; Compose</a>, and <a href="tech/git.html">Git &amp; GitHub</a>
+      for the reference-page versions of each fix.</p>
+  </div>
+
+  <h2 id="phase5">Phase 5 — Trivy/ZAP/Jenkins compliance gate</h2>
+  <p class="pill">10 steps (53–62), 1 branch. First CI/CD tool in this project. Feeds Phase 4 (Compliance
+    Service ingests its scan output). Written as <strong>pre-study material</strong>, ahead of the actual
+    build — status flips to Done and content gets corrected once each step is really built and tested. Uses
+    the simplified git workflow from here on — one branch for the whole phase, short commits, one PR/merge
+    at the very end, no issue tracking.</p>
+
+  <div class="step" id="step53">
+    <div class="step-header">
+      <span class="step-num">STEP 53</span>
+      <span class="step-title">Jenkins running in Docker, initial setup</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> Jenkins itself up and reachable, with a real admin account. Full explanation on
+      <a href="tech/jenkins.html#jenkins-basics">Jenkins, Trivy &amp; OWASP ZAP → Jenkins basics</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/jenkins-compliance-gate
+
+# add to docker-compose.yml:
+#   jenkins:
+#     image: jenkins/jenkins:lts-jdk17
+#     ports:
+#       - "8080:8080"
+#     volumes:
+#       - jenkins_home:/var/jenkins_home
+#
+# add jenkins_home: to the volumes: section at the bottom
+
+docker compose up -d jenkins
+docker compose logs jenkins | grep -A 3 "initialAdminPassword"
+# copy the password shown</code></pre>
+    <p>Open <code>http://localhost:8080</code> in a browser, paste the password to unlock, choose "Install
+      suggested plugins," then create a real admin user when prompted.</p>
+    <p><strong>How to check:</strong> after creating the admin user, Jenkins redirects to its dashboard
+      ("Welcome to Jenkins!"). <strong>Expected:</strong> the dashboard loads with no setup wizard remaining.</p>
+  </div>
+
+  <div class="step" id="step54">
+    <div class="step-header">
+      <span class="step-num">STEP 54</span>
+      <span class="step-title">Give the Jenkins container access to Docker</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> pipeline stages need to run real <code>docker build</code>/<code>docker run</code>
+      commands. Full explanation on
+      <a href="tech/jenkins.html#jenkinsfile-syntax">Jenkins, Trivy &amp; OWASP ZAP → Why the Jenkins container needs Docker access</a>.</p>
+    <pre><code># create infra/jenkins/Dockerfile:
+# FROM jenkins/jenkins:lts-jdk17
+# USER root
+# RUN apt-get update &amp;&amp; apt-get install -y docker.io
+# USER jenkins
+
+# update docker-compose.yml's jenkins service:
+#   build: ./infra/jenkins
+#   (remove "image: jenkins/jenkins:lts-jdk17", replaced by build:)
+#   volumes:
+#     - jenkins_home:/var/jenkins_home
+#     - /var/run/docker.sock:/var/run/docker.sock
+
+docker compose up -d --build jenkins</code></pre>
+    <p><strong>How to check:</strong>
+      <code>docker compose exec jenkins docker ps</code> — <strong>expected:</strong> lists this project's
+      running containers (proves the Jenkins container can actually talk to the host's Docker daemon through
+      the mounted socket), not a "permission denied" or "command not found" error.</p>
+  </div>
+
+  <div class="step" id="step55">
+    <div class="step-header">
+      <span class="step-num">STEP 55</span>
+      <span class="step-title">First Jenkinsfile — checkout + a trivial stage</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> prove Jenkins can pull this repo and run a pipeline from it at all, before
+      adding anything real. Full explanation on
+      <a href="tech/jenkins.html#jenkinsfile-syntax">Jenkins, Trivy &amp; OWASP ZAP → Jenkinsfile syntax</a>.</p>
+    <pre><code># create Jenkinsfile at the repo root:
+# pipeline {
+#     agent any
+#     stages {
+#         stage('Checkout') {
+#             steps { checkout scm }
+#         }
+#         stage('Hello') {
+#             steps { sh 'echo Jenkins can run a pipeline from this repo' }
+#         }
+#     }
+# }
+
+git add Jenkinsfile
+git commit -m "add first Jenkinsfile"
+git push -u origin feature/jenkins-compliance-gate</code></pre>
+    <p>In the Jenkins UI: New Item → name it <code>movetrack-ops-compliance</code> → Pipeline → OK. Under
+      Pipeline, set Definition to "Pipeline script from SCM," SCM to Git, Repository URL to
+      <code>https://github.com/theHparth/MoveTrack_Ops.git</code>, Branch to
+      <code>*/feature/jenkins-compliance-gate</code> (this specific branch, so Jenkins picks up each step's
+      changes as you push them — switch this to <code>*/main</code> after the phase merges). Save, then
+      click "Build Now."</p>
+    <p><strong>How to check:</strong> click the build number → Console Output. <strong>Expected:</strong>
+      both stages show green, and the log includes the literal text
+      <code>Jenkins can run a pipeline from this repo</code>.</p>
+  </div>
+
+  <div class="step" id="step56">
+    <div class="step-header">
+      <span class="step-num">STEP 56</span>
+      <span class="step-title">Build stage — docker build inside the pipeline</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> the pipeline builds a real image from this repo's own code.</p>
+    <pre><code># replace the 'Hello' stage in Jenkinsfile with:
+#         stage('Build') {
+#             steps {
+#                 sh 'docker build -t shipment-ingestion services/shipment-ingestion'
+#             }
+#         }
+
+git add Jenkinsfile
+git commit -m "add docker build stage"
+git push</code></pre>
+    <p>Click "Build Now" again in the Jenkins UI.</p>
+    <p><strong>How to check:</strong>
+      <code>docker images shipment-ingestion</code> (on your host machine)
+      — <strong>expected:</strong> a fresh row with a very recent "Created" timestamp, proving the image was
+      just rebuilt by the pipeline, not left over from Phase 6.</p>
+  </div>
+
+  <div class="step" id="step57">
+    <div class="step-header">
+      <span class="step-num">STEP 57</span>
+      <span class="step-title">Trivy stage — scan the built image</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> see real vulnerability findings, before turning them into a gate. Full
+      explanation on <a href="tech/jenkins.html#trivy">Jenkins, Trivy &amp; OWASP ZAP → Trivy</a>.</p>
+    <pre><code># add a new stage after 'Build':
+#         stage('Trivy Scan') {
+#             steps {
+#                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image shipment-ingestion'
+#             }
+#         }
+
+git add Jenkinsfile
+git commit -m "add trivy scan stage"
+git push</code></pre>
+    <p>Click "Build Now."</p>
+    <p><strong>How to check:</strong> Console Output for the "Trivy Scan" stage. <strong>Expected:</strong> a
+      table of findings (or "No vulnerabilities found," depending on the base image) — either way, the stage
+      itself still shows green, since no gate exists yet at this step.</p>
+  </div>
+
+  <div class="step" id="step58">
+    <div class="step-header">
+      <span class="step-num">STEP 58</span>
+      <span class="step-title">Compliance gate — fail the build on HIGH/CRITICAL findings</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> turn the scan from a report into an actual gate. Full explanation on
+      <a href="tech/jenkins.html#trivy">Jenkins, Trivy &amp; OWASP ZAP → Trivy</a>.</p>
+    <pre><code># update the Trivy Scan stage's sh command to add the gate flags:
+#                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion'
+
+git add Jenkinsfile
+git commit -m "add severity gate to trivy stage"
+git push</code></pre>
+    <p>Click "Build Now."</p>
+    <p><strong>How to check:</strong> the "Trivy Scan" stage's color in the UI.
+      <strong>Expected:</strong> still green if `shipment-ingestion`'s current base image
+      (<code>alpine:3.20</code>) has no HIGH/CRITICAL findings today — genuinely possible and fine. Step 61
+      later proves the gate really works by deliberately triggering a failure.</p>
+  </div>
+
+  <div class="step" id="step59">
+    <div class="step-header">
+      <span class="step-num">STEP 59</span>
+      <span class="step-title">OWASP ZAP baseline scan against a running service</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a dynamic scan against something actually running, not just a static image.
+      Full explanation on <a href="tech/jenkins.html#zap">Jenkins, Trivy &amp; OWASP ZAP → OWASP ZAP</a>.</p>
+    <pre><code># make sure the dashboard is running: docker compose up -d dashboard
+
+# add a new stage after the Trivy stage:
+#         stage('ZAP Baseline Scan') {
+#             steps {
+#                 sh 'docker run --rm --network movetrack_ops_default -t zaproxy/zap-stable zap-baseline.py -t http://dashboard:80 -r zap-report.html || true'
+#             }
+#         }
+# (the "|| true" keeps this stage from failing the whole build yet — ZAP baseline findings
+#  are review-worthy but not wired into the hard gate the way Trivy is, for this phase)
+
+git add Jenkinsfile
+git commit -m "add zap baseline scan stage"
+git push</code></pre>
+    <p>Click "Build Now."</p>
+    <p><strong>How to check:</strong> Console Output for the "ZAP Baseline Scan" stage.
+      <strong>Expected:</strong> ZAP's own summary lines (e.g. "FAIL-NEW: 0  FAIL-INPROG: 0  WARN-NEW: N"),
+      confirming it actually reached and scanned <code>http://dashboard:80</code>.</p>
+  </div>
+
+  <div class="step" id="step60">
+    <div class="step-header">
+      <span class="step-num">STEP 60</span>
+      <span class="step-title">Archive Trivy + ZAP reports as build artifacts</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> scan results should be reviewable after the fact, not just visible in a
+      scrolling console log. Full explanation on
+      <a href="tech/jenkins.html#archiving">Jenkins, Trivy &amp; OWASP ZAP → Archiving scan reports</a>.</p>
+    <pre><code># add a final stage:
+#         stage('Archive Reports') {
+#             steps {
+#                 archiveArtifacts artifacts: '*-report.html', allowEmptyArchive: true
+#             }
+#         }
+
+git add Jenkinsfile
+git commit -m "archive scan reports as build artifacts"
+git push</code></pre>
+    <p>Click "Build Now."</p>
+    <p><strong>How to check:</strong> open the completed build's page in the Jenkins UI.
+      <strong>Expected:</strong> a "Build Artifacts" section listing <code>zap-report.html</code>, downloadable
+      directly from there.</p>
+  </div>
+
+  <div class="step" id="step61">
+    <div class="step-header">
+      <span class="step-num">STEP 61</span>
+      <span class="step-title">Prove the gate actually fails on a real finding</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a gate that has never actually failed is unproven — deliberately trigger a
+      failure to confirm it's real, then revert.</p>
+    <pre><code># temporarily edit services/shipment-ingestion/Dockerfile's first line to an old,
+# known-vulnerable base image, e.g.:
+#   FROM golang:1.16-alpine AS build
+# (an old, unpatched version — expect real HIGH/CRITICAL CVEs here)
+
+git add services/shipment-ingestion/Dockerfile
+git commit -m "temporarily use an old base image to test the gate"
+git push</code></pre>
+    <p>Click "Build Now."</p>
+    <p><strong>How to check:</strong> the "Trivy Scan" stage.
+      <strong>Expected:</strong> RED this time — the pipeline stops, proving <code>--exit-code 1</code>
+      genuinely blocks a build with real findings, not just in theory.</p>
+    <pre><code># revert immediately:
+git revert HEAD
+git push</code></pre>
+    <p><strong>How to check (after reverting):</strong> click "Build Now" once more — <strong>expected:</strong>
+      back to green, confirming the revert restored the working, non-vulnerable base image.</p>
+  </div>
+
+  <div class="step" id="step62">
+    <div class="step-header">
+      <span class="step-num">STEP 62</span>
+      <span class="step-title">Final end-to-end run, merge</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> one last full green run, then close out the phase — single branch, single PR,
+      per the simplified git workflow.</p>
+    <pre><code>git checkout main
+git pull origin main</code></pre>
+    <p>In the Jenkins UI, edit the <code>movetrack-ops-compliance</code> job's branch back to
+      <code>*/main</code> (from the phase branch used during development), then click "Build Now" one final
+      time against the merged result.</p>
+    <pre><code>gh pr create --title "Add Jenkins Trivy/ZAP compliance gate"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>How to check:</strong>
+      <code>docker compose ps</code> — <strong>expected:</strong> 8 containers now (the 7 from Phase 6, plus
+      <code>jenkins</code>), all <code>Up</code>. Then one final "Build Now" in the Jenkins UI against
+      <code>main</code> — <strong>expected:</strong> every stage green, artifacts present.</p>
+    <p><strong>This completes Phase 5</strong> — 10 steps, 53–62.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

@@ -21,6 +21,7 @@
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -28,6 +29,7 @@
   <a href="../notes/aws.html">AWS Notes</a>
   <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
 </nav>
 
 <main>
@@ -332,12 +334,26 @@ CMD uvicorn app.main:app --host 0.0.0.0 --port 8000</code></pre>
     force-kill instead of the app shutting down cleanly.
   </div>
 
-  <h2>Diagnostic commands</h2>
+  <h2 id="diagnostic-commands">Diagnostic commands</h2>
   <table>
     <tr><th>Command</th><th>What it shows</th></tr>
     <tr><td><code>docker ps</code></td><td>Every running container across <em>all</em> projects on this machine — not just the current folder's compose stack. What caught Case Tracking Application's leftover Postgres holding port 5432.</td></tr>
     <tr><td><code>docker compose ps</code></td><td>Just this project's containers. PORTS column shows <code>0.0.0.0:5432-&gt;5432/tcp</code> if actually published to the host, or bare <code>5432/tcp</code> if only reachable from other containers — that difference is what exposed Incident 2.</td></tr>
+    <tr><td><code>docker compose ps -a</code> <span class="tag" style="margin-left:0;">not previously documented</span></td><td>Includes <strong>stopped/exited</strong> containers too — plain <code>docker compose ps</code> only shows currently-running ones, so a container that started and immediately crashed silently disappears from the default view. Real incident: Phase 6's <code>shipment-ingestion</code> container looked "Started" in the <code>up</code> output but vanished from plain <code>ps</code> — <code>-a</code> revealed it as <code>Exited (1)</code>.</td></tr>
+    <tr><td><code>docker compose logs &lt;service&gt;</code></td><td>The actual stdout/stderr of one service — the next step after <code>-a</code> shows something exited, to see <em>why</em>. Real incident: this is what surfaced the exact <code>dial tcp [::1]:5432: connect: connection refused</code> error that led to the <code>DATABASE_URL</code> host bug below.</td></tr>
+    <tr><td><code>docker compose config</code></td><td>Prints the fully resolved, interpolated compose file — what Compose is <em>actually</em> going to use, after merging any <code>.env</code> values and defaults. The reliable way to confirm an edit to <code>docker-compose.yml</code> really took effect, instead of assuming the file on disk matches what you think you saved.</td></tr>
+    <tr><td><code>docker images &lt;name&gt;</code></td><td>Confirms an image actually got built and shows its size — a multi-stage Go/Alpine image should be tens of MB, not hundreds; a much larger size is a sign the multi-stage split isn't actually excluding the build toolchain.</td></tr>
   </table>
+  <div class="box gotcha">
+    <div class="box-title">Real incident — <code>DATABASE_URL</code> pointed at <code>localhost</code> instead of the service name, twice</div>
+    Phase 6's <code>shipment-ingestion</code> service kept crashing with
+    <code>dial tcp [::1]:5432: connect: connection refused</code> even after being told to use the Compose
+    service name. The actual cause: the edit to <code>docker-compose.yml</code> was described but never
+    saved/applied before <code>docker compose up --build</code> ran — <code>docker compose config</code> would
+    have caught this immediately by showing the real, resolved value instead of trusting what the file was
+    assumed to contain. Lesson: when a fix "should have worked" but the same error repeats identically, verify
+    the actual file content / resolved config first, rather than re-explaining the same fix again.
+  </div>
 
   <div class="box tip">
     <div class="box-title">Telling Compose-managed containers apart from ad-hoc ones</div>
@@ -349,6 +365,13 @@ CMD uvicorn app.main:app --host 0.0.0.0 --port 8000</code></pre>
   </div>
 
   <h2>Interview Q&amp;A</h2>
+  <div class="qa" id="qa-docker-compose-config-verify">
+    <div class="q">How do you confirm an edit to docker-compose.yml actually took effect?</div>
+    <div class="a"><code>docker compose config</code> — it prints the fully resolved compose file, with any
+      environment variables and defaults already interpolated, showing exactly what Compose is going to use.
+      More reliable than assuming a saved edit is correct, especially after a repeated error suggests the
+      "fix" didn't actually change anything.</div>
+  </div>
   <div class="qa" id="qa-image-vs-container">
     <div class="q">What's the difference between a Docker image and a container?</div>
     <div class="a">An image is a frozen, read-only snapshot — filesystem plus config, like a class. A

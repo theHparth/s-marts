@@ -21,6 +21,7 @@
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="go.html" class="active">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -28,6 +29,7 @@
   <a href="../notes/aws.html">AWS Notes</a>
   <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
   <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
 </nav>
 
 <main>
@@ -37,11 +39,13 @@
     <a href="../steps.html#phase6">Steps page → Phase 6</a>.
   </p>
 
-  <div class="box warn">
-    <div class="box-title">Status: written ahead of the build</div>
-    Phase 6 (Go Ingestion Service) is in progress. Everything on this page reflects the <em>planned</em>
-    implementation given in the Step 41-52 instructions — read it now to get familiar with the language and
-    tools before writing code, then it gets corrected/confirmed once each step is really built and tested.
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 52</div>
+    Phase 6 (Go Ingestion Service) is complete. All 7 containers (<code>postgres</code>, <code>claims-service</code>,
+    <code>move-entitlement-service</code>, <code>dashboard</code>, <code>claims-triage-ml</code>,
+    <code>redis</code>, <code>shipment-ingestion</code>) run together via <code>docker compose up -d --build</code>.
+    This was the most gotcha-prone phase so far — every real bug hit while building it is documented inline
+    below, not just the clean final version of the code.
   </div>
 
   <h2>What each one is, in one line</h2>
@@ -110,6 +114,14 @@ if err != nil {
     machine it runs on. This is the direct cause of Phase 6's Dockerfile needing almost nothing in its final
     stage — see <a href="#containerizing">Containerizing</a> below.
   </div>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — <code>go run main.go</code> vs. <code>go run .</code></div>
+    Once a package has more than one file (e.g. <code>main.go</code> + <code>db.go</code>), running
+    <code>go run main.go</code> only compiles that one named file — it has no idea any other <code>.go</code>
+    file in the same folder exists, and fails with <code>undefined: connectDB</code> (or whatever the other
+    file defines). <code>go run .</code> (the dot) compiles the whole package/directory together. Always use
+    <code>go run .</code>, never <code>go run &lt;single-file&gt;.go</code>, once a package is more than one file.
+  </div>
 
   <h2 id="http-server">HTTP server &amp; routing</h2>
   <p><code>net/http</code> is Go's standard-library web server — no framework install needed, unlike Spring
@@ -175,11 +187,21 @@ pingsMu.Unlock()</code></pre>
 
 db, err := sql.Open("postgres", dsn)
 
-rows, err := db.Query(`SELECT device_id, latitude, longitude FROM shipment_pings`)
+rows, err := db.Query(`SELECT device_id, latitude, longitude, recorded_at::text FROM shipment_pings`)
 for rows.Next() {
     var p ShipmentPing
-    rows.Scan(&p.DeviceID, &p.Latitude, &p.Longitude)
+    rows.Scan(&p.DeviceID, &p.Latitude, &p.Longitude, &p.Timestamp)
 }</code></pre>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — scanning a <code>TIMESTAMPTZ</code> column into a Go <code>string</code> panics</div>
+    <code>lib/pq</code> decodes a <code>TIMESTAMPTZ</code> column into a Go <code>time.Time</code> value —
+    <code>Scan</code> can't automatically convert that into a <code>*string</code> destination, and panics
+    with <code>unsupported Scan, storing driver.Value type time.Time into type *string</code>. Two ways to
+    fix it: change the struct field to <code>time.Time</code> (ripples into JSON handling elsewhere), or cast
+    in the query itself — <code>recorded_at::text</code> — so Postgres sends a string instead. The query-cast
+    approach (used above) is the smaller, more surgical fix when the rest of the code already assumes a
+    <code>string</code>.
+  </div>
   <table>
     <tr><th>Piece</th><th>What it does</th></tr>
     <tr><td><code>database/sql</code></td><td>Go's standard database interface — same role as Java's JDBC: driver-agnostic, a separate package plugs in the actual database support.</td></tr>
@@ -249,7 +271,7 @@ handleIngest(w, req)
 // assert on w.Code, w.Body</code></pre>
 
   <h2 id="containerizing">Containerizing — an even smaller final image than Java's</h2>
-  <pre><code>FROM golang:1.23-alpine AS build
+  <pre><code>FROM golang:1.26-alpine AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -261,6 +283,16 @@ WORKDIR /app
 COPY --from=build /app/shipment-ingestion .
 EXPOSE 8090
 CMD ["./shipment-ingestion"]</code></pre>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — Docker's Go build stage was older than <code>go.mod</code> required</div>
+    <code>go mod init</code> records the locally-installed Go version into <code>go.mod</code>'s
+    <code>go</code> directive — enforced as a strict <em>minimum</em> since Go 1.21, not just a comment. A
+    Dockerfile build stage on an older Go image (<code>golang:1.23-alpine</code>, when the real local version
+    was 1.26.5) fails <code>go mod download</code> with
+    <code>go.mod requires go &gt;= 1.26.5 (running go 1.23.12; GOTOOLCHAIN=local)</code>. The Dockerfile's
+    build-stage version has to track whatever <code>go.mod</code> actually demands — it isn't picked
+    independently of the local dev environment.
+  </div>
   <div class="box why">
     <div class="box-title">Why this is more extreme than Java's JDK→JRE split</div>
     Go compiles to a single, statically-linked binary — the final image needs no runtime at all, not even a
@@ -273,6 +305,22 @@ CMD ["./shipment-ingestion"]</code></pre>
   </div>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-go-run-main-vs-dot">
+    <div class="q">Why does <code>go run main.go</code> fail with "undefined" errors once you add a second file?</div>
+    <div class="a"><code>go run main.go</code> only compiles that one named file — it doesn't know any other
+      <code>.go</code> file in the same directory exists, so anything defined elsewhere in the package (like
+      a <code>connectDB</code> function in <code>db.go</code>) shows as undefined. <code>go run .</code>
+      compiles the whole package/directory together and is the correct command once a package spans more
+      than one file.</div>
+  </div>
+  <div class="qa" id="qa-go-mod-version-enforcement">
+    <div class="q">Why would a Docker build fail with "go.mod requires go >= X, running go Y"?</div>
+    <div class="a"><code>go.mod</code>'s <code>go</code> directive records a minimum required toolchain
+      version — since Go 1.21, this is strictly enforced, not just informational. If the Docker build stage's
+      base image has an older Go version than what <code>go.mod</code> demands, <code>go mod download</code>
+      refuses to run. The fix is bumping the Dockerfile's build-stage image version to match, not lowering
+      what's in <code>go.mod</code> unless there's a real reason to support an older toolchain.</div>
+  </div>
   <div class="qa" id="qa-go-why-mutex">
     <div class="q">Why does the in-memory version of this service need a <code>sync.Mutex</code>?</div>
     <div class="a">Every HTTP request in Go runs on its own goroutine automatically. Two requests can hit the
@@ -293,6 +341,15 @@ CMD ["./shipment-ingestion"]</code></pre>
       checked explicitly with <code>if err != nil</code> at each call site. More verbose than try/catch, but
       it makes every failure-prone operation visible in the code instead of relying on an exception that
       might surface several call-frames away from where it was thrown.</div>
+  </div>
+  <div class="qa" id="qa-go-scan-timestamp-panic">
+    <div class="q">Why does scanning a TIMESTAMPTZ column into a Go string field panic?</div>
+    <div class="a">The <code>lib/pq</code> driver decodes a <code>TIMESTAMPTZ</code> column into a Go
+      <code>time.Time</code> value, not a string — <code>Scan</code> can't automatically convert
+      <code>time.Time</code> into a <code>*string</code> destination, so it panics with "unsupported Scan."
+      Fix it either by changing the struct field to <code>time.Time</code>, or by casting in the query itself
+      (<code>column::text</code>) so Postgres sends a string instead — the query-cast is the smaller change
+      when the rest of the code already assumes a string.</div>
   </div>
   <div class="qa" id="qa-go-blank-import">
     <div class="q">What does <code>_ "github.com/lib/pq"</code> do if the package name is never used?</div>
