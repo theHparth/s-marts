@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Linux/Unix Notes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="../tech/git.html">Git &amp; GitHub</a>
+  <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="../tech/docker.html">Docker &amp; Compose</a>
+  <a href="../tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="../tech/go.html">Go</a>
+  <a href="../tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="sql.html">SQL Notes</a>
+  <a href="aws.html">AWS Notes</a>
+  <a href="methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="linux.html" class="active">Linux/Unix Notes</a>
+</nav>
+
+<main>
+  <h1>Linux/Unix <span class="tag">Interview Notes</span></h1>
+  <p class="subtitle">
+    The original notes covered the basics well (file ops, permissions, package install, ssh, vim, a few
+    networking commands) — expanded here with everything a real interview or real day-to-day DevOps work
+    needs on top: process management, text processing (grep/sed/awk), redirection &amp; pipes, cron,
+    archiving, and links. Every AWS CLI content from the original file moved to
+    <a href="aws.html#aws-cli">AWS Notes → AWS CLI basics</a>, since that's AWS content, not Linux.
+  </p>
+
+  <h2 id="filesystem">The filesystem — navigation &amp; the directory tree</h2>
+  <div class="diagram">/
+├── bin      binaries — essential user commands (ls, cp, mv...)
+├── etc      system-wide configuration files
+├── home     each user's personal directory (/home/parth)
+├── var      variable data — logs, caches, spool files
+├── usr      installed software &amp; libraries (most of the OS lives here)
+├── tmp      temporary files, cleared on reboot
+└── root     the root user's home directory (not the same as /)</div>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>pwd</code></td><td>Print working directory — where am I right now</td></tr>
+    <tr><td><code>ls</code> / <code>ls -la</code></td><td>List directory contents / long format including hidden (dotfile) entries</td></tr>
+    <tr><td><code>cd &lt;path&gt;</code></td><td>Change directory. <code>cd ..</code> = up one level, <code>cd ~</code> = home directory</td></tr>
+    <tr><td><code>mkdir</code> / <code>rmdir</code></td><td>Create / remove an empty directory</td></tr>
+    <tr><td><code>touch file</code></td><td>Create an empty file, or update its modified timestamp if it exists</td></tr>
+    <tr><td><code>cp</code></td><td>Copy — <code>cp -r</code> for a whole directory</td></tr>
+    <tr><td><code>mv</code></td><td>Move, or rename in place (same command does both)</td></tr>
+    <tr><td><code>find /path -name "*.log"</code></td><td>Search the filesystem by name/type/size/date — more powerful, slower than <code>locate</code></td></tr>
+  </table>
+  <div class="box gotcha">
+    <div class="box-title"><code>rm -rf</code> — no undo, no trash can</div>
+    <code>rm</code> deletes permanently — there's no recycle bin. <code>-r</code> (recursive, for
+    directories) combined with <code>-f</code> (force, no confirmation prompts) is the single most dangerous
+    common Linux command — always double-check the path before running it, especially with a wildcard.
+  </div>
+
+  <h2 id="viewing-searching">Viewing &amp; searching file content</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>cat file</code></td><td>Print the whole file to the terminal</td></tr>
+    <tr><td><code>less file</code></td><td>Page through a large file without loading it all at once (<code>q</code> to quit) — prefer this over <code>cat</code> for big files</td></tr>
+    <tr><td><code>head -n 20 file</code></td><td>First 20 lines</td></tr>
+    <tr><td><code>tail -n 20 file</code></td><td>Last 20 lines</td></tr>
+    <tr><td><code>tail -f file</code></td><td><strong>Follow</strong> a file live as new lines are appended — the standard way to watch a log file in real time</td></tr>
+    <tr><td><code>wc -l file</code></td><td>Count lines (also <code>-w</code> words, <code>-c</code> bytes)</td></tr>
+  </table>
+  <h3>grep, sed &amp; awk — the classic text-processing trio</h3>
+  <table>
+    <tr><th>Tool</th><th>Job</th><th>Example</th></tr>
+    <tr><td><code>grep</code></td><td>Find lines matching a pattern</td><td><code>grep -i "error" app.log</code> (case-insensitive), <code>grep -r "TODO" .</code> (recursive through a directory)</td></tr>
+    <tr><td><code>sed</code></td><td>Find &amp; replace text in a stream</td><td><code>sed 's/foo/bar/g' file</code> — replace every "foo" with "bar"</td></tr>
+    <tr><td><code>awk</code></td><td>Process text column by column</td><td><code>awk '{print $2}' file</code> — print just the second column of every line</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">When to reach for which one</div>
+    <code>grep</code> when you just need to <em>find</em> lines. <code>sed</code> when you need to
+    <em>transform</em> text line-by-line (find &amp; replace). <code>awk</code> when the data has a
+    column/field structure and you need to extract, filter, or compute across columns (like a lightweight
+    <a href="sql.html">SQL</a> <code>SELECT</code> for text files).
+  </div>
+
+  <h2 id="permissions">Permissions — <code>chmod</code> &amp; <code>chown</code></h2>
+  <div class="diagram">-  rwx   r-x   r--
+│   │     │     │
+│  user group other
+│
+type (- = file, d = directory, l = symlink)</div>
+  <table>
+    <tr><th>Who</th><th>Symbol</th></tr>
+    <tr><td>User (owner)</td><td><code>u</code></td></tr>
+    <tr><td>Group</td><td><code>g</code></td></tr>
+    <tr><td>Other</td><td><code>o</code></td></tr>
+  </table>
+  <table>
+    <tr><th>Permission</th><th>Symbol</th><th>Numeric value</th></tr>
+    <tr><td>Read</td><td><code>r</code></td><td>4</td></tr>
+    <tr><td>Write</td><td><code>w</code></td><td>2</td></tr>
+    <tr><td>Execute</td><td><code>x</code></td><td>1</td></tr>
+  </table>
+  <pre><code>chmod 754 file-name
+# user (7 = 4+2+1 = read+write+execute)
+# group (5 = 4+1 = read+execute)
+# other (4 = read only)
+
+chmod u+x script.sh    # add execute for the owner only (symbolic notation)
+chmod g-w file          # remove write from the group</code></pre>
+  <table>
+    <tr><th>Symbolic operator</th><th>Meaning</th></tr>
+    <tr><td><code>+</code></td><td>Add a permission</td></tr>
+    <tr><td><code>-</code></td><td>Remove a permission</td></tr>
+    <tr><td><code>=</code></td><td>Set exactly this permission, nothing else</td></tr>
+  </table>
+  <p><code>chown user file</code> changes the owner. <code>sudo chown user:group file</code> changes owner
+    <em>and</em> group in one command. <code>chgrp group file</code> changes just the group.</p>
+
+  <h2 id="package-management">Package management</h2>
+  <table>
+    <tr><th>OS family</th><th>Package manager</th><th>Install</th><th>Update everything</th><th>Remove</th></tr>
+    <tr><td>Debian/Ubuntu</td><td>apt</td><td><code>sudo apt install docker</code></td><td><code>sudo apt update &amp;&amp; sudo apt upgrade</code></td><td><code>sudo apt purge docker</code></td></tr>
+    <tr><td>RHEL/CentOS/Amazon Linux (older)</td><td>yum</td><td><code>sudo yum install docker</code></td><td><code>sudo yum update</code></td><td><code>sudo yum remove docker</code></td></tr>
+    <tr><td>RHEL/Fedora (current)</td><td>dnf <span class="tag" style="margin-left:0;">not in original notes</span></td><td><code>sudo dnf install docker</code></td><td><code>sudo dnf upgrade</code></td><td><code>sudo dnf remove docker</code></td></tr>
+    <tr><td>macOS</td><td>brew</td><td><code>brew install docker</code></td><td><code>brew upgrade</code></td><td><code>brew uninstall docker</code></td></tr>
+  </table>
+  <p><code>dnf</code> is yum's modern successor (faster dependency resolution) — Amazon Linux 2023 and
+    current Fedora/RHEL use it by default; <code>yum</code> still works as an alias on many of these systems
+    for muscle-memory compatibility.</p>
+
+  <h2 id="processes">Process management <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>ps aux</code></td><td>Snapshot of every running process</td></tr>
+    <tr><td><code>top</code> / <code>htop</code></td><td>Live, auto-refreshing process view (<code>htop</code> is the nicer, color, interactive version — not always preinstalled)</td></tr>
+    <tr><td><code>kill &lt;pid&gt;</code></td><td>Ask a process to terminate gracefully (sends <code>SIGTERM</code>)</td></tr>
+    <tr><td><code>kill -9 &lt;pid&gt;</code></td><td>Force-kill immediately (<code>SIGKILL</code>) — no cleanup, last resort when a process won't respond to a normal <code>kill</code></td></tr>
+    <tr><td><code>&lt;command&gt; &amp;</code></td><td>Run a command in the background, get the terminal back immediately</td></tr>
+    <tr><td><code>jobs</code> / <code>fg</code> / <code>bg</code></td><td>List background jobs / bring one to the foreground / resume one in the background</td></tr>
+    <tr><td><code>nohup &lt;command&gt; &amp;</code></td><td>Run a command that keeps running even after you close the terminal/log out</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title"><code>kill</code> vs. <code>kill -9</code> — a real interview question</div>
+    Plain <code>kill</code> sends <code>SIGTERM</code> — a polite request the process can catch and use to
+    clean up (close files, finish a transaction) before exiting. <code>kill -9</code> sends
+    <code>SIGKILL</code>, which the OS enforces immediately — the process gets no chance to clean up at all.
+    Always try plain <code>kill</code> first; reach for <code>-9</code> only when a process is genuinely
+    unresponsive.
+  </div>
+
+  <h2 id="networking">Networking &amp; remote access</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>ping google.com</code></td><td>Test basic reachability/latency to a host</td></tr>
+    <tr><td><code>ip addr</code></td><td>Show this machine's IP addresses</td></tr>
+    <tr><td><code>nslookup google.com</code></td><td>DNS lookup — resolve a domain to its IP and related records</td></tr>
+    <tr><td><code>curl google.com</code></td><td>Fetch a URL's raw response in the terminal — the standard way to test an API from the command line</td></tr>
+    <tr><td><code>wget &lt;url&gt;</code></td><td>Download a file from a URL to disk</td></tr>
+    <tr><td><code>netstat -tulpn</code> / <code>ss -tulpn</code> <span class="tag" style="margin-left:0;">not in original</span></td><td>List listening ports and which process owns each — "what's using port 8080?"</td></tr>
+  </table>
+  <h3>SSH — expanded from the original notes</h3>
+  <pre><code>ssh username@ip-address
+ssh -i key.pem username@ip-address     # -i = identity file (private key)
+
+ssh-keygen -t ed25519                   # generate a new SSH key pair
+ssh-copy-id username@ip-address         # install your public key on a remote host
+
+scp file.txt username@ip-address:/remote/path/   # copy a file TO a remote host over SSH
+scp username@ip-address:/remote/file.txt .        # copy a file FROM a remote host</code></pre>
+  <p><code>scp</code> is literally "<code>cp</code>, but over SSH" — same mental model, remote destination.</p>
+
+  <h2 id="disk-system">Disk, memory &amp; system info</h2>
+  <table>
+    <tr><th></th><th><code>du</code></th><th><code>df</code></th></tr>
+    <tr><td>Answers</td><td>How much space do these files/directories use?</td><td>How much space is free on this filesystem/mount?</td></tr>
+    <tr><td>Common form</td><td><code>du -sh *</code> — human-readable size of everything in the current directory</td><td><code>df -h</code> — human-readable free space per mounted filesystem</td></tr>
+    <tr><td>Scope</td><td>Files and directories you point it at</td><td>Whole disks/partitions</td></tr>
+  </table>
+  <table>
+    <tr><th>Command</th><th>What it shows</th></tr>
+    <tr><td><code>free -h</code></td><td>Memory (RAM) usage — total/used/free/available</td></tr>
+    <tr><td><code>uptime</code></td><td>How long the system has been running, plus load average</td></tr>
+    <tr><td><code>whoami</code></td><td>Current logged-in user</td></tr>
+    <tr><td><code>which docker</code></td><td>Path to the executable that would run for that command (e.g. <code>/usr/bin/docker</code>)</td></tr>
+  </table>
+
+  <h2 id="redirection-pipes">Redirection &amp; pipes <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <div class="diagram">  ls -la  |  grep ".log"  |  wc -l
+    │           │              │
+    ▼           ▼              ▼
+ list files  keep only     count how
+             .log lines    many lines
+
+Each command's OUTPUT becomes the next command's INPUT — a "pipe" (|) chains them together.</div>
+  <table>
+    <tr><th>Operator</th><th>Meaning</th></tr>
+    <tr><td><code>&gt;</code></td><td>Redirect output to a file, <strong>overwriting</strong> it</td></tr>
+    <tr><td><code>&gt;&gt;</code></td><td>Redirect output to a file, <strong>appending</strong></td></tr>
+    <tr><td><code>&lt;</code></td><td>Feed a file in as input</td></tr>
+    <tr><td><code>|</code></td><td>Pipe — send one command's output into the next command's input</td></tr>
+  </table>
+  <pre><code>echo "hello" > file.txt        # overwrite file.txt with "hello"
+echo "world" >> file.txt       # append "world" to file.txt
+ps aux | grep java              # list processes, keep only lines mentioning "java"</code></pre>
+
+  <h2 id="archiving">Archiving &amp; compression <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>tar -czvf archive.tar.gz folder/</code></td><td>Create (<code>c</code>) a gzip-compressed (<code>z</code>) archive, verbose (<code>v</code>), to this file (<code>f</code>)</td></tr>
+    <tr><td><code>tar -xzvf archive.tar.gz</code></td><td>Extract (<code>x</code>) a gzip archive</td></tr>
+    <tr><td><code>zip -r archive.zip folder/</code></td><td>Create a zip archive, recursively</td></tr>
+    <tr><td><code>unzip archive.zip</code></td><td>Extract a zip archive</td></tr>
+  </table>
+  <p>Mnemonic for <code>tar</code> flags: "<strong>c</strong>reate / e<strong>x</strong>tract, <strong>z</strong>ip (gzip), <strong>v</strong>erbose, <strong>f</strong>ile" — <code>czvf</code> to pack, <code>xzvf</code> to unpack.</p>
+
+  <h2 id="links">Symbolic vs. hard links <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <table>
+    <tr><th></th><th>Symbolic (soft) link</th><th>Hard link</th></tr>
+    <tr><td>Create with</td><td><code>ln -s target link-name</code></td><td><code>ln target link-name</code></td></tr>
+    <tr><td>What it is</td><td>A pointer to a path (like a Windows shortcut)</td><td>Another name for the exact same data on disk</td></tr>
+    <tr><td>If the original is deleted</td><td>Link breaks (points nowhere)</td><td>Data still exists — it's only truly gone once <em>every</em> hard link to it is removed</td></tr>
+    <tr><td>Can cross filesystems/partitions?</td><td>Yes</td><td>No — must be on the same filesystem</td></tr>
+    <tr><td>Can point to a directory?</td><td>Yes</td><td>No (in practice, on most systems)</td></tr>
+  </table>
+
+  <h2 id="cron">Scheduling — cron <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>How Linux runs a command automatically on a recurring schedule — relevant here since Phase 5 of this
+    project (Jenkins CI/CD, not built yet) will eventually run scheduled/triggered jobs the same underlying way.</p>
+  <pre><code>crontab -e     # edit the current user's scheduled jobs</code></pre>
+  <div class="diagram">*  *  *  *  *  command-to-run
+│  │  │  │  │
+│  │  │  │  └── day of week (0-6, Sunday=0)
+│  │  │  └───── month (1-12)
+│  │  └──────── day of month (1-31)
+│  └─────────── hour (0-23)
+└────────────── minute (0-59)</div>
+  <table>
+    <tr><th>Schedule</th><th>Cron expression</th></tr>
+    <tr><td>Every minute</td><td><code>* * * * *</code></td></tr>
+    <tr><td>Every day at 2:30 AM</td><td><code>30 2 * * *</code></td></tr>
+    <tr><td>Every Monday at 9 AM</td><td><code>0 9 * * 1</code></td></tr>
+
+  </table>
+
+  <h2 id="vim">Vim essentials — expanded from the original notes</h2>
+  <table>
+    <tr><th>Key(s)</th><th>What it does</th></tr>
+    <tr><td><code>vi file.txt</code></td><td>Open (or create) a file in vim</td></tr>
+    <tr><td><code>i</code></td><td>Enter Insert mode (start typing)</td></tr>
+    <tr><td><code>Esc</code></td><td>Return to Normal mode (commands, not typing)</td></tr>
+    <tr><td><code>:wq</code></td><td>Save and quit</td></tr>
+    <tr><td><code>:q!</code></td><td>Quit <strong>without</strong> saving, discard changes</td></tr>
+    <tr><td><code>dd</code></td><td>Delete (cut) the current line</td></tr>
+    <tr><td><code>yy</code> / <code>p</code></td><td>Copy ("yank") the current line / paste it</td></tr>
+    <tr><td><code>/searchterm</code></td><td>Search forward in the file — <code>n</code> for next match</td></tr>
+    <tr><td><code>:%s/old/new/g</code></td><td>Find &amp; replace every occurrence in the whole file</td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-linux-kill-vs-kill9">
+    <div class="q">What's the difference between <code>kill</code> and <code>kill -9</code>?</div>
+    <div class="a">Plain <code>kill</code> sends <code>SIGTERM</code> — a request the process can catch and
+      handle gracefully (close files, finish in-flight work) before exiting. <code>kill -9</code> sends
+      <code>SIGKILL</code>, enforced immediately by the OS with no chance for cleanup. Always try plain
+      <code>kill</code> first; reserve <code>-9</code> for a genuinely unresponsive process.</div>
+  </div>
+  <div class="qa" id="qa-linux-du-vs-df">
+    <div class="q">What's the difference between <code>du</code> and <code>df</code>?</div>
+    <div class="a"><code>du</code> reports how much disk space specific files/directories are using —
+      scoped to whatever path you point it at. <code>df</code> reports free/used space at the filesystem or
+      mounted-partition level — a whole-disk view, not a per-file one. A directory can look small under
+      <code>du</code> while <code>df</code> still shows a disk nearly full, if space is consumed elsewhere.</div>
+  </div>
+  <div class="qa" id="qa-linux-soft-vs-hard-link">
+    <div class="q">What's the difference between a symbolic link and a hard link?</div>
+    <div class="a">A symbolic link is a pointer to a path — like a shortcut — and breaks if the original is
+      deleted or moved. A hard link is another name for the exact same data on disk; the data isn't actually
+      freed until every hard link pointing to it is removed. Hard links can't cross filesystems or point at
+      directories; symbolic links can do both.</div>
+  </div>
+  <div class="qa" id="qa-linux-when-awk-vs-sed-vs-grep">
+    <div class="q">When would you use awk instead of grep or sed?</div>
+    <div class="a"><code>grep</code> finds matching lines. <code>sed</code> transforms text line-by-line
+      (find &amp; replace). <code>awk</code> is for column/field-structured data — extracting a specific
+      column, filtering rows by a field's value, or computing across columns — closer to a lightweight SQL
+      query over a text file than either of the other two.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — general interview reference, not tied to a specific Step.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

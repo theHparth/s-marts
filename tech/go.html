@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Go</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html" class="active">Go</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+</nav>
+
+<main>
+  <h1>Go <span class="tag">Phase 6</span></h1>
+  <p class="subtitle">
+    Fundamentals + how this project actually uses it. For when each piece was introduced, see the
+    <a href="../steps.html#phase6">Steps page → Phase 6</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 6 (Go Ingestion Service) is in progress. Everything on this page reflects the <em>planned</em>
+    implementation given in the Step 41-52 instructions — read it now to get familiar with the language and
+    tools before writing code, then it gets corrected/confirmed once each step is really built and tested.
+  </div>
+
+  <h2>What each one is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>Go</strong></td><td>A compiled, statically-typed language from Google — compiles to a single native binary, no separate runtime needed to execute it.</td></tr>
+    <tr><td><strong>go.mod</strong></td><td>This project's dependency manifest — the Go equivalent of <code>pom.xml</code>/<code>package.json</code>/<code>requirements.txt</code>.</td></tr>
+    <tr><td><strong>go.sum</strong></td><td>The lockfile alongside it — pins exact resolved versions and checksums, like <code>package-lock.json</code>.</td></tr>
+    <tr><td><strong>net/http</strong></td><td>Go's standard-library HTTP server and router — no external framework needed for a basic REST API.</td></tr>
+    <tr><td><strong>goroutine</strong></td><td>A lightweight concurrent unit of execution — Go's version of a thread, but far cheaper. Every HTTP request gets its own automatically.</td></tr>
+    <tr><td><strong>struct</strong></td><td>A typed data shape — Go's equivalent of a Java DTO/TypeScript interface/Pydantic model.</td></tr>
+    <tr><td><strong>database/sql</strong></td><td>Go's standard-library database interface — same role as Java's JDBC.</td></tr>
+    <tr><td><strong>testing</strong></td><td>Go's built-in test package — same role as JUnit/Vitest/pytest.</td></tr>
+  </table>
+
+  <h2 id="basics">Language basics</h2>
+  <p>Go's syntax is deliberately small — this is close to the entire core language.</p>
+  <pre><code>package main               // every executable Go program starts with package main
+
+import (
+    "fmt"
+)
+
+func main() {               // the entry point — same role as Java's public static void main
+    var name string = "MoveTrack"  // explicit type
+    count := 5                      // := infers the type — shorthand for var count int = 5
+
+    fmt.Println(name, count)
+}</code></pre>
+  <table>
+    <tr><th>Syntax</th><th>Meaning</th></tr>
+    <tr><td><code>var x Type = value</code></td><td>Explicit variable declaration</td></tr>
+    <tr><td><code>x := value</code></td><td>Short declaration — type inferred from the value. Only usable inside a function, not at package level.</td></tr>
+    <tr><td><code>func name(args) ReturnType { ... }</code></td><td>Function definition — return type comes <em>after</em> the parameter list, opposite of Java/TypeScript order</td></tr>
+    <tr><td><code>if err != nil { ... }</code></td><td>Go's error-handling idiom — see the dedicated section below</td></tr>
+    <tr><td><code>&amp;x</code> / <code>*x</code></td><td>Address-of / dereference — Go has pointers (unlike Java), used constantly (e.g. <code>rows.Scan(&amp;p.DeviceID, ...)</code>)</td></tr>
+    <tr><td><code>[]Type</code></td><td>A slice — Go's dynamic array, closest equivalent to a Java <code>List&lt;T&gt;</code></td></tr>
+  </table>
+
+  <div class="box why">
+    <div class="box-title">Error handling — no exceptions, no try/catch</div>
+    Go doesn't have exceptions for ordinary error handling. Functions that can fail return an extra
+    <code>error</code> value as their last return, and you check it explicitly every time:
+    <pre><code>db, err := sql.Open("postgres", dsn)
+if err != nil {
+    log.Fatal(err)
+}</code></pre>
+    This is verbose compared to Java's <code>try/catch</code> or Python's exceptions, but deliberate — every
+    place an operation can fail is visible in the code, not hidden behind an invisible throw that might
+    surface three call-frames away.
+  </div>
+
+  <h2 id="modules-commands">Modules &amp; commands</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th><th>Closest equivalent</th></tr>
+    <tr><td><code>go mod init &lt;name&gt;</code></td><td>Creates <code>go.mod</code>, starts a new module</td><td><code>npm init</code> / Maven Archetype</td></tr>
+    <tr><td><code>go run .</code></td><td>Compiles and runs immediately, no separate build step to manage</td><td><code>npm run dev</code> / <code>mvn spring-boot:run</code></td></tr>
+    <tr><td><code>go build</code></td><td>Compiles to a native binary on disk, doesn't run it</td><td><code>mvn package</code> / <code>npm run build</code></td></tr>
+    <tr><td><code>go get &lt;package&gt;</code></td><td>Adds a dependency to <code>go.mod</code>/<code>go.sum</code></td><td><code>npm install &lt;pkg&gt;</code></td></tr>
+    <tr><td><code>go mod tidy</code></td><td>Cleans up <code>go.mod</code>/<code>go.sum</code> — adds anything missing, removes anything unused</td><td><code>npm prune</code> + install combined</td></tr>
+    <tr><td><code>go test ./...</code></td><td>Runs every test in the module</td><td><code>mvn test</code> / <code>pytest</code> / <code>npm test</code></td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">No separate runtime to install</div>
+    Once compiled, a Go binary runs standalone — no JVM, no Python interpreter, no Node runtime needed on the
+    machine it runs on. This is the direct cause of Phase 6's Dockerfile needing almost nothing in its final
+    stage — see <a href="#containerizing">Containerizing</a> below.
+  </div>
+
+  <h2 id="http-server">HTTP server &amp; routing</h2>
+  <p><code>net/http</code> is Go's standard-library web server — no framework install needed, unlike Spring
+    (<code>spring-boot-starter-webmvc</code>) or Python (FastAPI).</p>
+  <pre><code>mux := http.NewServeMux()
+mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintln(w, `{"status":"ok"}`)
+})
+mux.HandleFunc("POST /ingest", handleIngest)
+
+http.ListenAndServe(":8090", mux)</code></pre>
+  <table>
+    <tr><th>Piece</th><th>Role</th></tr>
+    <tr><td><code>http.NewServeMux()</code></td><td>The router — maps a method+path to a handler function. Same job as Spring's <code>@GetMapping</code>/<code>@PostMapping</code> or FastAPI's <code>@app.get</code>/<code>@app.post</code>.</td></tr>
+    <tr><td><code>"GET /health"</code></td><td>Go 1.22+'s combined method-and-path routing pattern — before 1.22 you had to check <code>r.Method</code> by hand inside the handler.</td></tr>
+    <tr><td><code>http.ListenAndServe</code></td><td>Starts the server <em>and</em> is the whole app in one call — Go has no separate "app definition vs. server" split the way FastAPI (Uvicorn) or Spring Boot (Tomcat, though bundled) do.</td></tr>
+  </table>
+
+  <h2 id="json-structs">Structs as DTOs</h2>
+  <pre><code>type ShipmentPing struct {
+    DeviceID  string  `json:"device_id"`
+    Latitude  float64 `json:"latitude"`
+    Longitude float64 `json:"longitude"`
+    Timestamp string  `json:"timestamp"`
+}</code></pre>
+  <p>The backtick text after each field is a <strong>struct tag</strong> — metadata <code>encoding/json</code>
+    reads to map the Go field name to a JSON key. Without it, JSON output would use the Go field name
+    (<code>"DeviceID"</code>) as-is.</p>
+  <table>
+    <tr><th>Concept</th><th>Java DTO</th><th>TypeScript interface</th><th>Pydantic</th><th>Go struct</th></tr>
+    <tr><td>Defines a shape</td><td><code>class ClaimDto</code></td><td><code>interface Claim</code></td><td><code>class X(BaseModel)</code></td><td><code>type X struct</code></td></tr>
+    <tr><td>Maps a JSON key to a field</td><td>Automatic (Jackson, field-name match)</td><td>Automatic (structural)</td><td>Automatic (field-name match)</td><td>Explicit — via struct tag</td></tr>
+  </table>
+
+  <h2 id="concurrency">Concurrency — goroutines &amp; <code>sync.Mutex</code></h2>
+  <p>Every incoming HTTP request in Go runs on its own <strong>goroutine</strong> automatically — a lightweight
+    concurrent unit, far cheaper than an OS thread, that <code>net/http</code> spins up for you with zero
+    configuration.</p>
+  <div class="box why">
+    <div class="box-title">Why that means shared state needs a lock</div>
+    Two requests can hit the same handler at literally the same moment. If both try to modify a shared
+    in-memory value (like an in-memory slice of pings) at once, the result is corrupted data — a data race.
+    <pre><code>var (
+    pings   []ShipmentPing
+    pingsMu sync.Mutex
+)
+
+pingsMu.Lock()
+pings = append(pings, p)
+pingsMu.Unlock()</code></pre>
+    <code>sync.Mutex</code> ensures only one goroutine touches <code>pings</code> at a time. Contrast: Node
+    sidesteps this with a single-threaded event loop; Java has the same underlying risk with shared state,
+    usually hidden behind Spring-managed, request-scoped beans. Go makes you handle it explicitly — once
+    Postgres replaces the in-memory slice (Step 45), the database itself handles concurrent writes safely and
+    the mutex is no longer needed for that particular piece of state.
+  </div>
+
+  <h2 id="database">Database — <code>database/sql</code>, no ORM</h2>
+  <pre><code>import (
+    "database/sql"
+    _ "github.com/lib/pq"
+)
+
+db, err := sql.Open("postgres", dsn)
+
+rows, err := db.Query(`SELECT device_id, latitude, longitude FROM shipment_pings`)
+for rows.Next() {
+    var p ShipmentPing
+    rows.Scan(&p.DeviceID, &p.Latitude, &p.Longitude)
+}</code></pre>
+  <table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><code>database/sql</code></td><td>Go's standard database interface — same role as Java's JDBC: driver-agnostic, a separate package plugs in the actual database support.</td></tr>
+    <tr><td><code>_ "github.com/lib/pq"</code></td><td>A <strong>blank import</strong> — the package is never referenced by name in the file, only imported for its side effect (registering itself with <code>database/sql</code> on load). The underscore tells Go this is intentional, not an accidental unused import.</td></tr>
+    <tr><td><code>$1</code>, <code>$2</code>, ...</td><td>Postgres-style positional query placeholders — same purpose as JDBC's <code>?</code>, prevents SQL injection by never string-concatenating user input into a query.</td></tr>
+    <tr><td><code>rows.Scan(&amp;p.DeviceID, ...)</code></td><td>Reads one row's columns into struct fields, in <code>SELECT</code> order. Needs pointers (<code>&amp;</code>) since <code>Scan</code> writes into the given variables.</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why no JPA/Hibernate-style ORM</div>
+    Go doesn't have a dominant, widely-used ORM the way Java has JPA/Hibernate. Raw SQL via
+    <code>database/sql</code> is the idiomatic default in the Go ecosystem — worth naming this contrast
+    directly if asked "how does data access differ between the Java and Go services in this project."
+  </div>
+  <p>General SQL reference (joins, subqueries, indexes, and more) lives on the
+    <a href="../notes/sql.html">SQL Notes</a> page.</p>
+
+  <h2 id="mvc-shape">How this maps to the layers you already know</h2>
+  <p>Go doesn't enforce a framework-level Controller/Service/Repository split the way Spring does — there's no
+    <code>@RestController</code>/<code>@Service</code>/<code>@Repository</code> annotation system. This
+    project's shipment ingestion service still separates concerns, just by plain file/function organization
+    instead of framework-enforced layers:</p>
+  <table>
+    <tr><th>Spring layer</th><th>This Go service's equivalent</th></tr>
+    <tr><td><code>@RestController</code> (routes + request handling)</td><td><code>handleIngest</code>/<code>handleListIngest</code> functions in <code>main.go</code></td></tr>
+    <tr><td><code>@Service</code> (business logic)</td><td><code>validatePing</code> and similar plain functions</td></tr>
+    <tr><td><code>@Repository</code>/<code>JpaRepository</code> (data access)</td><td><code>insertPing</code>/<code>listPings</code> in <code>db.go</code>, hand-written SQL</td></tr>
+    <tr><td>DTO</td><td><code>ShipmentPing</code> struct — used as both the request/response shape <em>and</em> passed straight into the SQL functions, no separate DTO-vs-entity split for a service this small</td></tr>
+  </table>
+  <p>The lesson: Spring's layered architecture is a framework convention, not a law of software — Go
+    achieves the same separation of concerns with far less ceremony, at the cost of more manual wiring
+    (no dependency injection container, no auto-configuration).</p>
+
+  <h2 id="testing">Testing — <code>testing</code> package &amp; table-driven tests</h2>
+  <p>Same underlying concept as JUnit/Vitest/pytest, a 4th toolchain now. Discovery: functions named
+    <code>TestXxx(t *testing.T)</code> in files named <code>*_test.go</code>.</p>
+  <pre><code>func TestValidatePing(t *testing.T) {
+    cases := []struct {
+        name    string
+        ping    ShipmentPing
+        wantErr bool
+    }{
+        {"valid ping", ShipmentPing{DeviceID: "truck-1"}, false},
+        {"missing device id", ShipmentPing{}, true},
+    }
+
+    for _, c := range cases {
+        t.Run(c.name, func(t *testing.T) {
+            err := validatePing(c.ping)
+            if (err != nil) != c.wantErr {
+                t.Errorf("got %v, wantErr %v", err, c.wantErr)
+            }
+        })
+    }
+}</code></pre>
+  <div class="box tip">
+    <div class="box-title">Table-driven tests — the idiomatic Go pattern</div>
+    Instead of one test function per case (JUnit/pytest style), Go convention is a slice of cases run through
+    one loop via <code>t.Run</code>, which creates a named sub-test per case — a failure reports exactly which
+    row in the table broke.
+  </div>
+  <p><code>net/http/httptest</code> gives the same "slice test" idea as <code>@WebMvcTest</code>/React Testing
+    Library/FastAPI's <code>TestClient</code> — build a fake request, call the handler function directly, no
+    real server or socket involved.</p>
+  <pre><code>req := httptest.NewRequest(http.MethodPost, "/ingest", body)
+w := httptest.NewRecorder()
+handleIngest(w, req)
+// assert on w.Code, w.Body</code></pre>
+
+  <h2 id="containerizing">Containerizing — an even smaller final image than Java's</h2>
+  <pre><code>FROM golang:1.23-alpine AS build
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o shipment-ingestion .
+
+FROM alpine:3.20
+WORKDIR /app
+COPY --from=build /app/shipment-ingestion .
+EXPOSE 8090
+CMD ["./shipment-ingestion"]</code></pre>
+  <div class="box why">
+    <div class="box-title">Why this is more extreme than Java's JDK→JRE split</div>
+    Go compiles to a single, statically-linked binary — the final image needs no runtime at all, not even a
+    JVM or interpreter. <code>CGO_ENABLED=0</code> disables Go's C-interop, forcing a fully static binary
+    with zero dynamic library dependencies — what makes it safe to run on Alpine (a minimal distro with a
+    different C library than most) without a missing-library error. The final stage could even be
+    <code>FROM scratch</code> (a completely empty, zero-OS image) for the absolute minimum size; this project
+    uses <code>alpine</code> instead specifically to keep a shell available for <code>docker exec -it ... sh</code>
+    debugging.
+  </div>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-go-why-mutex">
+    <div class="q">Why does the in-memory version of this service need a <code>sync.Mutex</code>?</div>
+    <div class="a">Every HTTP request in Go runs on its own goroutine automatically. Two requests can hit the
+      same handler at the same moment and both try to modify shared state (like an in-memory slice)
+      simultaneously, corrupting it. The mutex ensures only one goroutine touches that shared state at a
+      time — once Postgres replaces the in-memory slice, the database handles concurrent writes safely
+      instead.</div>
+  </div>
+  <div class="qa" id="qa-go-why-no-orm">
+    <div class="q">Why does the Go service use raw SQL instead of an ORM like the Java services do?</div>
+    <div class="a">Go doesn't have a dominant, widely-used ORM the way Java has JPA/Hibernate. Raw SQL via
+      the standard library's <code>database/sql</code> package is the idiomatic default in the Go ecosystem —
+      a deliberate ecosystem difference, not a shortcut taken for this project specifically.</div>
+  </div>
+  <div class="qa" id="qa-go-error-handling">
+    <div class="q">How does Go handle errors if it doesn't have exceptions?</div>
+    <div class="a">Functions that can fail return an extra <code>error</code> value as their last return,
+      checked explicitly with <code>if err != nil</code> at each call site. More verbose than try/catch, but
+      it makes every failure-prone operation visible in the code instead of relying on an exception that
+      might surface several call-frames away from where it was thrown.</div>
+  </div>
+  <div class="qa" id="qa-go-blank-import">
+    <div class="q">What does <code>_ "github.com/lib/pq"</code> do if the package name is never used?</div>
+    <div class="a">It's a blank import — imported purely for its side effect. The <code>pq</code> package
+      registers itself with <code>database/sql</code> when it loads, via its own <code>init()</code>
+      function. The underscore tells Go's compiler "this unused import is intentional," since Go normally
+      refuses to compile with an unused import.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

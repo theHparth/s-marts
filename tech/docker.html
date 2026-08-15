@@ -20,9 +20,14 @@
   <a href="docker.html" class="active">Docker &amp; Compose</a>
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
@@ -305,6 +310,28 @@ volumes:
     <li>To see a detached container's logs later: <code>docker compose logs -f</code> (<code>-f</code> = follow).</li>
   </ul>
 
+  <h2 id="cmd-exec-form">Dockerfile <code>CMD</code> — one command, not several</h2>
+  <p>Easy to misread at first glance: <code>CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code>
+    looks like a list of separate things happening one after another. It isn't — it's <strong>one program</strong>
+    (the first element) plus the <strong>arguments passed to it</strong> (everything after), written out as an
+    array instead of one plain string.</p>
+  <pre><code># these two lines do the exact same thing:
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port 8000</code></pre>
+  <table>
+    <tr><th>Form</th><th>How it runs</th></tr>
+    <tr><td><strong>Exec form</strong> — <code>CMD ["a", "b", "c"]</code></td><td>Docker runs the process directly, with that array as its argument list. No shell involved.</td></tr>
+    <tr><td><strong>Shell form</strong> — <code>CMD a b c</code></td><td>Docker wraps it as <code>/bin/sh -c "a b c"</code> first, then that shell runs the process.</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why exec form is preferred</div>
+    In exec form, the process you named (e.g. <code>uvicorn</code>) becomes PID 1 inside the container. In
+    shell form, <code>/bin/sh</code> becomes PID 1 instead, with your actual process running underneath it —
+    and a shutdown signal from <code>docker stop</code> goes to PID 1 first. A shell doesn't always forward
+    that signal to its child process, which can mean <code>docker stop</code> has to wait out a timeout and
+    force-kill instead of the app shutting down cleanly.
+  </div>
+
   <h2>Diagnostic commands</h2>
   <table>
     <tr><th>Command</th><th>What it shows</th></tr>
@@ -350,6 +377,14 @@ volumes:
       <code>spring.datasource.url</code> with the hostname <code>postgres</code> (not <code>localhost</code>)
       via an environment variable specifically for the containerized case, while local dev outside Docker
       keeps using <code>localhost</code> unchanged.</div>
+  </div>
+
+  <div class="qa" id="qa-cmd-array-is-one-command">
+    <div class="q">Is <code>CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code> running multiple commands?</div>
+    <div class="a">No — it's one program (the first array element) plus the arguments passed to it (everything
+      after), written as an explicit array instead of one string Docker would otherwise have to split itself.
+      Same idea as typing <code>uvicorn app.main:app --host 0.0.0.0 --port 8000</code> on a command line — one
+      process starts, reads its own argument list, and configures itself from it.</div>
   </div>
 
   <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>

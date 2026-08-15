@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — AWS Notes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="../tech/git.html">Git &amp; GitHub</a>
+  <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="../tech/docker.html">Docker &amp; Compose</a>
+  <a href="../tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="../tech/go.html">Go</a>
+  <a href="../tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="sql.html">SQL Notes</a>
+  <a href="aws.html" class="active">AWS Notes</a>
+  <a href="methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="linux.html">Linux/Unix Notes</a>
+</nav>
+
+<main>
+  <h1>AWS <span class="tag">Interview Notes</span></h1>
+  <p class="subtitle">
+    General AWS reference for interview prep — not tied to a specific Step, reorganized and merged from two
+    personal study files (~5-7 years old). Corrections and additions are called out explicitly in boxes below —
+    AWS moves fast, and a few things in the original notes are now renamed, deprecated, or missing entirely.
+  </p>
+
+  <div class="box gotcha">
+    <div class="box-title">Read this first — what's actually changed since these notes were written</div>
+    <ul>
+      <li><strong>Amazon ElasticSearch Service is now Amazon OpenSearch Service</strong> (renamed 2021, after
+        AWS forked Elasticsearch over an Elastic N.V. licensing dispute). If an interviewer says
+        "OpenSearch," that's the same service the original notes call "ElasticSearch."</li>
+      <li><strong>AWS Single Sign-On (SSO) is now AWS IAM Identity Center</strong> (renamed 2022) — same
+        service, and now the recommended default way to manage workforce access across accounts, ahead of
+        manually federating IAM roles.</li>
+      <li><strong>Savings Plans exist now</strong> (launched 2019) — a more flexible alternative to Reserved
+        Instances (commit to a $/hour spend instead of a specific instance type/family). The original notes
+        only cover Reserved Instances; Savings Plans are usually the better default answer in 2026.</li>
+      <li><strong>"NLB is out of courses, no exam question"</strong> in the original notes is simply wrong —
+        Network Load Balancer is a core, heavily-tested service. That was likely a note about one specific
+        exam version at one point in time, not a lasting AWS fact.</li>
+      <li><strong>Graviton (ARM-based) instances</strong> aren't mentioned at all in the original notes but are
+        a real, frequently-asked cost/performance topic now — see the EC2 section.</li>
+      <li>Several genuinely important services/topics were missing entirely from the originals — added below:
+        a proper <strong>IAM fundamentals</strong> section, <strong>CloudFront</strong> (mentioned once, never
+        actually explained), <strong>API Gateway</strong>, a real <strong>DynamoDB</strong> section,
+        <strong>CloudFormation</strong> basics, current <strong>S3 storage features</strong>
+        (Intelligent-Tiering, Object Lock, Access Points), and <strong>generative AI on AWS</strong>
+        (Bedrock, Amazon Q) — essentially nonexistent as an AWS product category when the originals were
+        written, now a routine interview topic.</li>
+    </ul>
+  </div>
+
+  <div class="box tip">
+    <div class="box-title">Where to start — suggested reading order</div>
+    <p>AWS is too broad to read start-to-finish without a plan. This page is ordered to build on itself —
+      each tier assumes you've read the one before it:</p>
+    <p><strong>1. Foundations</strong> — <a href="#overview">Core services overview</a> →
+      <a href="#iam">IAM fundamentals</a> (everything else assumes you know what a role/policy is) →
+      <a href="#aws-cli">AWS CLI basics</a> (how you'll actually touch most of what follows).</p>
+    <p><strong>2. The core building blocks</strong> — <a href="#ec2">EC2</a> →
+      <a href="#storage">Storage (S3/EBS/EFS)</a> → <a href="#cloudfront">CloudFront</a> →
+      <a href="#networking">VPC networking</a> → <a href="#load-balancing-asg">Load Balancing &amp; Auto Scaling</a>.
+      This is the "run a real web app" path — compute, where data lives, how it's delivered fast, how
+      instances talk to each other and the internet, how traffic gets distributed.</p>
+    <p><strong>3. Data &amp; compute models</strong> — <a href="#databases">Databases</a> →
+      <a href="#serverless-containers">Serverless &amp; containers</a> →
+      <a href="#sample-architecture">Sample reference architecture</a> (puts tiers 1-3 together into one
+      real picture — the moment this page stops being a list of services and starts being a system).</p>
+    <p><strong>4. Operating it for real</strong> — <a href="#monitoring">Monitoring &amp; management</a> →
+      <a href="#security">Security &amp; identity</a> → <a href="#cost">Cost management</a>. What you need
+      once something is actually running in production.</p>
+    <p><strong>5. Building &amp; scaling a real org</strong> — <a href="#devops">DevOps &amp; IaC</a> →
+      <a href="#migration">Migration &amp; hybrid</a> → <a href="#analytics-ml">Analytics, ML &amp; messaging</a> →
+      <a href="#generative-ai">Generative AI on AWS</a> → <a href="#well-architected">Organizations &amp; Well-Architected</a>.</p>
+    <p><strong>6.</strong> <a href="#interview-qa">Interview Q&amp;A</a> — once the sections above make sense, this is the fast-recall pass before an actual interview.</p>
+  </div>
+
+  <h2 id="overview">Core services, in one line</h2>
+  <table>
+    <tr><th>Service</th><th>What it is</th></tr>
+    <tr><td><strong>EC2</strong></td><td>Virtual machines — Infrastructure as a Service (IaaS)</td></tr>
+    <tr><td><strong>S3</strong></td><td>Object storage, accessed via REST API — not attachable to EC2 like a disk</td></tr>
+    <tr><td><strong>RDS</strong></td><td>Managed relational databases (Postgres, MySQL, etc.)</td></tr>
+    <tr><td><strong>DynamoDB</strong></td><td>Managed NoSQL key-value/document database, serverless-scaling</td></tr>
+    <tr><td><strong>Lambda</strong></td><td>Run code without provisioning servers — pay per invocation</td></tr>
+    <tr><td><strong>VPC</strong></td><td>Your own logically isolated network within AWS</td></tr>
+    <tr><td><strong>IAM</strong></td><td>Who can do what — users, roles, groups, policies</td></tr>
+    <tr><td><strong>CloudWatch</strong></td><td>Metrics, logs, alarms, dashboards</td></tr>
+    <tr><td><strong>CloudTrail</strong></td><td>Audit log of every API call made in the account</td></tr>
+  </table>
+
+  <h2 id="iam">IAM fundamentals <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Almost every other AWS service's security question comes back to IAM — worth understanding this before
+    anything else below.</p>
+  <table>
+    <tr><th>Concept</th><th>What it is</th></tr>
+    <tr><td>User</td><td>A person or application with long-term credentials (password and/or access keys)</td></tr>
+    <tr><td>Group</td><td>A collection of users — attach a policy once, every member inherits it</td></tr>
+    <tr><td>Role</td><td>A set of permissions <em>assumed temporarily</em> — by a user, an AWS service (e.g. EC2, Lambda), or an external identity. No long-term credentials; issues short-lived tokens via STS.</td></tr>
+    <tr><td>Policy</td><td>A JSON document listing what's allowed/denied — attached to a user, group, or role</td></tr>
+  </table>
+  <pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-bucket/*"
+    }
+  ]
+}</code></pre>
+  <table>
+    <tr><th>Policy element</th><th>Meaning</th></tr>
+    <tr><td><code>Effect</code></td><td>Allow or Deny</td></tr>
+    <tr><td><code>Action</code></td><td>Which API call(s) this statement covers</td></tr>
+    <tr><td><code>Resource</code></td><td>Which specific resource(s) (by ARN) this applies to</td></tr>
+    <tr><td><code>Principal</code></td><td>(Resource-based policies only) who the policy applies to</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Identity-based vs. resource-based policies — a common point of confusion</div>
+    An <strong>identity-based</strong> policy is attached to a user/group/role ("this role can read this
+    bucket"). A <strong>resource-based</strong> policy is attached to the resource itself (an S3 bucket
+    policy: "this account can read this bucket"). They can grant access from either direction — a resource
+    can be reachable because the identity's policy allows it, OR because the resource's own policy allows it
+    — but an explicit <code>Deny</code> anywhere always wins over any Allow.
+  </div>
+  <p><strong>Principle of least privilege</strong> — grant only the specific actions/resources actually
+    needed, nothing broader "just in case." The most commonly cited IAM best practice in interviews, and the
+    reason wildcard (<code>"Action": "*"</code>, <code>"Resource": "*"</code>) policies are a red flag.</p>
+  <p>Why use a <strong>role</strong> instead of embedding long-term access keys in an application: an EC2
+    instance/Lambda function assumes a role and gets automatically-rotated temporary credentials — nothing
+    hardcoded to leak, nothing to manually rotate.</p>
+
+  <h2 id="aws-cli">AWS CLI basics <span class="tag" style="margin-left:0;">moved here from the Linux notes file — this is AWS content, not Linux</span></h2>
+  <p>The command-line way to do anything the AWS Console does. Needs an IAM user's access keys (see
+    <a href="#iam">IAM fundamentals</a> above) — never use root account keys for this.</p>
+  <pre><code>aws configure
+# prompts for:
+#   AWS Access Key ID
+#   AWS Secret Access Key
+#   Default region name
+#   Default output format (json/yaml/text/table)</code></pre>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>aws s3 mb s3://my-bucket</code></td><td>Make a new bucket (<code>mb</code> = make bucket)</td></tr>
+    <tr><td><code>aws s3 cp file.txt s3://my-bucket</code></td><td>Copy a local file up to S3</td></tr>
+    <tr><td><code>aws s3 cp s3://my-bucket/file.txt .</code></td><td>Copy a file down from S3 (same command, reversed direction)</td></tr>
+    <tr><td><code>aws s3 ls s3://my-bucket</code></td><td>List a bucket's contents</td></tr>
+    <tr><td><code>aws s3 sync ./local-folder s3://my-bucket</code></td><td>Sync a whole folder — only uploads what's new/changed, not everything every time</td></tr>
+    <tr><td><code>aws s3 rm s3://my-bucket/file.txt</code></td><td>Delete an object</td></tr>
+    <tr><td><code>aws ec2 describe-instances</code></td><td>List EC2 instances and their details — the CLI equivalent of the EC2 console list</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">CLI/SDK vs. Console — a real interview framing</div>
+    The Console is for humans clicking around. The CLI (and the SDK, for code) is for anything that needs to
+    be <strong>scripted or automated</strong> — CI/CD pipelines, cron jobs, Infrastructure as Code tooling.
+    "Which would you use to integrate AWS directly into an application" → SDK, not CLI, not Console.
+  </div>
+
+  <h2 id="ec2">EC2 &amp; purchasing options</h2>
+  <ul>
+    <li>EC2 = Elastic Compute Cloud — IaaS. More expensive than S3 for equivalent workloads; best suited to
+      <strong>predictable</strong> workloads (unpredictable/spiky → Lambda instead).</li>
+    <li>Instance data on the root volume (if instance-store backed, not EBS) is lost on stop/termination.</li>
+    <li><strong>Reverse proxy</strong> pattern: used when the EC2 instance sits in a private subnet with no
+      direct internet access.</li>
+  </ul>
+  <table>
+    <tr><th>Purchase option</th><th>Best for</th></tr>
+    <tr><td>On-Demand</td><td>Short/unpredictable workloads, no commitment, highest per-hour price</td></tr>
+    <tr><td>Reserved Instances (1-3 yr)</td><td>Long, steady workloads with known instance type/family</td></tr>
+    <tr><td><strong>Savings Plans</strong> (not in original notes)</td><td>Same idea as RIs but commit to a $/hour spend instead of a specific instance type — more flexible, generally the better default recommendation now</td></tr>
+    <tr><td>Spot Instances</td><td>Fault-tolerant, interruptible workloads (batch, CI, data analysis) — up to 90% off, can be reclaimed with 2-min warning</td></tr>
+    <tr><td>Dedicated Instances</td><td>Hardware dedicated to your account, may still share with other instances in your account, no placement control</td></tr>
+    <tr><td>Dedicated Hosts</td><td>Whole physical server, full placement control, visible sockets/cores — for BYOL licensing or strict compliance</td></tr>
+  </table>
+  <p><strong>Hotel analogy</strong> (kept from the original notes, it's a genuinely good one): On-Demand = walk-in, pay full price. Reserved = book ahead for a discount. Spot = bid on empty rooms, can get kicked out. Dedicated Host = book the entire building.</p>
+  <div class="box why">
+    <div class="box-title">Graviton instances — not in the original notes, worth knowing</div>
+    AWS's own ARM-based Graviton processors (Graviton2/3/4) power instance families like <code>m7g</code>,
+    <code>c7g</code>, <code>r7g</code> — typically 20-40% better price/performance than the equivalent x86
+    instance for workloads that support ARM. A real, commonly-asked cost-optimization talking point now.
+  </div>
+  <h3>Placement groups</h3>
+  <table>
+    <tr><th>Type</th><th>Trade-off</th></tr>
+    <tr><td>Cluster</td><td>Single hardware rack — lowest latency, highest throughput, but a single point of failure</td></tr>
+    <tr><td>Partition</td><td>Spread across multiple hardware partitions — better for disaster recovery</td></tr>
+    <tr><td>Spread (not in original notes)</td><td>Each instance on distinct hardware — for a small number of critical instances that must never share a rack</td></tr>
+  </table>
+  <h3>Disaster recovery basics</h3>
+  <ul>
+    <li><strong>RPO</strong> (Recovery Point Objective) — how much data you can afford to lose (drives backup frequency).</li>
+    <li><strong>RTO</strong> (Recovery Time Objective) — how long recovery is allowed to take (drives downtime tolerance).</li>
+  </ul>
+
+  <h2 id="storage">Storage</h2>
+  <table>
+    <tr><th></th><th>Durability rank</th><th>Performance rank</th></tr>
+    <tr><td>Ordering (from original notes)</td><td>S3 &gt; EFS &gt; EBS</td><td>EBS is the maximum-performance option</td></tr>
+  </table>
+  <h3>EBS (Elastic Block Store)</h3>
+  <ul>
+    <li>A network-attached block volume (not a file system) — root volumes for EC2 can be EBS or instance-store.</li>
+    <li>Instance store: physically attached, better raw I/O, but lost on stop/terminate, can't be resized.</li>
+    <li>Snapshots restored from S3-backed storage need "pre-warming" (a full read pass) for best performance on first access.</li>
+  </ul>
+  <h3>EFS &amp; FSx</h3>
+  <ul>
+    <li><strong>EFS</strong> — managed NFS, mountable by many EC2 instances across multiple AZs simultaneously. Linux only.</li>
+    <li><strong>FSx</strong> — managed 3rd-party file systems. FSx for Windows File Server = Windows/SMB. FSx for Lustre = high-performance computing.</li>
+  </ul>
+  <h3>S3</h3>
+  <ul>
+    <li>Object storage via REST API — not a relational database, not attachable to EC2 as a volume.</li>
+    <li>Max object size: 5TB. Uploads &gt;100MB should, and &gt;5GB <strong>must</strong>, use multi-part upload.</li>
+    <li><strong>Versioning</strong> — bucket-level; overwriting the same key increments a version number instead of replacing data.</li>
+  </ul>
+  <table>
+    <tr><th>Encryption type</th><th>Who manages the key</th></tr>
+    <tr><td>SSE-S3</td><td>AWS (AES-256, header: <code>x-amz-server-side-encryption: AES256</code>)</td></tr>
+    <tr><td>SSE-KMS</td><td>AWS KMS (adds audit trail + user-level key control)</td></tr>
+    <tr><td>SSE-C</td><td>You supply the key per-request over HTTPS; AWS never stores it</td></tr>
+    <tr><td>Client-side</td><td>You encrypt/decrypt entirely yourself before/after S3</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">S3 features missing entirely from the original notes</div>
+    <ul>
+      <li><strong>S3 Intelligent-Tiering</strong> (2018) — automatically moves objects between access tiers based on actual usage patterns, no manual lifecycle rule needed. A very commonly asked "which storage class" answer now.</li>
+      <li><strong>S3 Object Lock</strong> — true object-level WORM (Write Once Read Many), with Governance/Compliance retention modes. More precise than the original notes' "Vault Lock" (which is actually a Glacier-specific feature).</li>
+      <li><strong>S3 Access Points</strong> — named network endpoints with their own policy, for simplifying access management on buckets shared by many applications.</li>
+      <li><strong>S3 Object Lambda</strong> — run a Lambda function to transform data as it's retrieved from S3, without a separate copy.</li>
+    </ul>
+  </div>
+  <ul>
+    <li><strong>Lifecycle rules</strong> — transition actions (move to a cheaper class after N days) and expiration actions (delete after N days), can target a prefix or object tag.</li>
+    <li><strong>Security:</strong> IAM policies (user-based) + Bucket Policies/ACLs (resource-based). A principal can access an object if IAM allows it OR the resource policy allows it, AND there's no explicit Deny.</li>
+    <li><strong>CORS</strong> matters for cross-origin browser requests to a bucket (a popular exam question).</li>
+  </ul>
+  <h3>Glacier &amp; Glacier Deep Archive</h3>
+  <table>
+    <tr><th></th><th>Retrieval options</th><th>Min. storage duration</th></tr>
+    <tr><td>Glacier</td><td>Expedited (1-5 min), Standard (3-5 hr), Bulk (5-12 hr)</td><td>90 days</td></tr>
+    <tr><td>Glacier Deep Archive</td><td>Standard (12 hr), Bulk (48 hr)</td><td>180 days</td></tr>
+  </table>
+  <h3>Snow Family (offline data transfer)</h3>
+  <table>
+    <tr><th>Device</th><th>Capacity</th><th>Use case</th></tr>
+    <tr><td>Snowcone</td><td>8 TB</td><td>Small, portable, edge computing</td></tr>
+    <tr><td>Snowball Edge</td><td>42-80 TB</td><td>Larger on-prem migrations, supports Lambda</td></tr>
+    <tr><td>Snowmobile</td><td>100 PB</td><td>Massive migrations, &gt;10PB</td></tr>
+  </table>
+  <p>Snowball transfers into S3, not directly into Glacier — use a lifecycle policy afterward to transition into Glacier if needed.</p>
+  <h3>Storage Gateway (on-premises ↔ cloud bridge)</h3>
+  <table>
+    <tr><th>Type</th><th>Use case</th></tr>
+    <tr><td>File Gateway</td><td>NFS file access, backed by S3</td></tr>
+    <tr><td>Volume Gateway</td><td>Block storage / iSCSI, backed by S3 with EBS snapshots</td></tr>
+    <tr><td>Tape Gateway</td><td>Virtual Tape Library backup, backed by S3 + Glacier</td></tr>
+  </table>
+
+  <h2 id="cloudfront">CloudFront <span class="tag" style="margin-left:0;">named once, never explained in the originals</span></h2>
+  <p>Amazon's CDN (Content Delivery Network) — caches content at edge locations physically close to users, so
+    repeat requests don't have to travel back to the origin server every time.</p>
+  <table>
+    <tr><th>Concept</th><th>What it means</th></tr>
+    <tr><td>Origin</td><td>Where the real content lives — an S3 bucket (static files) or a custom origin (ALB, EC2, any HTTP server)</td></tr>
+    <tr><td>Edge location</td><td>A CloudFront cache point close to end users — far more of these than there are AWS regions</td></tr>
+    <tr><td>Cache behavior</td><td>Per-path-pattern rules for what to cache, for how long, and which origin to use</td></tr>
+    <tr><td>Signed URL / Signed Cookie</td><td>Time-limited, authenticated access to private content (e.g. a paid video service)</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">CloudFront vs. Global Accelerator — a real interview question, and a typo in the original notes ("Global Accelerate")</div>
+    Both use AWS's global network to improve performance, but for different traffic:
+    <ul>
+      <li><strong>CloudFront</strong> — caches HTTP/HTTPS content at the edge. Best for static/cacheable content (websites, video, APIs with cacheable responses).</li>
+      <li><strong>AWS Global Accelerator</strong> — doesn't cache anything; it proxies TCP/UDP traffic over AWS's private backbone network to the nearest healthy endpoint, using static anycast IPs. Best for non-HTTP protocols, or applications needing fast regional failover without a DNS change.</li>
+    </ul>
+  </div>
+
+  <h2 id="networking">Networking — VPC</h2>
+  <ul>
+    <li>A CIDR block has a base IP + subnet mask (e.g. <code>/24</code>) defining the address range.</li>
+    <li>AWS reserves 5 IPs per subnet — a subnet needing 29 usable IPs needs at least a <code>/26</code> (64 - 5 = 59 ≥ 29), not a <code>/27</code> (32 - 5 = 27 &lt; 29). A classic exam-style sizing question.</li>
+  </ul>
+  <table>
+    <tr><th>Component</th><th>Role</th></tr>
+    <tr><td>Internet Gateway</td><td>VPC-level, gives IPv4/IPv6 internet access</td></tr>
+    <tr><td>NAT Gateway</td><td>Managed, gives private-subnet instances outbound internet access (IPv4 only)</td></tr>
+    <tr><td>NAT Instance</td><td>Legacy, self-managed equivalent of NAT Gateway — must disable source/destination check</td></tr>
+    <tr><td>Egress-Only Internet Gateway</td><td>Same idea as NAT Gateway, but for IPv6 (all IPv6 addresses are public by nature)</td></tr>
+    <tr><td>Route Tables</td><td>Must be edited to actually route subnet traffic to any of the above</td></tr>
+  </table>
+  <table>
+    <tr><th></th><th>Network ACL</th><th>Security Group</th></tr>
+    <tr><td>Stateless/stateful</td><td>Stateless — must define both inbound and outbound rules explicitly, including ephemeral return ports</td><td>Stateful — return traffic automatically allowed</td></tr>
+    <tr><td>Applies at</td><td>Subnet level</td><td>EC2 instance (ENI) level</td></tr>
+    <tr><td>Can block a specific IP?</td><td>Yes</td><td><strong>No</strong> — Security Groups only support Allow rules, no explicit Deny/block of an individual IP</td></tr>
+  </table>
+  <ul>
+    <li><strong>VPC Peering</strong> — connects two VPCs over AWS's private network, non-transitive (A↔B and B↔C doesn't give A↔C).</li>
+    <li><strong>VPC Endpoints</strong> — private connectivity to AWS services without traversing the public internet. Gateway type (S3, DynamoDB — uses a route table entry) vs. Interface type (most other services — provisions an ENI).</li>
+    <li><strong>Transit Gateway</strong> — hub-and-spoke connectivity for thousands of VPCs/on-prem networks, region-bound, supports transitive routing (unlike plain VPC Peering).</li>
+    <li><strong>PrivateLink</strong> — exposes a specific service from one VPC to many others without full peering; needs an NLB on the provider side and an ENI on the consumer side.</li>
+    <li><strong>Bastion Host</strong> — a public instance used purely as an SSH jump box into private-subnet instances.</li>
+  </ul>
+  <h3>Hybrid connectivity</h3>
+  <table>
+    <tr><th>Option</th><th>Notes</th></tr>
+    <tr><td>Site-to-Site VPN</td><td>IPSec tunnel over the public internet — Virtual Private Gateway (AWS side) + Customer Gateway (on-prem side). Cheapest, fastest to set up.</td></tr>
+    <tr><td>Direct Connect</td><td>Dedicated private physical connection to an AWS Direct Connect location — low-latency, not encrypted by default, slower to provision</td></tr>
+    <tr><td>Direct Connect Gateway</td><td>One Direct Connect link reaching multiple VPCs across regions</td></tr>
+  </table>
+  <h3>Route 53 (DNS)</h3>
+  <table>
+    <tr><th>Routing policy</th><th>Use case</th></tr>
+    <tr><td>Simple</td><td>One resource, no health check logic</td></tr>
+    <tr><td>Weighted</td><td>Split traffic by percentage across endpoints</td></tr>
+    <tr><td>Latency-based</td><td>Route to the region with lowest latency for that user</td></tr>
+    <tr><td>Failover</td><td>Active-passive — route to a backup only if primary fails a health check</td></tr>
+    <tr><td>Geolocation</td><td>Route based on the user's geographic location</td></tr>
+  </table>
+  <p><strong>Alias vs. CNAME:</strong> Alias records work for both root and non-root domains and are free; point directly at an AWS resource. CNAME only works for non-root (subdomain) records, points at any hostname.</p>
+
+  <h2 id="load-balancing-asg">Load balancing &amp; Auto Scaling</h2>
+  <table>
+    <tr><th>Load balancer</th><th>Layer</th><th>Key notes</th></tr>
+    <tr><td>Application Load Balancer (ALB)</td><td>7 (HTTP/HTTPS/WebSocket)</td><td>Routes by path, hostname, query string/headers. Great fit for microservices/containers (ECS). Multiple SSL certs via SNI.</td></tr>
+    <tr><td>Network Load Balancer (NLB)</td><td>4 (TCP/TLS/UDP)</td><td>Extreme performance, millions of req/sec, ~100ms latency. One static IP per AZ — supports Elastic IP for whitelisting. <strong>Still a core, actively-tested service</strong> despite what the original notes claimed.</td></tr>
+    <tr><td>Gateway Load Balancer (GWLB)</td><td>3 (Network)</td><td>For inserting third-party security/inspection appliances transparently into traffic flow</td></tr>
+    <tr><td>Classic Load Balancer (CLB)</td><td>4 &amp; 7</td><td>Legacy — one SSL cert only. AWS steers new workloads toward ALB/NLB; still worth recognizing for exam/legacy-system purposes only.</td></tr>
+  </table>
+  <ul>
+    <li>Health checks: ALB checks happen at the <strong>target group</strong> level, not the load balancer.</li>
+    <li>Load balancers distribute connections across existing instances — they do <em>not</em> themselves add/remove instances. That's Auto Scaling's job.</li>
+  </ul>
+  <h3>Auto Scaling Groups (ASG)</h3>
+  <ul>
+    <li>Free — you only pay for the underlying EC2 instances.</li>
+    <li>Scale out (add) / scale in (remove) based on CloudWatch alarms.</li>
+    <li><strong>Lifecycle hooks</strong> run extra steps before an instance goes into service (pending state) or before it's terminated (terminating state) — e.g. install software, or extract logs before shutdown.</li>
+    <li>ASG launches a replacement for an unhealthy instance — it does <strong>not</strong> reboot the unhealthy one for you.</li>
+    <li>High availability needs a <strong>multi-AZ</strong> ASG — at least 2 instances across 2 AZs.</li>
+  </ul>
+  <table>
+    <tr><th>Scalability type</th><th>What it means</th><th>Example</th></tr>
+    <tr><td>Vertical (scale up/down)</td><td>Bigger/smaller instance — limited by hardware, used in non-distributed systems</td><td>RDS, ElastiCache</td></tr>
+    <tr><td>Horizontal (scale out/in)</td><td>More/fewer instances — used in distributed systems, easier to achieve</td><td>EC2 behind an ASG</td></tr>
+  </table>
+
+  <h2 id="databases">Databases</h2>
+  <h3>RDS &amp; Aurora</h3>
+  <ul>
+    <li>Managed service: automated backups, automatic OS/DB patching, Multi-AZ for DR, read replicas for read scaling, point-in-time restore.</li>
+    <li>You cannot access the underlying OS to run scripts — that's the whole point of "managed."</li>
+    <li>Compute scaling is manual (change instance type); storage auto-scaling is available.</li>
+    <li><strong>Aurora</strong>: 6 copies of data across 3 AZs — needs 4/6 for writes, 3/6 for reads.</li>
+    <li>Read replicas: up to 5, asynchronous replication, can be promoted to their own standalone DB. Same-region replication is free; cross-region is paid.</li>
+  </ul>
+  <div class="box tip">
+    <div class="box-title">Not in the original notes: Aurora Serverless v2 &amp; RDS Proxy</div>
+    <strong>Aurora Serverless v2</strong> scales database capacity automatically based on load, billed per
+    fine-grained capacity unit — good for variable/unpredictable database workloads without managing instance
+    sizing. <strong>RDS Proxy</strong> pools and manages database connections, protecting against connection
+    exhaustion from spiky serverless/Lambda-heavy workloads.
+  </div>
+  <h3>DynamoDB — barely covered in the original notes, expanded here</h3>
+  <ul>
+    <li>A fully managed, serverless <strong>NoSQL</strong> key-value/document database — not relational, no SQL joins.</li>
+    <li>Every table needs a <strong>partition key</strong> (required) and optionally a <strong>sort key</strong> (composite primary key) — the partition key determines which physical partition an item lives on.</li>
+    <li><strong>Capacity modes:</strong> On-Demand (pay per request, scales automatically) vs. Provisioned (set read/write capacity units ahead of time, cheaper at steady, predictable load).</li>
+    <li><strong>DAX</strong> (DynamoDB Accelerator) — an in-memory cache in front of DynamoDB for microsecond read latency.</li>
+    <li><strong>Global Tables</strong> — multi-region, multi-active replication for low-latency global access.</li>
+    <li><strong>DynamoDB Streams</strong> — a time-ordered change log of table item modifications, commonly used to trigger a Lambda function on every write.</li>
+  </ul>
+  <h3>Caching &amp; search</h3>
+  <table>
+    <tr><th></th><th>Redis</th><th>Memcached</th></tr>
+    <tr><td>Data store</td><td>In-memory data store</td><td>Distributed memory object cache</td></tr>
+    <tr><td>Replication</td><td>Read replicas (scaling + HA)</td><td>None</td></tr>
+    <tr><td>Backup/restore</td><td>Yes</td><td>No</td></tr>
+    <tr><td>Threading</td><td>Single-threaded</td><td>Multi-threaded</td></tr>
+  </table>
+  <p>ElastiCache caches <strong>database</strong> reads (not whole websites) — reduces latency for read-heavy workloads, sits in front of RDS/Aurora, not in front of a website's static content (that's CloudFront's job).</p>
+  <div class="box gotcha">
+    <div class="box-title">Correction: "Amazon ElasticSearch" is now Amazon OpenSearch Service</div>
+    Renamed in 2021. Same purpose — combined with a database for search operations, supports partial matches,
+    provisioned cluster, Multi-AZ, used heavily in log analytics/Big Data pipelines.
+  </div>
+  <p><strong>Amazon Neptune</strong> — managed graph database, for highly connected data (social graphs, recommendation engines, fraud detection).</p>
+
+  <h2 id="serverless-containers">Serverless &amp; containers</h2>
+  <h3>Lambda — thin in the original notes, expanded here</h3>
+  <ul>
+    <li>Max execution time: 15 minutes, then it's force-terminated.</li>
+    <li>Best for unpredictable/event-driven workloads — genuinely cost-effective since you pay only for actual invocation time, not idle capacity.</li>
+    <li><strong>Triggers</strong> (not in original notes): S3 events, API Gateway, DynamoDB Streams, EventBridge, SQS, and more — Lambda is almost always wired to something else, rarely invoked standalone.</li>
+    <li><strong>Cold starts</strong> — the first invocation after idle time pays a startup penalty (especially with a VPC-attached Lambda or a large deployment package); a real interview topic around latency-sensitive Lambda design.</li>
+    <li><strong>Layers</strong> — share common code/dependencies across multiple Lambda functions without bundling them into every deployment package.</li>
+    <li><strong>Concurrency</strong> — reserved concurrency guarantees capacity for a function; without it, a traffic spike across all your functions can throttle each other.</li>
+  </ul>
+  <h3>API Gateway — missing entirely from the original notes</h3>
+  <ul>
+    <li>The front door for exposing Lambda functions (or any backend) as a REST/HTTP API — handles routing, auth, throttling, request/response transformation.</li>
+    <li><strong>REST API</strong> — full feature set (request validation, API keys, usage plans). <strong>HTTP API</strong> — newer, cheaper, lower-latency, fewer features — the default recommendation for a simple Lambda-backed API today.</li>
+    <li>A Lambda function behind an ALB receives its HTTP request translated into a JSON event — same underlying pattern as API Gateway's integration.</li>
+  </ul>
+  <h3>Containers</h3>
+  <table>
+    <tr><th>Service</th><th>What it is</th></tr>
+    <tr><td>ECS</td><td>AWS's own container orchestrator — runs Docker containers on a managed cluster of EC2 instances (or Fargate)</td></tr>
+    <tr><td>ECR</td><td>Managed Docker image registry</td></tr>
+    <tr><td>EKS (not in original notes)</td><td>AWS's managed <strong>Kubernetes</strong> control plane — for teams standardized on Kubernetes, cloud-agnostic by design</td></tr>
+    <tr><td>Fargate</td><td>Serverless compute for containers — define the container, Fargate handles the underlying servers entirely (works with both ECS and EKS)</td></tr>
+  </table>
+  <p><strong>Elastic Beanstalk</strong> — Platform as a Service. Handles capacity provisioning, load balancing, scaling, health monitoring automatically, while you keep configuration control. Three models: single instance (dev), LB+ASG (production web apps), ASG-only (non-web workers).</p>
+
+  <h2 id="monitoring">Monitoring &amp; management</h2>
+  <table>
+    <tr><th>Service</th><th>Answers</th></tr>
+    <tr><td>CloudWatch</td><td>Performance metrics, dashboards, alarms, log aggregation</td></tr>
+    <tr><td>CloudTrail</td><td>Who called what API, when — global service, tracks account activity</td></tr>
+    <tr><td>Config</td><td>How has a resource's configuration changed over time; compliance rule evaluation</td></tr>
+  </table>
+  <ul>
+    <li>EC2 basic monitoring: every 5 minutes, free. Detailed monitoring: every 1 minute, paid.
+      <strong>RAM is not included</strong> in default EC2 metrics — needs a custom CloudWatch agent metric.</li>
+    <li><strong>EventBridge</strong> — serverless event bus; default (AWS service events), partner (external SaaS), and custom (your own apps) event buses. The recommended way to decouple apps that react to third-party events.</li>
+    <li><strong>Systems Manager</strong> — patch management, Session Manager (browser-based shell access, no SSH keys/bastion needed), Parameter Store (secure config/secret storage, simpler and free vs. Secrets Manager's rotation features).</li>
+    <li><strong>Trusted Advisor</strong> — real-time best-practice recommendations across cost, performance, security, fault tolerance, service limits.</li>
+  </ul>
+
+  <h2 id="security">Security &amp; identity — deeper services</h2>
+  <p>IAM fundamentals are covered <a href="#iam">earlier</a> — these are the specialized security services built on top of that foundation.</p>
+  <table>
+    <tr><th>Service</th><th>Role</th></tr>
+    <tr><td>IAM Identity Center (formerly AWS SSO)</td><td>Centralized workforce identity across an AWS Organization</td></tr>
+    <tr><td>KMS</td><td>Encryption key management, AWS-managed software, free tier available</td></tr>
+    <tr><td>CloudHSM</td><td>Dedicated encryption hardware, you manage the keys, not free</td></tr>
+    <tr><td>STS</td><td>Temporary security credentials, tokens valid up to 1 hour</td></tr>
+    <tr><td>Secrets Manager</td><td>Rotates, manages, retrieves DB credentials/API keys — vs. Parameter Store, which doesn't rotate automatically</td></tr>
+    <tr><td>WAF</td><td>Filters web requests by rule — protects against SQL injection, common exploits</td></tr>
+    <tr><td>Shield</td><td>DDoS protection (Standard is automatic/free; Advanced adds 24/7 support)</td></tr>
+    <tr><td>GuardDuty</td><td>Threat detection via VPC/DNS/CloudTrail log analysis</td></tr>
+    <tr><td>Inspector</td><td>Automated vulnerability assessment — EC2 (and container images) only</td></tr>
+    <tr><td>Macie</td><td>Discovers/classifies sensitive data in S3</td></tr>
+    <tr><td>Detective</td><td>Investigates security findings after the fact — doesn't detect threats itself</td></tr>
+    <tr><td>Security Hub</td><td>Aggregates findings/alerts across the above into one place</td></tr>
+    <tr><td>Access Analyzer</td><td>Flags resources unintentionally shared with an external entity</td></tr>
+  </table>
+  <ul>
+    <li><strong>Access keys</strong> (long-term, for CLI/SDK/API) vs. <strong>key pairs</strong> (SSH into EC2) vs. <strong>username/password</strong> (console login only) — three genuinely different credential types, a common source of confusion.</li>
+    <li><strong>STS AssumeRole</strong> family: <code>AssumeRole</code> (IAM user → IAM role), <code>AssumeRoleWithSAML</code> (enterprise SSO), <code>AssumeRoleWithWebIdentity</code> (Google/Facebook-style identity providers).</li>
+    <li><strong>SCPs</strong> (Service Control Policies) — whitelist/blacklist actions at the OU/account level within AWS Organizations. Do not apply to the management (root) account. Must have an explicit Allow.</li>
+  </ul>
+
+  <h2 id="cost">Cost management</h2>
+  <table>
+    <tr><th>Tool</th><th>Use it for</th></tr>
+    <tr><td>Pricing Calculator</td><td>Forecast a new workload's monthly cost before building it</td></tr>
+    <tr><td>Cost Explorer</td><td>Analyze historical spend, predict next 12 months</td></tr>
+    <tr><td>Cost &amp; Usage Report</td><td>Detailed cost breakdown by resource/tag/duration</td></tr>
+    <tr><td>Budgets</td><td>Alarms when cost/usage/reservation exceeds a threshold you set</td></tr>
+    <tr><td>Cost allocation tags</td><td>Categorize and track spend by project/team</td></tr>
+  </table>
+  <p>Cloud economics: <strong>economies of scale</strong> — aggregated usage across hundreds of thousands of AWS customers drives lower pay-as-you-go pricing than any single company could achieve alone.</p>
+
+  <h2 id="devops">DevOps &amp; Infrastructure as Code</h2>
+  <table>
+    <tr><th>Service</th><th>Role</th></tr>
+    <tr><td>CodeCommit</td><td>Managed Git source control</td></tr>
+    <tr><td>CodeBuild</td><td>Compile &amp; test code</td></tr>
+    <tr><td>CodeDeploy</td><td>Automate deployment to EC2/Lambda/ECS</td></tr>
+    <tr><td>CodePipeline</td><td>Orchestrates the full release pipeline end to end</td></tr>
+    <tr><td>CodeStar</td><td>Unified UI over the above, for managing a project's whole dev lifecycle</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">CloudFormation — underrepresented in the original notes</div>
+    AWS's native Infrastructure-as-Code service — define resources declaratively in a JSON/YAML
+    <strong>template</strong>, CloudFormation creates/updates/deletes a <strong>stack</strong> to match it.
+    <strong>Change sets</strong> preview what a template update would actually do before applying it. <strong>SAM</strong>
+    (Serverless Application Model) is an extension specifically for Lambda/API Gateway/DynamoDB-based
+    serverless apps, with a simplified YAML syntax and local testing support.
+  </div>
+  <p><strong>OpsWorks</strong> — managed Chef/Puppet, configuration-as-code, cross-cloud (unlike CloudFormation/SAM which are AWS-only) — legacy-leaning today compared to CloudFormation/Terraform for most new projects.</p>
+
+  <h2 id="migration">Migration &amp; hybrid</h2>
+  <table>
+    <tr><th>Migration type</th><th>Process</th></tr>
+    <tr><td>Homogeneous (same DB engine, e.g. Oracle→Oracle)</td><td>Database Migration Service (DMS) only</td></tr>
+    <tr><td>Heterogeneous (different engines, e.g. SQL Server→Aurora)</td><td>Schema Conversion Tool (SCT) first, then DMS</td></tr>
+  </table>
+  <p><strong>AWS DataSync</strong> — online transfer between on-prem NAS/file systems and AWS storage over NFS/SMB, encrypted with TLS. <strong>AWS Application Discovery Service</strong> — inventories on-prem servers/processes/network connections ahead of a migration, for cost estimation and application grouping.</p>
+
+  <h2 id="analytics-ml">Analytics, ML &amp; messaging</h2>
+  <table>
+    <tr><th>Service</th><th>What it does</th></tr>
+    <tr><td>Kinesis</td><td>Near-real-time streaming data (thousands of sensors/high-volume — beyond what SQS handles well)</td></tr>
+    <tr><td>Athena</td><td>Serverless SQL queries directly against data sitting in S3</td></tr>
+    <tr><td>QuickSight</td><td>BI dashboards, natural-language queries over your data</td></tr>
+    <tr><td>Glue</td><td>Managed ETL — extract, transform, load, prep data for analytics</td></tr>
+    <tr><td>SageMaker</td><td>Build, train, deploy custom ML models with managed infrastructure</td></tr>
+    <tr><td>Rekognition</td><td>Detects objects/faces/text in images and video</td></tr>
+    <tr><td>Polly</td><td>Text-to-speech</td></tr>
+    <tr><td>SQS</td><td>Message queue — decouples producer/consumer applications</td></tr>
+    <tr><td>SWF</td><td>Coordinates multi-step (parallel or sequential) background jobs — largely superseded by Step Functions for new work</td></tr>
+    <tr><td>Step Functions</td><td>Serverless workflow orchestration — represents a flow as a JSON state machine, commonly orchestrating Lambda functions</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">Synchronous vs. asynchronous application communication</div>
+    <strong>Synchronous</strong> (app → app directly) can cascade failure if one service gets overwhelmed by a
+    traffic spike. <strong>Asynchronous/event-based</strong> (app → queue → app, e.g. via SQS) lets each side
+    scale independently and absorbs spikes in the queue instead of failing outright.
+  </div>
+
+  <h2 id="generative-ai">Generative AI on AWS <span class="tag" style="margin-left:0;">didn't meaningfully exist when the originals were written</span></h2>
+  <p>SageMaker (above) is for building/training your <em>own</em> ML models. These services are for using
+    pre-built <strong>foundation models</strong> — a completely different, now-central part of AWS's offering.</p>
+  <table>
+    <tr><th>Service</th><th>What it does</th></tr>
+    <tr><td>Amazon Bedrock</td><td>Fully managed access to foundation models from multiple providers (Anthropic's Claude, Meta's Llama, Amazon's own Titan/Nova, and others) through one API — no infrastructure to manage, pay per use</td></tr>
+    <tr><td>Amazon Q</td><td>AWS's generative-AI assistant family — Q Developer (coding/AWS-console assistance), Q Business (enterprise data Q&amp;A)</td></tr>
+    <tr><td>Bedrock Knowledge Bases</td><td>Managed Retrieval-Augmented Generation (RAG) — connects a foundation model to your own private data without you building the retrieval pipeline yourself</td></tr>
+    <tr><td>Bedrock Agents</td><td>Lets a foundation model take multi-step actions by calling your own APIs/Lambda functions, not just answer questions</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why this matters for an interview even outside an "AI role"</div>
+    Bedrock is now a routinely mentioned service in general AWS architecture discussions — "how would you add
+    an AI feature to this system" is a realistic follow-up question regardless of the role, and knowing that
+    Bedrock is the managed, multi-provider, no-infrastructure answer (vs. self-hosting a model on
+    SageMaker/EC2) is the expected baseline.
+  </div>
+
+  <h2 id="sample-architecture">Sample reference architecture <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>The classic "design a scalable, highly-available web app on AWS" interview answer — ties together nearly
+    every service covered above into one picture.</p>
+  <div class="diagram">                              Users
+                                │
+                                ▼
+                        Route 53  (DNS, health checks)
+                                │
+                                ▼
+                CloudFront  (CDN, caches static content) ────► S3  (static assets, images)
+                                │
+                                ▼
+                  ALB  (public subnets, spans 2 AZs)
+                                │
+                ┌───────────────┴───────────────┐
+                ▼                                ▼
+      EC2, AZ-a (private subnet)        EC2, AZ-b (private subnet)
+      └──────────── Auto Scaling Group across both AZs ────────────┘
+                │                                │
+                └───────────────┬────────────────┘
+                                 ▼
+                    ElastiCache  (read cache, reduces DB load)
+                                 │
+                                 ▼
+                RDS Multi-AZ  (private subnet)
+        primary (AZ-a)  ◄─sync replication─►  standby (AZ-b)</div>
+  <table>
+    <tr><th>Layer</th><th>Why this service, specifically</th></tr>
+    <tr><td>Route 53</td><td>DNS + health checks — can fail over to a backup region if the primary fails</td></tr>
+    <tr><td>CloudFront + S3</td><td>Static content served from the edge, never touches the app servers at all</td></tr>
+    <tr><td>ALB</td><td>Distributes traffic across AZs, Layer 7 routing, single entry point for the app tier</td></tr>
+    <tr><td>EC2 + ASG, 2 AZs</td><td>Horizontal scaling + high availability — losing one AZ doesn't take the app down</td></tr>
+    <tr><td>ElastiCache</td><td>Absorbs repeated read load so it never reaches the database</td></tr>
+    <tr><td>RDS Multi-AZ</td><td>Synchronous standby — automatic failover on primary failure, not just a backup</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Every layer here maps to a Well-Architected pillar</div>
+    Multi-AZ ASG + RDS Multi-AZ = <strong>Reliability</strong>. CloudFront + ElastiCache = <strong>Performance
+    Efficiency</strong> (less redundant work, lower latency). Auto Scaling = <strong>Cost Optimization</strong>
+    (pay only for capacity actually needed). Security Groups/NACLs on private subnets (not drawn here, but
+    implied — see <a href="#networking">Networking</a>) = <strong>Security</strong>. This is exactly the kind
+    of connection an interviewer wants to see made explicitly, not just "I used RDS because it's a database."
+  </div>
+
+  <h2 id="well-architected">AWS Organizations &amp; the Well-Architected Framework</h2>
+  <ul>
+    <li><strong>Organizations</strong> — manage multiple accounts under one management (root) account, consolidated billing, volume-discount pricing benefits, SCPs for guardrails.</li>
+    <li><strong>Control Tower</strong> — automates setting up a well-architected, secure multi-account environment (a "landing zone") on top of Organizations, rather than configuring one by hand.</li>
+  </ul>
+  <div class="box why">
+    <div class="box-title">Well-Architected Framework — now 6 pillars, not 5</div>
+    The original notes only clearly enumerate 5 in most places. <strong>Sustainability</strong> was added as
+    the 6th pillar in November 2021:
+    <ol>
+      <li>Operational Excellence — operate as code, small reversible changes, learn from failures</li>
+      <li>Security</li>
+      <li>Reliability — design for automated failure recovery</li>
+      <li>Performance Efficiency</li>
+      <li>Cost Optimization</li>
+      <li>Sustainability</li>
+    </ol>
+  </div>
+  <h3>Shared Responsibility Model</h3>
+  <table>
+    <tr><th></th><th>AWS's responsibility</th><th>Your responsibility</th></tr>
+    <tr><td>EC2</td><td>Underlying hardware, hypervisor, physical security</td><td>Guest OS patching, firewall/network config, IAM, data</td></tr>
+    <tr><td>RDS</td><td>OS/DB engine patching, underlying instance</td><td>DB user/permissions, public accessibility, SSL enforcement, encryption settings</td></tr>
+    <tr><td>S3</td><td>Infrastructure durability, encryption capability, tenant isolation</td><td>Bucket policy, public access settings, IAM, enabling encryption</td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-aws-elasticsearch-rename">
+    <div class="q">What is Amazon OpenSearch Service, and how does it relate to "Amazon ElasticSearch"?</div>
+    <div class="a">Same service — Amazon ElasticSearch Service was renamed to Amazon OpenSearch Service in
+      2021, after AWS forked the open-source Elasticsearch project due to a licensing dispute with Elastic
+      N.V. Functionally it's the same managed search/analytics engine, commonly paired with a database for
+      search or used for log analytics at scale.</div>
+  </div>
+  <div class="qa" id="qa-aws-savings-plans-vs-ri">
+    <div class="q">What's the difference between Reserved Instances and Savings Plans?</div>
+    <div class="a">Reserved Instances commit to a specific instance type/family/region for a discount. Savings
+      Plans (launched 2019) commit to a dollar-per-hour spend instead, and automatically apply across any
+      instance type/family/region/even compute service (EC2, Fargate, Lambda) — more flexible, and generally
+      the recommended default over RIs for new commitments today.</div>
+  </div>
+  <div class="qa" id="qa-aws-alb-vs-nlb">
+    <div class="q">When would you choose an NLB over an ALB?</div>
+    <div class="a">NLB when you need raw TCP/UDP performance, extremely low latency, millions of requests per
+      second, or a static IP per AZ. ALB when you need Layer 7 features — path/host-based routing, WebSocket
+      support, and it's the natural fit for microservices/container-based (ECS) applications routing to
+      multiple target groups.</div>
+  </div>
+  <div class="qa" id="qa-aws-sg-vs-nacl">
+    <div class="q">Can a Security Group block a specific malicious IP address?</div>
+    <div class="a">No — Security Groups only support Allow rules, not explicit Deny, so they can't block one
+      specific IP. Use a Network ACL at the subnet level instead, which supports both Allow and Deny rules.</div>
+  </div>
+  <div class="qa" id="qa-aws-dynamodb-vs-rds">
+    <div class="q">When would you choose DynamoDB over RDS?</div>
+    <div class="a">DynamoDB when the access pattern is simple key-value/document lookups at very high, elastic
+      scale with single-digit-millisecond latency and you don't need SQL joins or complex relational queries.
+      RDS/Aurora when you need relational integrity, joins, transactions across multiple tables, or existing
+      SQL-based tooling. DynamoDB's schema is defined by query patterns, not by the data's natural relational
+      shape — a real design-time tradeoff, not just a performance one.</div>
+  </div>
+  <div class="qa" id="qa-aws-cloudfront-vs-global-accelerator">
+    <div class="q">What's the difference between CloudFront and Global Accelerator?</div>
+    <div class="a">CloudFront caches HTTP/HTTPS content at edge locations — best for cacheable web content.
+      Global Accelerator doesn't cache; it proxies TCP/UDP traffic over AWS's private backbone to the nearest
+      healthy endpoint using static anycast IPs — best for non-HTTP protocols or fast regional failover
+      without waiting on DNS propagation.</div>
+  </div>
+  <div class="qa" id="qa-aws-least-privilege">
+    <div class="q">What's the principle of least privilege, and why does it matter in IAM policy design?</div>
+    <div class="a">Grant only the specific actions and resources an identity actually needs, nothing broader
+      "just in case." It limits the blast radius if credentials are ever compromised — a wildcard
+      (<code>"Action": "*"</code>) policy that works is not the same as a correct policy; it's usually a sign
+      permissions weren't scoped deliberately.</div>
+  </div>
+  <div class="qa" id="qa-aws-shared-responsibility">
+    <div class="q">Explain the Shared Responsibility Model for RDS specifically.</div>
+    <div class="a">AWS is responsible for patching the underlying OS and database engine, managing the
+      instance, and guaranteeing infrastructure durability. You're responsible for everything inside that
+      boundary — database user accounts and permissions, whether the DB is publicly accessible, enforcing SSL
+      connections, and encryption configuration. You never get OS-level shell access to an RDS instance —
+      that boundary is the whole point of a managed service.</div>
+  </div>
+  <div class="qa" id="qa-aws-bedrock-vs-sagemaker">
+    <div class="q">What's the difference between Amazon Bedrock and Amazon SageMaker?</div>
+    <div class="a">SageMaker is for building, training, and deploying your <em>own</em> custom ML models —
+      you manage the training data and process. Bedrock gives managed API access to pre-built foundation
+      models from multiple providers (Anthropic, Meta, Amazon, and others) — no training or infrastructure
+      management, pay per request. Bedrock is the faster path when an existing foundation model already
+      solves the problem; SageMaker is for when you need a model trained on your own proprietary data/task.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — general interview reference, not tied to a specific Step.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

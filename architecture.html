@@ -43,9 +43,14 @@
   <a href="tech/docker.html">Docker &amp; Compose</a>
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="tech/go.html">Go</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
+  <a href="notes/sql.html">SQL Notes</a>
+  <a href="notes/aws.html">AWS Notes</a>
+  <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main style="max-width: 1400px;">
@@ -97,6 +102,9 @@
 
           <line class="edge" data-edge data-from="moveent" data-to="redis" x1="220" y1="296" x2="470" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
           <line class="edge" data-edge data-from="claims" data-to="redis" x1="410" y1="296" x2="540" y2="378" stroke="#9aa39f" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+
+          <line class="edge" data-edge data-from="ml" data-to="redis" x1="915" y1="500" x2="660" y2="410" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
+          <text class="edge edge-text" data-edge data-from="ml" data-to="redis" x="760" y="440" font-size="10.5" fill="#5b6663">cache predictions</text>
 
           <line class="edge" data-edge data-from="goingest" data-to="kafka" x1="1030" y1="296" x2="1030" y2="378" stroke="#9aa39f" stroke-width="1.3" marker-end="url(#arrow)"/>
           <text class="edge edge-text" data-edge data-from="goingest" data-to="kafka" x="1038" y="340" font-size="10.5" fill="#5b6663">publishes</text>
@@ -152,11 +160,11 @@
         </g>
 
         <g class="node" data-node="goingest">
-          <rect x="915" y="216" width="230" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <rect x="915" y="216" width="230" height="80" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
           <text x="1030" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
-          <text x="1030" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Go</text>
-          <text x="1030" y="268" text-anchor="middle" font-size="10" fill="#1f2523">raw UDP/TCP + WireGuard</text>
-          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <text x="1030" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Go — REST first, Phase 6</text>
+          <text x="1030" y="268" text-anchor="middle" font-size="10" fill="#1f2523">raw UDP/TCP + WireGuard later (Phase 13)</text>
+          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Steps 41-52</text>
         </g>
 
         <g class="node" data-node="postgres">
@@ -192,17 +200,18 @@
         </g>
 
         <g class="node" data-node="ml">
-          <rect x="915" y="480" width="230" height="55" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <rect x="915" y="480" width="230" height="55" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="1030" y="502" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Claims Triage ML</text>
           <text x="1030" y="516" text-anchor="middle" font-size="10" fill="#1f2523">Python / FastAPI / scikit-learn</text>
-          <text x="1030" y="528" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">Step 32 done, in progress</text>
+          <text x="1030" y="528" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 32-40 done, containerized, running</text>
         </g>
 
         <g class="node" data-node="redis">
-          <rect x="470" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <text x="565" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Redis</text>
-          <text x="565" y="419" text-anchor="middle" font-size="10" fill="#1f2523">used by: Move&amp;Ent, Claims</text>
-          <text x="565" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <rect x="470" y="380" width="190" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="565" y="401" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Redis</text>
+          <text x="565" y="415" text-anchor="middle" font-size="10" fill="#1f2523">used by: Claims Triage ML</text>
+          <text x="565" y="428" text-anchor="middle" font-size="9.5" fill="#1f2523">Move&amp;Ent/Claims caching not wired yet</text>
+          <text x="565" y="441" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">running — Phase 8</text>
         </g>
 
         <!-- legend -->
@@ -243,10 +252,10 @@
     <tr><td>1</td><td><a href="steps.html#phase1">Move &amp; Entitlement Service</a></td><td>1–2, 13–21</td><td>11</td><td class="mark">Done</td><td>Feeds: Phase 9 (WebSocket needs its REST API), Phase 7 (SOAP Adapter calls its REST API)</td></tr>
     <tr><td>2</td><td><a href="steps.html#phase2">Claims Service</a></td><td>3–12</td><td>10</td><td class="mark">Done</td><td>Feeds: Phase 8 (ML trains on claims data), Phase 9 (WebSocket)</td></tr>
     <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>22–31</td><td>10</td><td class="mark">Done</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
-    <tr><td>8</td><td>Claims triage ML + Redis</td><td>32–40</td><td>9</td><td class="prog">In progress (Step 32 done)</td><td>Needs: Phase 2's claim data to train on. Pulled forward ahead of Phases 4–7.</td></tr>
+    <tr><td>8</td><td><a href="steps.html#phase8">Claims triage ML + Redis</a></td><td>32–40</td><td>9</td><td class="mark">Done</td><td>Needs: Phase 2's claim data to train on. Pulled forward ahead of Phases 4–7. Feeds: Phase 10 (Kafka) once that phase exists, for real-time consumption instead of synchronous /predict calls; Phase 14 (ML research track compares against this production model).</td></tr>
     <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>TBD</td><td>~18</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
     <tr><td>5</td><td>Trivy/ZAP/Jenkins compliance gate</td><td>TBD</td><td>~10</td><td>Not started</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
-    <tr><td>6</td><td>Go Ingestion Service (REST)</td><td>TBD</td><td>~12</td><td>Not started</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
+    <tr><td>6</td><td><a href="steps.html#phase6">Go Ingestion Service (REST)</a></td><td>41–52</td><td>12</td><td class="prog">In progress</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
     <tr><td>7</td><td>SOAP Legacy Adapter</td><td>TBD</td><td>~8</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
     <tr><td>9</td><td>WebSocket live feed</td><td>TBD</td><td>~6</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
     <tr><td>10</td><td>Kafka</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 6 (Go service to publish to it). Feeds: Phase 8's ML pipeline, Phase 9's live feed</td></tr>
@@ -342,12 +351,25 @@
       steps: []
     },
     goingest: {
-      name: "Shipment Ingestion Service", tech: "Go", status: "not-started",
-      port: "TBD — will need a raw UDP and a raw TCP port for device traffic, plus a REST port",
-      input: "Carrier tracking device pings — raw UDP (frequent, lightweight) and raw TCP (occasional, higher-reliability) over a WireGuard tunnel",
-      output: "Normalized events published to Kafka (shipment.tracking topic)",
-      why: "Go's goroutines hold many concurrent, mostly-idle device connections far more cheaply than a JVM thread-per-request model — the language choice and this service's whole reason to exist are the same fact.",
-      steps: []
+      name: "Shipment Ingestion Service", tech: "Go", status: "in-progress",
+      port: "8090 (planned) — REST only for now; raw UDP/TCP ports added in Phase 13",
+      input: "Phase 6: REST POST from carriers/simulated devices. Phase 13 later: raw UDP (frequent, lightweight) and raw TCP (occasional, higher-reliability) over a WireGuard tunnel",
+      output: "Phase 6: persisted to its own Postgres database. Phase 10 later: normalized events published to Kafka (shipment.tracking topic) instead/in addition",
+      why: "Go's goroutines hold many concurrent, mostly-idle device connections far more cheaply than a JVM thread-per-request model — the language choice and this service's whole reason to exist are the same fact. Built REST-first so the ingestion contract and persistence exist before the harder raw-socket transport is added.",
+      steps: [
+        {n:"Step 41", t:"Go toolchain check, module init, project skeleton", href:null, done:false},
+        {n:"Step 42", t:"Ingestion request struct + POST /ingest handler (in-memory)", href:null, done:false},
+        {n:"Step 43", t:"GET /ingest (list in-memory), closes PR A", href:null, done:false},
+        {n:"Step 44", t:"New shipment_ingestion Postgres database + Go driver connection", href:null, done:false},
+        {n:"Step 45", t:"Persist ingested events to Postgres", href:null, done:false},
+        {n:"Step 46", t:"GET /ingest reads from Postgres, closes PR B", href:null, done:false},
+        {n:"Step 47", t:"Unit tests — table-driven Go tests", href:null, done:false},
+        {n:"Step 48", t:"HTTP integration tests (net/http/httptest)", href:null, done:false},
+        {n:"Step 49", t:"Closes PR C", href:null, done:false},
+        {n:"Step 50", t:"Multi-stage Dockerfile — Go build stage, minimal run stage", href:null, done:false},
+        {n:"Step 51", t:"Wired into docker-compose.yml", href:null, done:false},
+        {n:"Step 52", t:"Verify, closes PR D", href:null, done:false}
+      ]
     },
     postgres: {
       name: "PostgreSQL (shared container)", tech: "postgres:17-alpine, Docker Compose", status: "done",
@@ -367,11 +389,15 @@
       steps: []
     },
     redis: {
-      name: "Redis", tech: "In-memory cache", status: "not-started",
-      port: "TBD", input: "Entitlement/weight-table lookups from Move & Entitlement and Claims",
-      output: "Cached responses; also rate-limits the public intake endpoint",
-      why: "A hot-path cache for data that's read far more often than it changes.",
-      steps: []
+      name: "Redis", tech: "In-memory cache", status: "in-progress",
+      port: "6379, published to host",
+      input: "Claim feature payloads from Claims Triage ML (hashed into a cache key); Entitlement/weight-table lookups from Move & Entitlement and Claims once that integration is built",
+      output: "Cached triage predictions (5-minute TTL) for Claims Triage ML; not yet used as a response cache for the Java services",
+      why: "A hot-path cache for data that's read far more often than it changes. First real use: avoid re-running the ML model for identical repeated requests.",
+      steps: [
+        {n:"Step 36", t:"Wired up as the Claims Triage ML prediction cache", href:"steps.html#step36", done:true},
+        {n:"TBD", t:"Move & Entitlement / Claims response caching — not yet planned as a numbered step", href:null, done:false}
+      ]
     },
     rabbitmq: {
       name: "RabbitMQ", tech: "Message broker", status: "not-started",
@@ -387,21 +413,21 @@
       steps: []
     },
     ml: {
-      name: "Claims Triage ML", tech: "Python / FastAPI / scikit-learn (production)", status: "in-progress",
-      port: "TBD — will be a real FastAPI network service (revised from the original batch-job guess), not yet assigned",
-      input: "Claim features (amount, description) via a future /predict endpoint; consumes real-time claims from Kafka once Phase 10 exists",
-      output: "A triage classification/priority for the claims workflow",
+      name: "Claims Triage ML", tech: "Python / FastAPI / scikit-learn (production)", status: "done",
+      port: "8000, published to host — POST /predict, GET /health",
+      input: "Claim features (claim_amount, days_since_incident, claim_type, description_length) via POST /predict; consumes real-time claims from Kafka once Phase 10 exists, instead of synchronous calls",
+      output: "A triage priority (low/medium/high) for the claims workflow, cached in Redis for repeated identical requests",
       why: "Small, fast, right-sized model for a tabular classification task — compared against PyTorch/TensorFlow in a separate research track (Phase 14) before choosing this as the deployed one.",
       steps: [
         {n:"Step 32", t:"Python venv + requirements.txt (scikit-learn, pandas, FastAPI, Redis client)", href:null, done:true},
-        {n:"Step 33", t:"Small representative training dataset", href:null, done:false},
-        {n:"Step 34", t:"Train the scikit-learn classifier, save model to disk", href:null, done:false},
-        {n:"Step 35", t:"FastAPI service — /predict endpoint", href:null, done:false},
-        {n:"Step 36", t:"Redis caching layer for predictions", href:null, done:false},
-        {n:"Step 37", t:"Unit tests (pytest) for prediction logic", href:null, done:false},
-        {n:"Step 38", t:"API integration tests (FastAPI TestClient)", href:null, done:false},
-        {n:"Step 39", t:"Containerize (Python/FastAPI Dockerfile)", href:null, done:false},
-        {n:"Step 40", t:"Wired into docker-compose.yml (+ Redis service)", href:null, done:false}
+        {n:"Step 33", t:"Small representative training dataset", href:"steps.html#step33", done:true},
+        {n:"Step 34", t:"Train the scikit-learn classifier, save model to disk", href:"steps.html#step34", done:true},
+        {n:"Step 35", t:"FastAPI service — /predict endpoint", href:"steps.html#step35", done:true},
+        {n:"Step 36", t:"Redis caching layer for predictions", href:"steps.html#step36", done:true},
+        {n:"Step 37", t:"Unit tests (pytest) for prediction logic", href:"steps.html#step37", done:true},
+        {n:"Step 38", t:"API integration tests (FastAPI TestClient)", href:"steps.html#step38", done:true},
+        {n:"Step 39", t:"Containerize (Python/FastAPI Dockerfile)", href:"steps.html#step39", done:true},
+        {n:"Step 40", t:"Wired into docker-compose.yml (+ Redis service)", href:"steps.html#step40", done:true}
       ]
     }
   };

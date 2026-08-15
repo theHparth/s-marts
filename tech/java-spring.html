@@ -20,9 +20,14 @@
   <a href="docker.html">Docker &amp; Compose</a>
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
@@ -215,6 +220,8 @@ spring.jpa.defer-datasource-initialization=true</code></pre>
     <code>ON CONFLICT (rank) DO NOTHING</code> — requires a <code>unique</code> constraint on that column
     (<code>@Column(unique = true)</code> on the entity) for Postgres to know what "conflict" even means.
   </div>
+  <p>General SQL reference (DDL constraints, <code>INSERT</code> syntax, and more) lives on the
+    <a href="../notes/sql.html">SQL Notes</a> page.</p>
 
   <h2 id="argument-captor">Mockito's <code>ArgumentCaptor</code></h2>
   <p>A step further than a plain stub. <code>when(...).thenReturn(...)</code> controls what a mock gives

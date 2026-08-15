@@ -20,25 +20,29 @@
   <a href="docker.html">Docker &amp; Compose</a>
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html" class="active">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
   <h1>Python, FastAPI &amp; scikit-learn <span class="tag">Phase 8</span></h1>
   <p class="subtitle">
     Fundamentals + how this project actually uses it. For when each piece was introduced, see the
-    <a href="../steps.html#phase8">Steps page → Phase 8</a>. This page was written as pre-study material
-    before Phase 8's steps were actually built — content will be corrected/confirmed once the real code
-    exists and gets tested.
+    <a href="../steps.html#phase8">Steps page → Phase 8</a>.
   </p>
 
-  <div class="box warn">
-    <div class="box-title">Status: written ahead of the build</div>
-    Phase 8 (Claims Triage ML) is in progress. Everything on this page reflects the <em>planned</em>
-    implementation given in the Step 33-40 instructions — read it now to get familiar with the tools before
-    writing code, then it gets corrected/confirmed against what actually got built and tested.
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified in Step 40</div>
+    Phase 8 (Claims Triage ML) is complete. All 6 containers (<code>postgres</code>, <code>claims-service</code>,
+    <code>move-entitlement-service</code>, <code>dashboard</code>, <code>claims-triage-ml</code>,
+    <code>redis</code>) run together via <code>docker compose up -d --build</code>. Content on this page
+    reflects what was actually built and tested, not just the original plan.
   </div>
 
   <h2>What each one is, in one line</h2>
@@ -142,6 +146,14 @@ joblib.dump(pipeline, "model/triage_model.joblib")
 # later, anywhere:
 model = joblib.load("model/triage_model.joblib")
 model.predict(new_row)</code></pre>
+  <div class="box tip">
+    <div class="box-title"><code>joblib</code> vs. Python's built-in <code>pickle</code></div>
+    Both serialize Python objects to disk. <code>joblib</code> is scikit-learn's own recommendation over
+    <code>pickle</code> specifically because it's faster and more memory-efficient for objects holding large
+    NumPy arrays — exactly what a trained model's internal weights are. Same bridge as saving a compiled
+    <code>.jar</code>: a reusable built artifact, no retraining needed to reuse it.
+  </div>
+
   <div class="box why">
     <div class="box-title">Why scikit-learn, not PyTorch/TensorFlow</div>
     This is a small, tabular classification problem — a handful of numeric/categorical columns predicting
@@ -175,6 +187,17 @@ uvicorn app.main:app --reload --port 8000</code></pre>
     <div class="box-title">Auto-generated docs — a real FastAPI selling point</div>
     Visiting <code>http://localhost:8000/docs</code> shows an interactive Swagger UI generated automatically
     from the route definitions and Pydantic models below — no extra annotations or separate doc-writing step.
+    Click a route → <strong>Try it out</strong> → fill the form → <strong>Execute</strong> — sends a real
+    request to the running server and shows the actual response, no <code>curl</code>/Postman needed.
+  </div>
+
+  <div class="box warn">
+    <div class="box-title">Testing from PowerShell — <code>curl</code> doesn't work the way you'd expect</div>
+    On this machine, <code>curl</code> is just an alias for <code>Invoke-WebRequest</code> — it doesn't
+    understand Unix curl's <code>-X</code>/<code>-H</code>/<code>-d</code> flags, and PowerShell's string
+    escaping uses backticks, not backslashes. Use PowerShell's own HTTP cmdlet instead, with a
+    <strong>single-quoted</strong> body so the JSON's own double quotes don't need escaping at all:
+    <pre><code>Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body '{"claim_amount": 9500, "days_since_incident": 70, "claim_type": "vehicle_damage", "description_length": 200}'</code></pre>
   </div>
 
   <h2 id="pydantic">Pydantic — typed request/response shapes</h2>
@@ -188,7 +211,19 @@ class ClaimFeatures(BaseModel):
     claim_amount: float = Field(..., gt=0)
     days_since_incident: int = Field(..., ge=0)
     claim_type: Literal["household_goods", "vehicle_damage", "personal_property", "temporary_lodging"]
-    description_length: int = Field(..., ge=0)</code></pre>
+    description_length: int = Field(..., ge=0)
+
+class TriageResponse(BaseModel):
+    priority: str
+    cached: bool</code></pre>
+  <table>
+    <tr><th>Piece</th><th>What it means</th></tr>
+    <tr><td><code>BaseModel</code></td><td>Inheriting from it is what makes FastAPI treat the class as something to auto-validate, not just a plain Python class.</td></tr>
+    <tr><td><code>Field(...)</code></td><td>The <code>...</code> is Python's <code>Ellipsis</code> object, meaning "required, no default." A missing field triggers a <code>422</code> before the route function runs at all.</td></tr>
+    <tr><td><code>gt=0</code> / <code>ge=0</code></td><td>"Greater than" / "greater than or equal" — validation constraints. <code>claim_amount</code> can never be zero or negative; <code>days_since_incident</code> can be <code>0</code> (same-day claim) but not negative.</td></tr>
+    <tr><td><code>Literal["a", "b", ...]</code></td><td>Restricts a field to one exact set of values — Python's closest equivalent to a Java <code>enum</code>. No <code>Field(...)</code> needed; a bare <code>Literal</code> is already implicitly required and self-validating.</td></tr>
+    <tr><td><code>TriageResponse</code> (no <code>Field</code>)</td><td>The response shape doesn't validate incoming data — it just declares what the route returns, which FastAPI uses to build the <code>/docs</code> example and strip any accidental extra fields.</td></tr>
+  </table>
   <table>
     <tr><th>Concept</th><th>Java DTO</th><th>TypeScript interface</th><th>Pydantic</th></tr>
     <tr><td>Defines a shape</td><td><code>class ClaimDto</code></td><td><code>interface Claim</code></td><td><code>class ClaimFeatures(BaseModel)</code></td></tr>
@@ -267,8 +302,25 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></p
     manifest-first layer-caching trick already used for <code>pom.xml</code> (Maven) and <code>package.json</code>
     (npm): dependencies only reinstall when <code>requirements.txt</code> actually changes, not on every code
     edit.</p>
+  <p>The <code>CMD [...]</code> line is one command (Uvicorn) plus its arguments, written as an array — full
+    breakdown, including why <code>0.0.0.0</code> and not <code>localhost</code>, on
+    <a href="docker.html#cmd-exec-form">Docker &amp; Compose → Dockerfile CMD — one command, not several</a>.</p>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-python-swagger-ui">
+    <div class="q">What does visiting <code>/docs</code> on a FastAPI service actually show you?</div>
+    <div class="a">An interactive Swagger UI, generated automatically from the route definitions and Pydantic
+      models — no separate documentation to write. You can expand any route, click "Try it out", fill in a
+      real request, and send it straight from the browser — the same thing <code>curl</code> or Postman would
+      do, with a UI instead of hand-typed JSON.</div>
+  </div>
+  <div class="qa" id="qa-python-field-ellipsis">
+    <div class="q">What does <code>Field(...)</code> mean in a Pydantic model?</div>
+    <div class="a">The <code>...</code> is Python's <code>Ellipsis</code> object, and here it means "this
+      field is required, no default value." A request missing it gets rejected with a <code>422</code> before
+      the route function runs. <code>Field</code> can also carry validation constraints like <code>gt=0</code>
+      or <code>ge=0</code> alongside that requirement.</div>
+  </div>
   <div class="qa" id="qa-python-why-no-multistage">
     <div class="q">Why doesn't the Python service use a multi-stage Docker build like the Java and Node services do?</div>
     <div class="a">Multi-stage builds exist to keep a heavy build toolchain out of the final runtime image —

@@ -20,9 +20,14 @@
   <a href="docker.html">Docker &amp; Compose</a>
   <a href="react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
   <a href="comparison.html" class="active">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
@@ -32,8 +37,7 @@
     dependencies are managed, how the API is built, where data lives, how tests work, and how data actually
     moves end to end. Each per-technology page (Git, Java/Spring, Docker, React/Redux, Python/FastAPI) is the
     deep reference; this page is the quick side-by-side for comparing them. A new column gets added the first
-    time a new stack is introduced. The Python/FastAPI column is marked <strong>Planned</strong> — Phase 8 is
-    still in progress, so it reflects the planned implementation, not yet-confirmed real code.
+    time a new stack is introduced.
   </p>
 
   <h2 id="stack-overview">Stack overview</h2>
@@ -42,13 +46,15 @@
       <th>Question</th>
       <th>Java / Spring Boot</th>
       <th>React / Redux / TypeScript</th>
-      <th>Python / FastAPI <span class="tag" style="margin-left:0;">Planned</span></th>
+      <th>Python / FastAPI</th>
+      <th>Go <span class="tag" style="margin-left:0;">Planned</span></th>
     </tr>
     <tr>
       <td><strong>Used for</strong></td>
       <td>Move &amp; Entitlement Service, Claims Service — the backend REST APIs</td>
       <td>The Dashboard — the browser-side single-page app</td>
       <td>Claims Triage ML — a prediction API for claim priority</td>
+      <td>Shipment Ingestion Service — receives carrier tracking pings</td>
     </tr>
     <tr>
       <td><strong>Server / runtime</strong></td>
@@ -60,6 +66,9 @@
         separate, general-purpose web server) serves them — React itself never runs a server.</td>
       <td><strong>Uvicorn</strong> — FastAPI does not bundle a server the way Spring Boot bundles Tomcat; you
         run Uvicorn yourself (<code>uvicorn app.main:app</code>) to actually listen on a port.</td>
+      <td>None needed — <code>net/http</code> is Go's standard-library server, and <code>http.ListenAndServe</code>
+        both defines and runs the app in one call. Compiles to a single native binary; no runtime install
+        needed on the machine that runs it.</td>
     </tr>
     <tr>
       <td><strong>Dependency file</strong></td>
@@ -70,6 +79,8 @@
       <td><code>requirements.txt</code> — a plain <code>package==version</code> list, regenerated with
         <code>pip freeze &gt; requirements.txt</code>. Installed into an isolated <code>venv/</code>, this
         project's per-project dependency isolation.</td>
+      <td><code>go.mod</code> + the lockfile <code>go.sum</code> (exact resolved versions and checksums).
+        <code>go get</code> resolves and downloads them.</td>
     </tr>
     <tr>
       <td><strong>API framework</strong></td>
@@ -81,6 +92,9 @@
         Redux Toolkit <code>createAsyncThunk</code> actions.</td>
       <td>FastAPI. Routes are Python functions decorated <code>@app.get</code>/<code>@app.post</code>. Request
         validation is automatic, handled by Pydantic models.</td>
+      <td><code>net/http.ServeMux</code>, standard library — no external framework installed. Routes are
+        registered with combined method+path strings (<code>"POST /ingest"</code>). No automatic request
+        validation; checked by hand in the handler.</td>
     </tr>
     <tr>
       <td><strong>Database / data store</strong></td>
@@ -91,6 +105,9 @@
         services.</td>
       <td>No database — a trained scikit-learn model (<code>triage_model.joblib</code>, loaded at startup)
         plus Redis as a prediction cache, not a system of record.</td>
+      <td>Its own PostgreSQL database (<code>shipment_ingestion</code>), accessed through the standard-library
+        <code>database/sql</code> package — no ORM. Hand-written SQL with <code>$1</code>/<code>$2</code>
+        placeholders.</td>
     </tr>
     <tr>
       <td><strong>Testing framework</strong></td>
@@ -101,6 +118,9 @@
         querying them the way a user would (by visible text/role, not internal implementation detail).</td>
       <td>pytest for plain unit tests (discovery by naming convention, no annotations), FastAPI's
         <code>TestClient</code> for the same "slice test" idea as <code>@WebMvcTest</code>/RTL.</td>
+      <td>The standard library's <code>testing</code> package (discovery by <code>TestXxx</code> naming,
+        table-driven test cases), <code>net/http/httptest</code> for the same "slice test" idea as the other
+        three stacks.</td>
     </tr>
     <tr>
       <td><strong>Data exchange / import-export flow</strong></td>
@@ -114,6 +134,9 @@
       <td>Client sends JSON → Pydantic validates and parses it into a typed request object → pandas builds a
         one-row DataFrame from it → the loaded scikit-learn pipeline predicts a priority → the result is
         cached in Redis and returned as JSON.</td>
+      <td>Client sends JSON → <code>encoding/json</code> decodes it into a <code>ShipmentPing</code> struct →
+        a hand-written <code>validatePing</code> function checks it → <code>database/sql</code> inserts it
+        into Postgres via a parameterized query → the same struct is re-encoded to JSON on the way out.</td>
     </tr>
   </table>
 

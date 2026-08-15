@@ -20,9 +20,14 @@
   <a href="tech/docker.html">Docker &amp; Compose</a>
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="tech/go.html">Go</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
+  <a href="notes/sql.html">SQL Notes</a>
+  <a href="notes/aws.html">AWS Notes</a>
+  <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
@@ -1218,9 +1223,8 @@ git pull</code></pre>
   <h2 id="phase8">Phase 8 — Claims Triage ML</h2>
   <p class="pill">9 steps (32–40), 4 PRs. First Python stack in this project — Python/pip checked before
     first use, per the standing rule. Tackled out of numeric order, right after Phase 3 (skipping 4–7 for
-    now) — see <a href="../architecture.html#diagram">Architecture</a> for why. Steps 33–40 are written as
-    <strong>pre-study material</strong>, ahead of the actual build — status flips to Done and content gets
-    corrected once each step is really built and tested.</p>
+    now) — see <a href="../architecture.html#diagram">Architecture</a> for why. <strong>Complete</strong> —
+    all 4 PRs merged, all 6 containers verified running together.</p>
 
   <div class="step" id="step32">
     <div class="step-header">
@@ -1245,7 +1249,7 @@ pip freeze &gt; requirements.txt</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 33</span>
       <span class="step-title">Claims Triage ML — training dataset</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a small, representative CSV of labeled claims to train on —
       <code>claim_amount</code>, <code>days_since_incident</code>, <code>claim_type</code>,
@@ -1265,7 +1269,7 @@ git commit -m "data: add sample training dataset for claims triage model"</code>
     <div class="step-header">
       <span class="step-num">STEP 34</span>
       <span class="step-title">Claims Triage ML — train the classifier, closes PR A</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a scikit-learn <code>Pipeline</code> (encode + classify) trained on Step 33's
       data, saved as a reusable artifact. Full breakdown on
@@ -1275,12 +1279,15 @@ git commit -m "data: add sample training dataset for claims triage model"</code>
 python train_model.py
 # expected: prints "Test accuracy: 0.NN", creates model/triage_model.joblib
 
+pip install joblib
+pip freeze &gt; requirements.txt
+
 git add services/claims-triage-ml/train_model.py services/claims-triage-ml/model/triage_model.joblib services/claims-triage-ml/requirements.txt
 git commit -m "feat: train scikit-learn triage classifier and save model artifact"
 git push -u origin feature/ml-training-data
 
 gh issue create --title "Train claims triage classifier" --body "Add a sample training dataset and a scikit-learn pipeline that trains and saves a triage-priority classifier."
-gh pr create --title "Add training dataset and trained triage classifier" --body "Closes #&lt;issue-number&gt;"
+gh pr create --title "Add training dataset and trained triage classifier" --body "Closes #&lt;real-issue-number&gt;"
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
@@ -1290,13 +1297,35 @@ git pull origin main</code></pre>
       separate training pipeline. A real production setup would push it to a model registry instead — worth
       saying exactly that if asked about it.
     </div>
+    <div class="box why">
+      <div class="box-title"><code>joblib</code> needed adding explicitly</div>
+      <code>train_model.py</code> does <code>import joblib</code> directly. It comes along transitively as
+      scikit-learn's own dependency, but anything your code imports directly should be pinned explicitly —
+      relying on "it happens to come in via scikit-learn" is fragile if that ever changes upstream. Installed
+      it directly, then re-ran <code>pip freeze</code> to capture the real, full dependency list (scikit-learn,
+      pandas, numpy, fastapi, uvicorn, redis, joblib, plus their transitive dependencies like scipy and
+      threadpoolctl) rather than a hand-trimmed subset.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — literal <code>&lt;issue-number&gt;</code> left in the PR body</div>
+      <code>gh pr create --body "Closes #&lt;issue-number&gt;"</code> got run with the placeholder text typed
+      literally, instead of substituting the real number <code>gh issue create</code> printed — so the PR
+      never actually linked to (or auto-closed) its issue on merge. A PR's description is just metadata on
+      GitHub, separate from git commit history, so this was a safe, non-destructive fix — no force-push, no
+      history rewrite:
+      <pre><code>gh pr list --state merged --limit 5
+gh issue list --state open --limit 5
+
+gh pr edit &lt;PR-number&gt; --body "Closes #&lt;real-issue-number&gt;"
+gh issue close &lt;real-issue-number&gt;</code></pre>
+    </div>
   </div>
 
   <div class="step" id="step35">
     <div class="step-header">
       <span class="step-num">STEP 35</span>
       <span class="step-title">Claims Triage ML — FastAPI predict endpoint</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> expose the trained model over a <code>POST /predict</code> endpoint. Full
       explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>
@@ -1306,17 +1335,40 @@ git pull origin main</code></pre>
 # write app/__init__.py, app/schemas.py, app/main.py
 
 uvicorn app.main:app --reload --port 8000
-# verify at http://localhost:8000/docs and via curl POST /predict
+# verify at http://localhost:8000/docs
 
 git add services/claims-triage-ml/app
 git commit -m "feat: add FastAPI predict endpoint for claims triage"</code></pre>
+    <div class="box warn">
+      <div class="box-title">Real mistake — <code>curl</code> doesn't work as expected in PowerShell</div>
+      <code>curl</code> here is just an alias for <code>Invoke-WebRequest</code> — it doesn't understand Unix
+      curl's <code>-X</code>/<code>-H</code>/<code>-d</code> flags or backslash-escaped quotes. Fixed with
+      PowerShell's own HTTP cmdlet and a single-quoted body (no escaping needed):
+      <pre><code>Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body '{"claim_amount": 9500, "days_since_incident": 70, "claim_type": "vehicle_damage", "description_length": 200}'</code></pre>
+      Full explanation on
+      <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>.
+    </div>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-swagger-ui-step35">
+      <div class="q">What does visiting <code>/docs</code> on a FastAPI service actually show you?</div>
+      <div class="a">An interactive Swagger UI, generated automatically from the route definitions and
+        Pydantic models — no separate documentation to write. Expand a route, click "Try it out", send a
+        real request straight from the browser.</div>
+    </div>
+    <div class="qa" id="qa-field-ellipsis-step35">
+      <div class="q">What does <code>Field(...)</code> mean in a Pydantic model?</div>
+      <div class="a">The <code>...</code> is Python's <code>Ellipsis</code> object, meaning "required, no
+        default." A request missing that field gets rejected with a <code>422</code> before the route
+        function even runs.</div>
+    </div>
   </div>
 
   <div class="step" id="step36">
     <div class="step-header">
       <span class="step-num">STEP 36</span>
       <span class="step-title">Claims Triage ML — Redis caching, closes PR B</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> cache repeated predictions in Redis. Full explanation on
       <a href="tech/python-fastapi.html#redis-caching">Python, FastAPI &amp; scikit-learn → Caching predictions</a>.</p>
@@ -1342,7 +1394,7 @@ git pull origin main</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 37</span>
       <span class="step-title">Claims Triage ML — unit tests</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> pytest coverage for the trained model directly. Full explanation on
       <a href="tech/python-fastapi.html#pytest-testclient">Python, FastAPI &amp; scikit-learn → Testing</a>.</p>
@@ -1361,7 +1413,7 @@ git commit -m "test: add unit tests for the triage model"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 38</span>
       <span class="step-title">Claims Triage ML — API integration tests, closes PR C</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> FastAPI's <code>TestClient</code> for the <code>/predict</code> endpoint. Same
       slice-test idea as <code>@WebMvcTest</code>; full explanation on
@@ -1386,7 +1438,7 @@ git pull origin main</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 39</span>
       <span class="step-title">Claims Triage ML — Dockerfile</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> containerize the service — single-stage, unlike the Java/Node Dockerfiles. Full
       explanation on
@@ -1397,18 +1449,25 @@ git pull origin main</code></pre>
 
 docker build -t claims-triage-ml services/claims-triage-ml
 docker run -p 8000:8000 --name ml-standalone-test claims-triage-ml
-# verify curl http://localhost:8000/health, then:
+# verify with Invoke-RestMethod http://localhost:8000/health, then:
 docker rm -f ml-standalone-test
 
 git add services/claims-triage-ml/Dockerfile services/claims-triage-ml/.dockerignore
 git commit -m "feat: containerize the claims triage ML service"</code></pre>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-cmd-array-step39">
+      <div class="q">Is <code>CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code> running multiple commands?</div>
+      <div class="a">No — one program (the first array element) plus the arguments passed to it. Full
+        breakdown on <a href="tech/docker.html#cmd-exec-form">Docker &amp; Compose → Dockerfile CMD</a>.</div>
+    </div>
   </div>
 
   <div class="step" id="step40">
     <div class="step-header">
       <span class="step-num">STEP 40</span>
       <span class="step-title">Claims Triage ML — wired into docker-compose.yml, closes PR D</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> the last piece — <code>claims-triage-ml</code> and <code>redis</code> running
       alongside the existing 4 containers. <code>REDIS_HOST: redis</code> resolves via Compose's service-name
@@ -1418,18 +1477,261 @@ git commit -m "feat: containerize the claims triage ML service"</code></pre>
 
 docker compose up -d --build
 docker compose ps
-# expect redis and claims-triage-ml both Up
 
 git add docker-compose.yml
 git commit -m "feat: wire claims triage ML service and Redis into docker-compose"
 git push -u origin feature/ml-containerize
 
 gh issue create --title "Containerize and wire claims triage ML into docker-compose" --body "Add a Dockerfile for the ML service and add both it and Redis to the root docker-compose.yml."
-gh pr create --title "Containerize claims triage ML and wire into compose" --body "Closes #&lt;issue-number&gt;"
+gh pr create --title "Containerize claims triage ML and wire into compose" --body "Closes #&lt;real-issue-number&gt;"
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
-    <p><strong>This completes Phase 8</strong> once all 4 PRs are actually merged — 9 steps, 32–40.</p>
+    <div class="box why">
+      <div class="box-title">Verified — all 6 containers running together</div>
+      <pre><code>NAME                                 SERVICE                    PORTS
+movetrack-claims-service             claims-service             0.0.0.0:8081-&gt;8081/tcp
+movetrack-dashboard                  dashboard                  0.0.0.0:3000-&gt;80/tcp
+movetrack-move-entitlement-service   move-entitlement-service   0.0.0.0:8082-&gt;8082/tcp
+movetrack-postgres                   postgres                   0.0.0.0:5432-&gt;5432/tcp
+movetrack_ops-claims-triage-ml-1     claims-triage-ml           0.0.0.0:8000-&gt;8000/tcp
+movetrack_ops-redis-1                redis                      0.0.0.0:6379-&gt;6379/tcp</code></pre>
+    </div>
+    <p><strong>This completes Phase 8</strong> — all 4 PRs merged, 9 steps, 32–40. First non-JVM, non-Node
+      stack in this project, first ML component, first cache layer.</p>
+  </div>
+
+  <h2 id="phase6">Phase 6 — Go Ingestion Service</h2>
+  <p class="pill">12 steps (41–52), 4 PRs. First Go stack in this project — Go toolchain checked before first
+    use, per the standing rule. Feeds Phase 10 (Kafka) and Phase 13 (raw sockets extend this same service)
+    later. Written as <strong>pre-study material</strong>, ahead of the actual build — status flips to Done
+    and content gets corrected once each step is really built and tested.</p>
+
+  <div class="step" id="step41">
+    <div class="step-header">
+      <span class="step-num">STEP 41</span>
+      <span class="step-title">Shipment Ingestion — Go module init + skeleton HTTP server</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a bare Go module with a working <code>/health</code> endpoint. Full explanation
+      on <a href="tech/go.html#modules-commands">Go → Modules &amp; commands</a> and
+      <a href="tech/go.html#http-server">→ HTTP server &amp; routing</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/go-ingest-skeleton
+
+mkdir services/shipment-ingestion
+cd services/shipment-ingestion
+go mod init shipment-ingestion
+
+# write main.go
+
+go run main.go
+# verify GET http://localhost:8090/health
+
+git add services/shipment-ingestion/go.mod services/shipment-ingestion/main.go
+git commit -m "feat: scaffold Go shipment ingestion service"</code></pre>
+    <p class="pill">First non-JVM, non-Node, non-Python stack — Go version checked before this step, per the
+      standing "check tooling is current" rule.</p>
+  </div>
+
+  <div class="step" id="step42">
+    <div class="step-header">
+      <span class="step-num">STEP 42</span>
+      <span class="step-title">Shipment Ingestion — POST /ingest (in-memory)</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a <code>ShipmentPing</code> struct plus an in-memory-storing handler. Full
+      explanation on <a href="tech/go.html#json-structs">Go → Structs as DTOs</a> and
+      <a href="tech/go.html#concurrency">→ Concurrency</a>.</p>
+    <pre><code># update main.go with ShipmentPing struct, handleIngest, sync.Mutex-protected slice
+
+git add services/shipment-ingestion/main.go
+git commit -m "feat: add POST /ingest endpoint with in-memory storage"</code></pre>
+  </div>
+
+  <div class="step" id="step43">
+    <div class="step-header">
+      <span class="step-num">STEP 43</span>
+      <span class="step-title">Shipment Ingestion — GET /ingest, closes PR A</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> list the in-memory pings back out, proving Step 42 actually stored them.</p>
+    <pre><code># add handleListIngest to main.go
+
+go run main.go
+# POST a ping, then GET /ingest, verify it comes back
+
+git add services/shipment-ingestion/main.go
+git commit -m "feat: add GET /ingest to list ingested pings"
+git push -u origin feature/go-ingest-skeleton
+
+gh issue create --title "Scaffold Go shipment ingestion service" --body "Go project skeleton with in-memory POST/GET /ingest endpoints."
+gh pr create --title "Add Go shipment ingestion service skeleton" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+  </div>
+
+  <div class="step" id="step44">
+    <div class="step-header">
+      <span class="step-num">STEP 44</span>
+      <span class="step-title">Shipment Ingestion — new database + Postgres driver</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> its own <code>shipment_ingestion</code> Postgres database, database-per-service
+      like the Java services. Full explanation on
+      <a href="tech/go.html#database">Go → Database, no ORM</a>.</p>
+    <pre><code>git checkout -b feature/go-ingest-persistence
+
+# add CREATE DATABASE shipment_ingestion; to the existing multi-database init script
+
+go get github.com/lib/pq
+# write db.go — connectDB()
+
+git add services/shipment-ingestion/db.go services/shipment-ingestion/go.mod services/shipment-ingestion/go.sum
+git commit -m "feat: add Postgres connection for shipment ingestion"</code></pre>
+  </div>
+
+  <div class="step" id="step45">
+    <div class="step-header">
+      <span class="step-num">STEP 45</span>
+      <span class="step-title">Shipment Ingestion — persist pings to Postgres</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> replace the in-memory slice with a real table. Full breakdown on
+      <a href="tech/go.html#database">Go → Database, no ORM</a>.</p>
+    <pre><code># add ensureSchema, insertPing to db.go; wire handleIngest to call insertPing
+
+git add services/shipment-ingestion/main.go services/shipment-ingestion/db.go
+git commit -m "feat: persist ingested pings to Postgres"</code></pre>
+  </div>
+
+  <div class="step" id="step46">
+    <div class="step-header">
+      <span class="step-num">STEP 46</span>
+      <span class="step-title">Shipment Ingestion — read pings from Postgres, closes PR B</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> <code>GET /ingest</code> reads real rows back — proof it's persisted, not just
+      in-memory (restart the process between POST and GET to confirm).</p>
+    <pre><code># add listPings to db.go; wire handleListIngest to call it
+
+git add services/shipment-ingestion/main.go services/shipment-ingestion/db.go
+git commit -m "feat: read ingested pings from Postgres"
+git push -u origin feature/go-ingest-persistence
+
+gh issue create --title "Persist shipment pings to Postgres" --body "Add a dedicated Postgres database and persist/read ingested pings through it instead of in-memory storage."
+gh pr create --title "Add Postgres persistence for shipment ingestion" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+  </div>
+
+  <div class="step" id="step47">
+    <div class="step-header">
+      <span class="step-num">STEP 47</span>
+      <span class="step-title">Shipment Ingestion — unit tests, table-driven</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a <code>validatePing</code> function plus table-driven tests for it. Full
+      explanation on <a href="tech/go.html#testing">Go → Testing</a>.</p>
+    <pre><code>git checkout -b feature/go-ingest-tests
+
+# extract validatePing into main.go, call it from handleIngest
+# write main_test.go with a table-driven TestValidatePing
+
+go test ./...
+# expected: ok
+
+git add services/shipment-ingestion/main.go services/shipment-ingestion/main_test.go
+git commit -m "test: add table-driven unit tests for ping validation"</code></pre>
+  </div>
+
+  <div class="step" id="step48">
+    <div class="step-header">
+      <span class="step-num">STEP 48</span>
+      <span class="step-title">Shipment Ingestion — HTTP integration test</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> <code>net/http/httptest</code> for the handler directly — same slice-test idea
+      as <code>@WebMvcTest</code>/RTL/FastAPI's <code>TestClient</code>. Full explanation on
+      <a href="tech/go.html#testing">Go → Testing</a>.</p>
+    <pre><code># write handlers_test.go — TestHandleIngest_MissingDeviceID
+
+go test ./...
+
+git add services/shipment-ingestion/handlers_test.go
+git commit -m "test: add HTTP integration test for /ingest validation"</code></pre>
+  </div>
+
+  <div class="step" id="step49">
+    <div class="step-header">
+      <span class="step-num">STEP 49</span>
+      <span class="step-title">Shipment Ingestion — closes PR C</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code>git push -u origin feature/go-ingest-tests
+
+gh issue create --title "Add tests for shipment ingestion" --body "Add table-driven unit tests for ping validation and an HTTP integration test for the /ingest handler."
+gh pr create --title "Add unit and integration tests" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+  </div>
+
+  <div class="step" id="step50">
+    <div class="step-header">
+      <span class="step-num">STEP 50</span>
+      <span class="step-title">Shipment Ingestion — multi-stage Dockerfile</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a statically-compiled binary in a minimal Alpine image — even leaner than the
+      Java Dockerfiles. Full explanation on <a href="tech/go.html#containerizing">Go → Containerizing</a>.</p>
+    <pre><code>git checkout -b feature/go-ingest-containerize
+
+go mod tidy
+# write Dockerfile, .dockerignore
+
+docker build -t shipment-ingestion services/shipment-ingestion
+
+git add services/shipment-ingestion/Dockerfile services/shipment-ingestion/.dockerignore services/shipment-ingestion/go.sum
+git commit -m "feat: containerize the shipment ingestion service"</code></pre>
+  </div>
+
+  <div class="step" id="step51">
+    <div class="step-header">
+      <span class="step-num">STEP 51</span>
+      <span class="step-title">Shipment Ingestion — docker-compose wiring</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> add the service to the root compose file — <code>DATABASE_URL</code> pointing
+      at the <code>postgres</code> service name, same networking rule as every other service; see
+      <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.</p>
+    <pre><code># add shipment-ingestion service to docker-compose.yml
+
+git add docker-compose.yml
+git commit -m "feat: wire shipment ingestion service into docker-compose"</code></pre>
+  </div>
+
+  <div class="step" id="step52">
+    <div class="step-header">
+      <span class="step-num">STEP 52</span>
+      <span class="step-title">Shipment Ingestion — verify, closes PR D</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code>docker compose up -d --build
+docker compose ps
+# expect shipment-ingestion Up alongside the other 6 containers
+
+git push -u origin feature/go-ingest-containerize
+
+gh issue create --title "Containerize and wire shipment ingestion into docker-compose" --body "Add a multi-stage Dockerfile and add the service to the root docker-compose.yml."
+gh pr create --title "Containerize shipment ingestion and wire into compose" --body "Closes #&lt;issue-number&gt;"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>This completes Phase 6</strong> once all 4 PRs are actually merged — 12 steps, 41–52.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

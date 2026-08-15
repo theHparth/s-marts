@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Agile & SDLC Methodologies</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="../tech/git.html">Git &amp; GitHub</a>
+  <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="../tech/docker.html">Docker &amp; Compose</a>
+  <a href="../tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="../tech/go.html">Go</a>
+  <a href="../tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="sql.html">SQL Notes</a>
+  <a href="aws.html">AWS Notes</a>
+  <a href="methodologies.html" class="active">Agile &amp; SDLC Methodologies</a>
+  <a href="linux.html">Linux/Unix Notes</a>
+</nav>
+
+<main>
+  <h1>Agile &amp; SDLC Methodologies <span class="tag">Interview Notes</span></h1>
+  <p class="subtitle">
+    The original source file only covered Agile/Waterfall/Scrum basics — expanded here to cover every
+    SDLC methodology worth knowing for an interview: Waterfall, V-Model, Spiral, Agile, Scrum, Kanban, Lean,
+    XP, and DevOps, with a diagram and comparison table for each. Diagrams are plain-text so they render
+    consistently everywhere.
+  </p>
+
+  <h2 id="sdlc-overview">SDLC — the umbrella</h2>
+  <p><strong>SDLC</strong> (Software Development Life Cycle) is the general process any of these
+    methodologies fills in differently: specification → development → validation → evolution. Every
+    methodology below is one specific answer to "in what order, and how repeatedly, do we move through
+    those stages?"</p>
+  <table>
+    <tr><th>Model</th><th>Shape</th><th>Best for</th></tr>
+    <tr><td>Waterfall</td><td>Strictly sequential, one pass</td><td>Fixed, well-understood requirements (e.g. hardware-tied systems)</td></tr>
+    <tr><td>V-Model</td><td>Sequential, but each dev stage pairs with a matching test stage</td><td>Safety-critical / highly regulated systems</td></tr>
+    <tr><td>Spiral</td><td>Repeated risk-analysis loops, growing in scope each pass</td><td>Large, high-risk, poorly-understood projects</td></tr>
+    <tr><td>Agile</td><td>Short, repeated iterations, continuous feedback</td><td>Evolving requirements, fast market feedback needed</td></tr>
+    <tr><td>Scrum</td><td>Agile + fixed-length sprints, defined roles/ceremonies</td><td>Teams that want Agile with real structure</td></tr>
+    <tr><td>Kanban</td><td>Agile + continuous flow, no fixed iteration length</td><td>Ongoing support/maintenance work, unpredictable arrival of tasks</td></tr>
+  </table>
+
+  <h2 id="waterfall">Waterfall</h2>
+  <div class="diagram">Requirements
+     │
+     ▼
+   Design
+     │
+     ▼
+Implementation
+     │
+     ▼
+ Verification
+     │
+     ▼
+ Maintenance
+
+Each phase must fully finish before the next starts — no going back once you move on.</div>
+  <table>
+    <tr><th>Disadvantage</th><th>Why it hurts</th></tr>
+    <tr><td>Hard to change direction</td><td>Requirements are locked in early; a late discovery means redoing already-finished phases</td></tr>
+    <tr><td>High cost of failure</td><td>A mistake found in Verification can trace back to a bad decision made in Requirements, months earlier</td></tr>
+    <tr><td>Late customer feedback</td><td>The customer often doesn't see working software until Implementation is nearly done</td></tr>
+  </table>
+  <p>Still genuinely appropriate when requirements really are stable and well understood up front — e.g.
+    systems tightly coupled to fixed hardware, where redesigning mid-project is prohibitively expensive.</p>
+
+  <h2 id="v-model">V-Model <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Waterfall's structure, but every development stage is explicitly paired with a verification stage — the
+    "V" shape comes from drawing development stages going down the left side and their matching test stages
+    going up the right side.</p>
+  <div class="diagram">Requirements  ─────────────────────────────  Acceptance Testing
+        │                                                    │
+        ▼                                                    │
+ System Design ───────────────────────────────  System Testing
+        │                                                    │
+        ▼                                                    │
+Architecture Design ─────────────────────  Integration Testing
+        │                                                    │
+        ▼                                                    │
+  Module Design ─────────────────────────────────  Unit Testing
+                  \                              /
+                   \                            /
+                    ────────  Coding  ──────────
+
+Left side = build it.  Right side = prove that side of the V was built correctly.</div>
+  <p>Requirements pairs with Acceptance Testing, System Design pairs with System Testing, and so on down to
+    Coding at the bottom of the V — test planning happens at the <em>same time</em> as the matching design
+    stage, not as an afterthought once coding is done.</p>
+
+  <h2 id="spiral">Spiral Model <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Repeats four activities every cycle, growing the amount of working software each time around — risk
+    analysis happens every single loop, not just once at the start.</p>
+  <div class="diagram">        1. Determine objectives
+              &amp; alternatives
+                   │
+     4. Plan next    ▼
+        cycle  ◄──[ SPIRAL ]──►  2. Identify &amp;
+        (grows            resolve risks
+        each loop)  ▲
+                   │
+        3. Develop &amp; test
+           this cycle's piece
+
+Each full loop around produces a more complete, more validated version of the system.</div>
+  <p>Chosen for large, high-risk, poorly-understood projects where the cost of a wrong early decision is
+    severe enough to justify explicit risk analysis on every iteration — heavier process than Agile, but
+    with Waterfall's up-front planning discipline built in per cycle.</p>
+
+  <h2 id="agile">Agile</h2>
+  <div class="diagram">   ┌─────────────────────────────────────────────┐
+   │                                               │
+   ▼                                               │
+ Plan → Design → Build → Test → Review → Deliver ──┘
+                (repeats every short iteration/sprint)</div>
+  <table>
+    <tr><th>Agile Manifesto value</th><th>Over</th></tr>
+    <tr><td>Individuals and interactions</td><td>Processes and tools</td></tr>
+    <tr><td>Working software</td><td>Comprehensive documentation</td></tr>
+    <tr><td>Customer collaboration</td><td>Contract negotiation</td></tr>
+    <tr><td>Responding to change</td><td>Following a fixed plan</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">The values are "X over Y," not "X instead of Y" — a common misread</div>
+    The Manifesto explicitly says the items on the right still have value — the point is the left side is
+    valued <em>more</em> when the two are in tension. "Working software over documentation" doesn't mean
+    "no documentation," it means don't let documentation become the bottleneck to shipping.
+  </div>
+  <table>
+    <tr><th></th><th>Waterfall</th><th>Agile</th></tr>
+    <tr><td>Requirements</td><td>Fixed upfront</td><td>Evolve throughout the project</td></tr>
+    <tr><td>Delivery</td><td>One release at the very end</td><td>Frequent small increments</td></tr>
+    <tr><td>Change tolerance</td><td>Low — expensive once a phase is done</td><td>High — built for change</td></tr>
+    <tr><td>Customer involvement</td><td>Mainly at the start and the end</td><td>Continuous, every iteration</td></tr>
+    <tr><td>Risk of "big reveal" failure</td><td>High — problems surface late</td><td>Low — problems surface every sprint</td></tr>
+  </table>
+
+  <h2 id="scrum">Scrum</h2>
+  <p>The most common way teams actually implement Agile — Agile is the philosophy, Scrum is one concrete
+    framework for doing it, with defined roles, artifacts, and a fixed rhythm.</p>
+  <h3>Roles</h3>
+  <table>
+    <tr><th>Role</th><th>Responsible for</th></tr>
+    <tr><td>Product Owner</td><td>What gets built, and in what priority order — owns the Product Backlog</td></tr>
+    <tr><td>Scrum Master</td><td>Removing blockers, protecting the team's process, facilitating ceremonies — not a project manager telling people what to do</td></tr>
+    <tr><td>Development Team</td><td>How the work actually gets built — self-organizing, cross-functional</td></tr>
+  </table>
+  <h3>Artifacts</h3>
+  <table>
+    <tr><th>Artifact</th><th>What it is</th></tr>
+    <tr><td>Product Backlog</td><td>Everything that could ever be built, ranked by priority — never "done," constantly refined</td></tr>
+    <tr><td>Sprint Backlog</td><td>The slice of the Product Backlog committed to for this one sprint</td></tr>
+    <tr><td>Increment</td><td>The actual working, shippable software produced by the sprint</td></tr>
+  </table>
+  <h3>The sprint cycle</h3>
+  <div class="diagram">Sprint Planning ──► Daily Standup ──► Sprint Review ──► Sprint Retrospective
+(what will we    (blockers? on   (demo the result   (what should we
+ build this        track?)        to the Product      change about
+ sprint?)                          Owner)              HOW we work?)
+      ▲                                                       │
+      └───────────────────────────────────────────────────────┘
+                     (next sprint starts)</div>
+  <table>
+    <tr><th>Ceremony</th><th>Answers</th></tr>
+    <tr><td>Sprint Planning</td><td>What are we building this sprint, and how?</td></tr>
+    <tr><td>Daily Standup</td><td>What did I do yesterday, what will I do today, what's blocking me? (timeboxed ~15 min)</td></tr>
+    <tr><td>Sprint Review</td><td>Does this increment actually meet what the Product Owner wanted?</td></tr>
+    <tr><td>Sprint Retrospective</td><td>Not about the product — about the <em>process</em>: what should the team change next sprint?</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Story points &amp; velocity — not in the original notes</div>
+    <strong>Story points</strong> estimate relative effort/complexity of a task (not hours directly) —
+    typically Fibonacci-like values (1, 2, 3, 5, 8, 13...) so the team is forced to distinguish "clearly
+    small" from "clearly big" rather than false-precision hour estimates. <strong>Velocity</strong> is how
+    many story points a team completes per sprint on average — used to forecast how much backlog a future
+    sprint can realistically hold, not as an individual performance metric.
+  </div>
+  <table>
+    <tr><th></th><th>Definition of Ready</th><th>Definition of Done</th></tr>
+    <tr><td>Applies to</td><td>A backlog item, before it enters a sprint</td><td>A backlog item, before it's considered complete</td></tr>
+    <tr><td>Answers</td><td>Is this well-understood enough to start work on?</td><td>Does "complete" mean the same thing to everyone — coded, tested, reviewed, deployed?</td></tr>
+  </table>
+
+  <h2 id="kanban">Kanban <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Agile, but continuous — no fixed-length sprints. Work flows through columns, and each column has a
+    hard cap on how many items can sit in it at once (a WIP limit), which is Kanban's core mechanism for
+    surfacing bottlenecks immediately instead of at a retrospective two weeks later.</p>
+  <div class="diagram">┌───────────┬────────────┬─────────────┬────────────┐
+│  Backlog  │   To Do    │ In Progress │    Done    │
+│           │            │  (WIP: 2)   │            │
+├───────────┼────────────┼─────────────┼────────────┤
+│ Task F    │ Task C     │ Task A      │ Task X     │
+│ Task G    │ Task D     │ Task B      │ Task Y     │
+│ Task H    │ Task E     │  ⚠ full —   │ Task Z     │
+│           │            │  nothing new │            │
+│           │            │  starts until │            │
+│           │            │  A or B moves │            │
+└───────────┴────────────┴─────────────┴────────────┘</div>
+  <table>
+    <tr><th></th><th>Scrum</th><th>Kanban</th></tr>
+    <tr><td>Cadence</td><td>Fixed-length sprints (1-4 weeks)</td><td>Continuous flow, no fixed iteration</td></tr>
+    <tr><td>Roles</td><td>Defined (Product Owner, Scrum Master, Dev Team)</td><td>No prescribed roles</td></tr>
+    <tr><td>Mid-cycle changes</td><td>Discouraged once a sprint has started</td><td>Allowed anytime — that's the point</td></tr>
+    <tr><td>Work limit mechanism</td><td>Sprint backlog fixed at planning time</td><td>WIP limit per column, enforced continuously</td></tr>
+    <tr><td>Best fit</td><td>Product development with plannable chunks of work</td><td>Support/maintenance work with unpredictable, continuous task arrival</td></tr>
+  </table>
+
+  <h2 id="lean-xp">Lean &amp; Extreme Programming (XP) <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <h3>Lean — 7 wastes to eliminate</h3>
+  <table>
+    <tr><th>Waste</th><th>Software example</th></tr>
+    <tr><td>Partially done work</td><td>Half-finished features sitting in branches, never merged</td></tr>
+    <tr><td>Extra features</td><td>Building something nobody asked for "just in case"</td></tr>
+    <tr><td>Relearning</td><td>Undocumented tribal knowledge that has to be rediscovered repeatedly</td></tr>
+    <tr><td>Handoffs</td><td>Work passed between teams/people, losing context each time</td></tr>
+    <tr><td>Task switching</td><td>Splitting focus across too many things at once</td></tr>
+    <tr><td>Delays</td><td>Waiting on approvals, code review, environment access</td></tr>
+    <tr><td>Defects</td><td>Bugs caught late cost far more to fix than bugs caught immediately</td></tr>
+  </table>
+  <h3>Extreme Programming (XP) — engineering-practice-focused Agile</h3>
+  <ul>
+    <li><strong>Pair programming</strong> — two developers, one keyboard, continuous real-time code review.</li>
+    <li><strong>Test-Driven Development (TDD)</strong> — write the failing test first, then the code that makes it pass.</li>
+    <li><strong>Continuous Integration</strong> — merge and test against <code>main</code> frequently, never let a branch drift far from it.</li>
+    <li><strong>Small, frequent releases</strong> — ship in small batches instead of one large release.</li>
+  </ul>
+
+  <h2 id="devops">DevOps <span class="tag" style="margin-left:0;">not in the original notes</span></h2>
+  <p>Extends Agile's "ship fast, get feedback fast" philosophy past the development team and into operations
+    — the same team that builds the software also owns deploying and running it, closing the loop that
+    Waterfall (and even plain Scrum) leaves open between "code is done" and "code is actually live."</p>
+  <div class="diagram">Plan → Code → Build → Test → Release → Deploy → Operate → Monitor
+  ▲                                                                │
+  └────────────────────────  feedback loop  ──────────────────────┘</div>
+  <p>This project's own workflow already lives inside that loop — GitHub Flow (issue → branch → PR → merge)
+    is the Plan/Code/Build/Test slice; see <a href="../tech/git.html">Git &amp; GitHub</a> for how it's
+    actually practiced here. The automated CI/CD security-gate piece (Jenkins/Trivy/ZAP) is Phase 5 on the
+    <a href="../architecture.html">Architecture page</a> — not built yet, but the same DevOps loop this
+    section describes.</p>
+
+  <h2 id="comparison">Full comparison matrix</h2>
+  <table>
+    <tr><th></th><th>Waterfall</th><th>Agile (generic)</th><th>Scrum</th><th>Kanban</th><th>Spiral</th></tr>
+    <tr><td>Structure</td><td>Sequential, one pass</td><td>Iterative</td><td>Iterative, fixed sprints</td><td>Continuous flow</td><td>Iterative, risk-driven loops</td></tr>
+    <tr><td>Requirements</td><td>Fixed upfront</td><td>Evolve continuously</td><td>Evolve between sprints</td><td>Evolve continuously</td><td>Refined every loop</td></tr>
+    <tr><td>Customer feedback</td><td>Start &amp; end only</td><td>Continuous</td><td>Every sprint</td><td>Continuous</td><td>Every loop</td></tr>
+    <tr><td>Change mid-project</td><td>Very costly</td><td>Expected, cheap</td><td>Deferred to next sprint</td><td>Immediate</td><td>Expected, risk-assessed</td></tr>
+    <tr><td>Best fit</td><td>Stable, well-understood requirements</td><td>Evolving requirements generally</td><td>Product teams with plannable chunks</td><td>Support/maintenance, unpredictable task flow</td><td>Large, high-risk, poorly-understood projects</td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-methodology-waterfall-vs-agile">
+    <div class="q">When would you choose Waterfall over Agile, if Agile is generally more flexible?</div>
+    <div class="a">When requirements are genuinely stable and well understood up front, and the cost of
+      mid-project change is severe — e.g. systems tightly coupled to fixed hardware, or heavily regulated
+      environments where every change needs formal sign-off. Agile's advantage (cheap, continuous change) is
+      wasted effort if change was never going to happen anyway, and Waterfall's upfront planning rigor can be
+      a genuine asset in that specific situation.</div>
+  </div>
+  <div class="qa" id="qa-methodology-scrum-vs-kanban">
+    <div class="q">How do you decide between Scrum and Kanban for a team?</div>
+    <div class="a">Scrum fits work that can be planned into fixed-length chunks with a clear "done" per
+      sprint — typical product development. Kanban fits continuous, unpredictable work where tasks arrive at
+      any time and priorities can shift immediately — typical of a support/maintenance team, where a 2-week
+      sprint commitment doesn't match how the work actually shows up.</div>
+  </div>
+  <div class="qa" id="qa-methodology-velocity-purpose">
+    <div class="q">What is velocity actually used for in Scrum?</div>
+    <div class="a">Forecasting how much backlog a team can realistically commit to in a future sprint, based
+      on their historical average story points completed per sprint. It's a planning tool for the team, not
+      a performance metric to compare between teams or individuals — velocity is relative to one team's own
+      estimation habits, not an absolute measure of output.</div>
+  </div>
+  <div class="qa" id="qa-methodology-devops-vs-agile">
+    <div class="q">How does DevOps relate to Agile?</div>
+    <div class="a">Agile is about how a development team plans and builds software in short, feedback-driven
+      iterations. DevOps extends that same philosophy past "code is done" into deployment and operations —
+      the same team owns running the software in production too, closing the feedback loop between writing
+      code and seeing how it actually behaves live, instead of handing that off to a separate ops team.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — general interview reference, not tied to a specific Step.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

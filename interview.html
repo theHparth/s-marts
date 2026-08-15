@@ -20,9 +20,14 @@
   <a href="tech/docker.html">Docker &amp; Compose</a>
   <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="tech/go.html">Go</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
+  <a href="notes/sql.html">SQL Notes</a>
+  <a href="notes/aws.html">AWS Notes</a>
+  <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="notes/linux.html">Linux/Unix Notes</a>
 </nav>
 
 <main>
@@ -304,6 +309,15 @@
   </div>
   <p class="pill">↳ <a href="tech/docker.html#qa-localhost-vs-service-name">Docker &amp; Compose</a></p>
 
+  <div class="qa">
+    <div class="q">Is <code>CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code> running multiple commands?</div>
+    <div class="a">No — it's one program (the first array element) plus the arguments passed to it (everything
+      after), written as an explicit array instead of one string Docker would otherwise have to split itself.
+      Same idea as typing <code>uvicorn app.main:app --host 0.0.0.0 --port 8000</code> on a command line — one
+      process starts, reads its own argument list, and configures itself from it.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-cmd-array-is-one-command">Docker &amp; Compose</a></p>
+
   <h2 id="from-react-redux">From React, Redux &amp; TypeScript</h2>
 
   <div class="qa">
@@ -333,7 +347,25 @@
   </div>
   <p class="pill">↳ <a href="tech/react-redux.html#qa-thunk-why">React, Redux &amp; TypeScript</a></p>
 
-  <h2 id="from-python-fastapi">From Python, FastAPI &amp; scikit-learn <span class="tag" style="margin-left:0;">Planned — Phase 8 in progress</span></h2>
+  <h2 id="from-python-fastapi">From Python, FastAPI &amp; scikit-learn</h2>
+
+  <div class="qa">
+    <div class="q">What does visiting <code>/docs</code> on a FastAPI service actually show you?</div>
+    <div class="a">An interactive Swagger UI, generated automatically from the route definitions and Pydantic
+      models — no separate documentation to write. You can expand any route, click "Try it out", fill in a
+      real request, and send it straight from the browser — the same thing <code>curl</code> or Postman would
+      do, with a UI instead of hand-typed JSON.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-swagger-ui">Python, FastAPI &amp; scikit-learn</a></p>
+
+  <div class="qa">
+    <div class="q">What does <code>Field(...)</code> mean in a Pydantic model?</div>
+    <div class="a">The <code>...</code> is Python's <code>Ellipsis</code> object, and here it means "this
+      field is required, no default value." A request missing it gets rejected with a <code>422</code> before
+      the route function runs. <code>Field</code> can also carry validation constraints like <code>gt=0</code>
+      or <code>ge=0</code> alongside that requirement.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-field-ellipsis">Python, FastAPI &amp; scikit-learn</a></p>
 
   <div class="qa">
     <div class="q">Why doesn't the Python service use a multi-stage Docker build like the Java and Node services do?</div>
@@ -371,6 +403,170 @@
       <code>@Test</code>.</div>
   </div>
   <p class="pill">↳ <a href="tech/python-fastapi.html#qa-python-pytest-vs-others">Python, FastAPI &amp; scikit-learn</a></p>
+
+  <h2 id="from-go">From Go <span class="tag" style="margin-left:0;">Planned — Phase 6 in progress</span></h2>
+
+  <div class="qa">
+    <div class="q">Why does the in-memory version of this service need a <code>sync.Mutex</code>?</div>
+    <div class="a">Every HTTP request in Go runs on its own goroutine automatically. Two requests can hit the
+      same handler at the same moment and both try to modify shared state (like an in-memory slice)
+      simultaneously, corrupting it. The mutex ensures only one goroutine touches that shared state at a
+      time — once Postgres replaces the in-memory slice, the database handles concurrent writes safely
+      instead.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-why-mutex">Go</a></p>
+
+  <div class="qa">
+    <div class="q">Why does the Go service use raw SQL instead of an ORM like the Java services do?</div>
+    <div class="a">Go doesn't have a dominant, widely-used ORM the way Java has JPA/Hibernate. Raw SQL via
+      the standard library's <code>database/sql</code> package is the idiomatic default in the Go ecosystem —
+      a deliberate ecosystem difference, not a shortcut taken for this project specifically.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-why-no-orm">Go</a></p>
+
+  <div class="qa">
+    <div class="q">How does Go handle errors if it doesn't have exceptions?</div>
+    <div class="a">Functions that can fail return an extra <code>error</code> value as their last return,
+      checked explicitly with <code>if err != nil</code> at each call site. More verbose than try/catch, but
+      it makes every failure-prone operation visible in the code instead of relying on an exception that
+      might surface several call-frames away from where it was thrown.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-error-handling">Go</a></p>
+
+  <div class="qa">
+    <div class="q">What does <code>_ "github.com/lib/pq"</code> do if the package name is never used?</div>
+    <div class="a">It's a blank import — imported purely for its side effect. The <code>pq</code> package
+      registers itself with <code>database/sql</code> when it loads, via its own <code>init()</code>
+      function. The underscore tells Go's compiler "this unused import is intentional," since Go normally
+      refuses to compile with an unused import.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/go.html#qa-go-blank-import">Go</a></p>
+
+  <h2 id="from-sql-notes">From SQL Notes</h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between WHERE and HAVING?</div>
+    <div class="a"><code>WHERE</code> filters individual rows before grouping happens; <code>HAVING</code>
+      filters groups after <code>GROUP BY</code> has run, and can reference aggregate functions like
+      <code>COUNT(...)</code> that don't exist yet at the <code>WHERE</code> stage.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/sql.html#qa-sql-where-vs-having">SQL Notes</a></p>
+
+  <div class="qa">
+    <div class="q">How do window functions differ from GROUP BY?</div>
+    <div class="a"><code>GROUP BY</code> collapses multiple rows into one row per group.
+      A window function (<code>ROW_NUMBER()</code>, <code>RANK()</code>, etc. with <code>OVER (...)</code>)
+      computes a value per row while still having access to a related set of rows — you keep every original
+      row and get a ranking/running-total/comparison alongside it, instead of losing row-level detail.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/sql.html#qa-sql-window-vs-groupby">SQL Notes</a></p>
+
+  <div class="qa">
+    <div class="q">How do parameterized queries prevent SQL injection?</div>
+    <div class="a">The query structure and the user-supplied value are sent to the database separately —
+      the database never parses the value as part of the SQL text, so a malicious string like
+      <code>' OR '1'='1</code> is treated as a literal value to search for, not executable SQL. String
+      concatenation is what allows injection in the first place, by letting user input become part of the
+      query's actual syntax.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/sql.html#qa-sql-injection-fix">SQL Notes</a></p>
+
+  <h2 id="from-aws-notes">From AWS Notes</h2>
+
+  <div class="qa">
+    <div class="q">What is Amazon OpenSearch Service, and how does it relate to "Amazon ElasticSearch"?</div>
+    <div class="a">Same service — Amazon ElasticSearch Service was renamed to Amazon OpenSearch Service in
+      2021, after AWS forked the open-source Elasticsearch project due to a licensing dispute with Elastic
+      N.V. Functionally it's the same managed search/analytics engine, commonly paired with a database for
+      search or used for log analytics at scale.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/aws.html#qa-aws-elasticsearch-rename">AWS Notes</a></p>
+
+  <div class="qa">
+    <div class="q">When would you choose DynamoDB over RDS?</div>
+    <div class="a">DynamoDB when the access pattern is simple key-value/document lookups at very high, elastic
+      scale with single-digit-millisecond latency and you don't need SQL joins or complex relational queries.
+      RDS/Aurora when you need relational integrity, joins, transactions across multiple tables, or existing
+      SQL-based tooling. DynamoDB's schema is defined by query patterns, not by the data's natural relational
+      shape — a real design-time tradeoff, not just a performance one.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/aws.html#qa-aws-dynamodb-vs-rds">AWS Notes</a></p>
+
+  <div class="qa">
+    <div class="q">Can a Security Group block a specific malicious IP address?</div>
+    <div class="a">No — Security Groups only support Allow rules, not explicit Deny, so they can't block one
+      specific IP. Use a Network ACL at the subnet level instead, which supports both Allow and Deny rules.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/aws.html#qa-aws-sg-vs-nacl">AWS Notes</a></p>
+
+  <div class="qa">
+    <div class="q">What's the difference between Amazon Bedrock and Amazon SageMaker?</div>
+    <div class="a">SageMaker is for building, training, and deploying your <em>own</em> custom ML models —
+      you manage the training data and process. Bedrock gives managed API access to pre-built foundation
+      models from multiple providers (Anthropic, Meta, Amazon, and others) — no training or infrastructure
+      management, pay per request. Bedrock is the faster path when an existing foundation model already
+      solves the problem; SageMaker is for when you need a model trained on your own proprietary data/task.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/aws.html#qa-aws-bedrock-vs-sagemaker">AWS Notes</a></p>
+
+  <h2 id="from-methodologies-notes">From Agile &amp; SDLC Methodologies Notes</h2>
+
+  <div class="qa">
+    <div class="q">When would you choose Waterfall over Agile, if Agile is generally more flexible?</div>
+    <div class="a">When requirements are genuinely stable and well understood up front, and the cost of
+      mid-project change is severe — e.g. systems tightly coupled to fixed hardware, or heavily regulated
+      environments where every change needs formal sign-off. Agile's advantage (cheap, continuous change) is
+      wasted effort if change was never going to happen anyway, and Waterfall's upfront planning rigor can be
+      a genuine asset in that specific situation.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/methodologies.html#qa-methodology-waterfall-vs-agile">Agile &amp; SDLC Methodologies</a></p>
+
+  <div class="qa">
+    <div class="q">How do you decide between Scrum and Kanban for a team?</div>
+    <div class="a">Scrum fits work that can be planned into fixed-length chunks with a clear "done" per
+      sprint — typical product development. Kanban fits continuous, unpredictable work where tasks arrive at
+      any time and priorities can shift immediately — typical of a support/maintenance team, where a 2-week
+      sprint commitment doesn't match how the work actually shows up.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/methodologies.html#qa-methodology-scrum-vs-kanban">Agile &amp; SDLC Methodologies</a></p>
+
+  <div class="qa">
+    <div class="q">What is velocity actually used for in Scrum?</div>
+    <div class="a">Forecasting how much backlog a team can realistically commit to in a future sprint, based
+      on their historical average story points completed per sprint. It's a planning tool for the team, not
+      a performance metric to compare between teams or individuals — velocity is relative to one team's own
+      estimation habits, not an absolute measure of output.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/methodologies.html#qa-methodology-velocity-purpose">Agile &amp; SDLC Methodologies</a></p>
+
+  <h2 id="from-linux-notes">From Linux/Unix Notes</h2>
+
+  <div class="qa">
+    <div class="q">What's the difference between <code>kill</code> and <code>kill -9</code>?</div>
+    <div class="a">Plain <code>kill</code> sends <code>SIGTERM</code> — a request the process can catch and
+      handle gracefully (close files, finish in-flight work) before exiting. <code>kill -9</code> sends
+      <code>SIGKILL</code>, enforced immediately by the OS with no chance for cleanup. Always try plain
+      <code>kill</code> first; reserve <code>-9</code> for a genuinely unresponsive process.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/linux.html#qa-linux-kill-vs-kill9">Linux/Unix Notes</a></p>
+
+  <div class="qa">
+    <div class="q">What's the difference between <code>du</code> and <code>df</code>?</div>
+    <div class="a"><code>du</code> reports how much disk space specific files/directories are using —
+      scoped to whatever path you point it at. <code>df</code> reports free/used space at the filesystem or
+      mounted-partition level — a whole-disk view, not a per-file one. A directory can look small under
+      <code>du</code> while <code>df</code> still shows a disk nearly full, if space is consumed elsewhere.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/linux.html#qa-linux-du-vs-df">Linux/Unix Notes</a></p>
+
+  <div class="qa">
+    <div class="q">When would you use awk instead of grep or sed?</div>
+    <div class="a"><code>grep</code> finds matching lines. <code>sed</code> transforms text line-by-line
+      (find &amp; replace). <code>awk</code> is for column/field-structured data — extracting a specific
+      column, filtering rows by a field's value, or computing across columns — closer to a lightweight SQL
+      query over a text file than either of the other two.</div>
+  </div>
+  <p class="pill">↳ <a href="notes/linux.html#qa-linux-when-awk-vs-sed-vs-grep">Linux/Unix Notes</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

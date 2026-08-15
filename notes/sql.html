@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — SQL Notes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="../tech/git.html">Git &amp; GitHub</a>
+  <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="../tech/docker.html">Docker &amp; Compose</a>
+  <a href="../tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="../tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="../tech/go.html">Go</a>
+  <a href="../tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="sql.html" class="active">SQL Notes</a>
+  <a href="aws.html">AWS Notes</a>
+  <a href="methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="linux.html">Linux/Unix Notes</a>
+</nav>
+
+<main>
+  <h1>SQL <span class="tag">Interview Notes</span></h1>
+  <p class="subtitle">
+    General SQL reference for interview prep — not tied to a specific Step, reorganized from personal study
+    notes. This project actually uses SQL via PostgreSQL — through Spring Data JPA/Hibernate in the Java
+    services (see <a href="../tech/java-spring.html#sql-seeding">Java, Spring &amp; Maven → Seeding with data.sql</a>),
+    and hand-written SQL via Go's <code>database/sql</code> (see <a href="../tech/go.html#database">Go → Database, no ORM</a>).
+    Corrections/additions from the original notes are called out explicitly in boxes below.
+  </p>
+
+  <h2 id="basics">Creating &amp; inspecting a database</h2>
+  <pre><code>CREATE DATABASE imdb;
+USE imdb;
+SHOW TABLES;
+DESCRIBE movies;</code></pre>
+  <div class="box tip">
+    <div class="box-title">These four are MySQL syntax — Postgres differs</div>
+    This project runs <strong>PostgreSQL</strong>, not MySQL. The equivalents in <code>psql</code> (Postgres's
+    CLI):
+    <table>
+      <tr><th>MySQL</th><th>Postgres (<code>psql</code>)</th></tr>
+      <tr><td><code>CREATE DATABASE imdb;</code></td><td>Same — standard SQL, works in both</td></tr>
+      <tr><td><code>USE imdb;</code></td><td><code>\c imdb</code></td></tr>
+      <tr><td><code>SHOW TABLES;</code></td><td><code>\dt</code></td></tr>
+      <tr><td><code>DESCRIBE movies;</code></td><td><code>\d movies</code></td></tr>
+    </table>
+  </div>
+
+  <h2 id="select-basics">SELECT basics</h2>
+  <pre><code>SELECT * FROM movies;
+
+SELECT name, year FROM movies;
+
+SELECT rankscore, name FROM movies;</code></pre>
+  <ul>
+    <li>A <strong>result-set</strong> is the set of rows a query returns, along with column names and metadata.</li>
+    <li>Row order in a plain <code>SELECT</code> (no <code>ORDER BY</code>) is not guaranteed — it happens to
+      often match table order, but the query optimizer and index structures don't promise it.</li>
+  </ul>
+
+  <h2 id="limit-offset">LIMIT &amp; OFFSET</h2>
+  <pre><code>SELECT name, rankscore FROM movies LIMIT 20;
+
+SELECT name, rankscore FROM movies LIMIT 20 OFFSET 40;</code></pre>
+  <p><code>OFFSET 40</code> skips the first 40 rows before returning the next <code>LIMIT</code> rows — the
+    standard pattern for pagination.</p>
+
+  <h2 id="order-by">ORDER BY</h2>
+  <pre><code>SELECT name, rankscore, year FROM movies ORDER BY year DESC LIMIT 10;
+
+-- default direction is ASC
+SELECT name, rankscore, year FROM movies ORDER BY year LIMIT 10;
+
+SELECT * FROM movies ORDER BY year DESC, id ASC LIMIT 20;</code></pre>
+  <p>Multi-column sort: rows are sorted by the first column; only rows that <em>tie</em> on that column get
+    sorted by the second column as a tiebreaker.</p>
+
+  <h2 id="distinct">DISTINCT</h2>
+  <pre><code>SELECT DISTINCT genre FROM movies_genres;
+
+-- multi-column DISTINCT: treats the (first_name, last_name) pair as the unique unit
+SELECT DISTINCT first_name, last_name FROM directors;</code></pre>
+
+  <h2 id="where-null">WHERE, comparison operators &amp; NULL</h2>
+  <pre><code>SELECT name, year, rankscore FROM movies WHERE rankscore > 9;
+SELECT * FROM movies_genres WHERE genre = 'Comedy';
+SELECT * FROM movies_genres WHERE genre <> 'Horror';</code></pre>
+  <table>
+    <tr><th>Operator</th><th>Meaning</th></tr>
+    <tr><td><code>=</code></td><td>Equal</td></tr>
+    <tr><td><code>&lt;&gt;</code> or <code>!=</code></td><td>Not equal</td></tr>
+    <tr><td><code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code></td><td>Less/greater than, inclusive variants</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">NULL means "unknown," not "empty" — <code>=</code> can't compare to it</div>
+    <pre><code>-- always returns an empty result-set, never matches anything:
+SELECT name FROM movies WHERE rankscore = NULL;
+
+-- correct way to test for NULL:
+SELECT name FROM movies WHERE rankscore IS NULL;
+SELECT name FROM movies WHERE rankscore IS NOT NULL;</code></pre>
+    <code>NULL</code> represents "unknown," so <code>unknown = unknown</code> is itself unknown (not true) —
+    <code>=</code> and <code>&lt;&gt;</code> simply never match a <code>NULL</code>. Only <code>IS NULL</code>/
+    <code>IS NOT NULL</code> test for it correctly.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">Correction — matching an exact decimal like <code>9.8</code> is a floating-point issue, not a general SQL rule</div>
+    The original note's <code>WHERE rankscore = 9.8</code> "doesn't work" and suggests
+    <code>LIKE 9.8</code> as the fix. That's a MySQL-specific quirk (numeric-to-string coercion happens to let
+    <code>LIKE</code> match), not standard practice, and it's fragile. The real cause: if
+    <code>rankscore</code> is stored as a floating-point type (<code>FLOAT</code>/<code>REAL</code>), the
+    value actually stored may not be <em>exactly</em> <code>9.8</code> due to binary floating-point
+    representation — the same reason <code>0.1 + 0.2 != 0.3</code> in most programming languages. Two
+    portable, correct fixes:
+    <pre><code>-- 1. Round before comparing
+SELECT * FROM movies WHERE ROUND(rankscore, 2) = 9.8;
+
+-- 2. Better: store the column as DECIMAL/NUMERIC instead of FLOAT
+--    when exact comparisons matter (money, ratings) — DECIMAL stores
+--    the exact digits, not a binary approximation.</code></pre>
+  </div>
+
+  <h2 id="logical-operators">Logical operators &amp; pattern matching</h2>
+  <p>AND, OR, NOT, BETWEEN, IN, LIKE, EXISTS, ANY, ALL, SOME.</p>
+  <pre><code>SELECT name, year, rankscore FROM movies WHERE rankscore > 9 AND year > 2000;
+SELECT name, year, rankscore FROM movies WHERE rankscore > 9 OR year > 2007;
+SELECT name, year, rankscore FROM movies WHERE NOT year <= 2000;
+
+SELECT name, year, rankscore FROM movies WHERE year BETWEEN 1999 AND 2000;
+-- inclusive: year >= 1999 AND year <= 2000. low value must be <= high value, else empty result.
+
+SELECT director_id, genre FROM directors_genres WHERE genre IN ('Comedy', 'Horror');
+-- same as genre = 'Comedy' OR genre = 'Horror'
+
+SELECT name FROM movies WHERE name LIKE 'Tis%';   -- starts with "Tis"
+SELECT first_name FROM actors WHERE first_name LIKE '%es';   -- ends with "es"
+SELECT first_name FROM actors WHERE first_name LIKE '%es%';  -- contains "es"
+SELECT first_name FROM actors WHERE first_name LIKE 'Agn_s'; -- '_' = exactly one character</code></pre>
+  <p><code>%</code> = zero or more characters, <code>_</code> = exactly one character. To match a literal
+    <code>%</code> or <code>_</code>, escape it: <code>\%</code>, <code>\_</code>. Reference:
+    <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank" rel="noopener">w3schools — LIKE</a>.</p>
+
+  <h2 id="aggregate">Aggregate functions</h2>
+  <pre><code>SELECT MIN(year) FROM movies;
+SELECT MAX(year) FROM movies;
+SELECT COUNT(*) FROM movies;
+SELECT COUNT(year) FROM movies;</code></pre>
+  <div class="box why">
+    <div class="box-title"><code>COUNT(*)</code> vs. <code>COUNT(column)</code></div>
+    <code>COUNT(*)</code> counts every row, including ones where a column is <code>NULL</code>.
+    <code>COUNT(column)</code> counts only rows where that specific column is <strong>not</strong>
+    <code>NULL</code> — a common source of off-by-some-N surprises.
+  </div>
+
+  <h2 id="group-by-having">GROUP BY &amp; HAVING</h2>
+  <pre><code>SELECT year, COUNT(year) FROM movies GROUP BY year;
+
+SELECT year, COUNT(year) AS year_count FROM movies GROUP BY year ORDER BY year_count;
+-- year_count is a column alias
+
+SELECT year, COUNT(year) AS year_count FROM movies GROUP BY year HAVING year_count > 1000;</code></pre>
+  <table>
+    <tr><th></th><th>WHERE</th><th>HAVING</th></tr>
+    <tr><td>Applies to</td><td>Individual rows</td><td>Groups (post-aggregation)</td></tr>
+    <tr><td>Runs</td><td>Before grouping</td><td>After grouping</td></tr>
+    <tr><td>Can reference an aggregate like <code>COUNT(...)</code>?</td><td>No</td><td>Yes</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">Logical order of execution — the precise version</div>
+    The original mnemonic (<code>SELECT * FROM WHERE G-H-O-L</code>) is a solid memory aid, but the exact
+    logical order a query is evaluated in (a common interview question on its own) is:
+    <ol>
+      <li><strong>FROM</strong> — identify the source table(s)/joins</li>
+      <li><strong>WHERE</strong> — filter individual rows</li>
+      <li><strong>GROUP BY</strong> — form groups</li>
+      <li><strong>HAVING</strong> — filter groups</li>
+      <li><strong>SELECT</strong> — compute the output columns/aggregates</li>
+      <li><strong>ORDER BY</strong> — sort the result</li>
+      <li><strong>LIMIT</strong> — cut down to the requested row count</li>
+    </ol>
+    This is <em>why</em> <code>WHERE</code> can't reference a column alias defined in <code>SELECT</code>
+    (it hasn't been computed yet), but <code>ORDER BY</code> can (it runs after <code>SELECT</code>).
+  </div>
+  <p><code>HAVING</code> without <code>GROUP BY</code> behaves like <code>WHERE</code>, but isn't idiomatic —
+    use <code>WHERE</code> for row-level filtering.</p>
+
+  <h2 id="joins">JOINs</h2>
+  <pre><code>SELECT m.name, g.genre FROM movies m JOIN movies_genres g ON m.id = g.movie_id;
+
+-- natural join (same column name in both tables) — no need for ON
+SELECT * FROM T1 JOIN T2 USING (C1);
+
+SELECT m.name, g.genre FROM movies m LEFT JOIN movies_genres g ON m.id = g.movie_id;
+
+-- 3-way join
+SELECT a.first_name, a.last_name
+FROM actors a
+JOIN roles r ON a.id = r.actor_id
+JOIN movies m ON m.id = r.movie_id AND m.name = 'Officer 444';</code></pre>
+  <table>
+    <tr><th>Join type</th><th>Keeps</th></tr>
+    <tr><td><code>JOIN</code> / <code>INNER JOIN</code> (default)</td><td>Only rows with a match on both sides</td></tr>
+    <tr><td><code>LEFT JOIN</code> / <code>LEFT OUTER JOIN</code></td><td>All left-table rows, <code>NULL</code> for unmatched right-side columns</td></tr>
+    <tr><td><code>RIGHT JOIN</code> / <code>RIGHT OUTER JOIN</code></td><td>All right-table rows, <code>NULL</code> for unmatched left-side columns</td></tr>
+    <tr><td><code>FULL JOIN</code> / <code>FULL OUTER JOIN</code></td><td>All rows from both sides, <code>NULL</code> wherever there's no match</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Conceptually: a join is a filtered cross product</div>
+    A table with <em>n</em> rows joined against one with <em>m</em> rows produces a cross product of
+    <em>n × m</em> rows before any filtering; the join condition (<code>ON</code>/<code>USING</code>) filters
+    that down. This is also why joins on large, unindexed tables get expensive fast — worth naming directly
+    if asked about query performance.
+  </div>
+  <p>A <strong>self join</strong> (not in the original notes, common interview topic) joins a table to
+    itself — e.g. finding pairs of actors who appeared in the same movie:</p>
+  <pre><code>SELECT r1.actor_id AS actor_a, r2.actor_id AS actor_b
+FROM roles r1
+JOIN roles r2 ON r1.movie_id = r2.movie_id AND r1.actor_id < r2.actor_id;</code></pre>
+  <p>The <code>r1.actor_id &lt; r2.actor_id</code> avoids matching an actor with themselves and avoids
+    duplicate reversed pairs.</p>
+
+  <h2 id="subqueries">Subqueries</h2>
+  <pre><code>SELECT first_name, last_name FROM actors WHERE id IN (
+  SELECT actor_id FROM roles WHERE movie_id IN (
+    SELECT id FROM movies WHERE name = 'Schindler''s List'
+  )
+);
+
+SELECT * FROM movies WHERE rankscore >= ALL (SELECT MAX(rankscore) FROM movies);</code></pre>
+  <ul>
+    <li>The inner query runs first; its result feeds the outer query.</li>
+    <li><code>IN</code> — value belongs to the set returned by the subquery.</li>
+    <li><code>EXISTS</code> — true if the subquery returns one or more rows at all.</li>
+    <li><code>ANY</code> — true if <em>any</em> value from the subquery satisfies the condition.</li>
+    <li><code>ALL</code> — true only if <em>every</em> value from the subquery satisfies the condition.</li>
+    <li>A <strong>correlated subquery</strong> references a column from the outer query inside the inner
+      one, so it re-runs once per outer row (more expensive) — see
+      <a href="https://en.wikipedia.org/wiki/Correlated_subquery" target="_blank" rel="noopener">Correlated subquery</a>.</li>
+  </ul>
+
+  <h2 id="dml">Data Manipulation Language — INSERT, UPDATE, DELETE</h2>
+  <pre><code>INSERT INTO movies (id, name, year, rankscore) VALUES (412321, 'Thor', 2011, 7);
+
+INSERT INTO movies (id, name, year, rankscore) VALUES
+  (412321, 'Thor', 2011, 7),
+  (412322, 'Iron Man', 2008, 7.9);
+
+UPDATE movies SET rankscore = 9 WHERE id = 412321;
+
+DELETE FROM movies WHERE id = 412321;</code></pre>
+  <ul>
+    <li><code>UPDATE</code>/<code>DELETE</code> without a <code>WHERE</code> clause affects <strong>every</strong> row — always double-check the <code>WHERE</code> before running either interactively.</li>
+    <li><code>TRUNCATE TABLE movies;</code> removes all rows — functionally similar to <code>DELETE</code> without a <code>WHERE</code>, but typically faster and doesn't fire row-level triggers.</li>
+  </ul>
+
+  <h2 id="ddl">Data Definition Language — CREATE, ALTER, DROP</h2>
+  <pre><code>CREATE TABLE language (id INT PRIMARY KEY, lang VARCHAR(50) NOT NULL);
+
+ALTER TABLE language ADD country VARCHAR(50);
+ALTER TABLE language MODIFY country VARCHAR(60);   -- MySQL syntax; Postgres uses:
+-- ALTER TABLE language ALTER COLUMN country TYPE VARCHAR(60);
+ALTER TABLE language DROP COLUMN country;
+
+DROP TABLE IF EXISTS language;</code></pre>
+  <table>
+    <tr><th>Constraint</th><th>What it enforces</th></tr>
+    <tr><td><code>NOT NULL</code></td><td>Column can never be <code>NULL</code></td></tr>
+    <tr><td><code>UNIQUE</code></td><td>All values in the column must differ from each other</td></tr>
+    <tr><td><code>PRIMARY KEY</code></td><td><code>NOT NULL</code> + <code>UNIQUE</code> combined — uniquely identifies each row</td></tr>
+    <tr><td><code>FOREIGN KEY</code></td><td>Value must match a primary key value in another table</td></tr>
+    <tr><td><code>CHECK</code></td><td>Value must satisfy a boolean condition</td></tr>
+    <tr><td><code>DEFAULT</code></td><td>Value used when none is specified on insert</td></tr>
+    <tr><td><code>INDEX</code></td><td>Speeds up lookups/filters on that column, at the cost of slower writes</td></tr>
+  </table>
+  <div class="box tip">
+    <div class="box-title">PRIMARY KEY vs. UNIQUE — the nuance worth knowing (not in the original notes)</div>
+    <ul>
+      <li>A table can have only <strong>one</strong> <code>PRIMARY KEY</code>, but <strong>multiple</strong> <code>UNIQUE</code> constraints.</li>
+      <li><code>PRIMARY KEY</code> implies <code>NOT NULL</code>. A <code>UNIQUE</code> column, in most
+        databases (including Postgres and MySQL), can still hold <strong>one</strong> <code>NULL</code> —
+        since <code>NULL &lt;&gt; NULL</code>, multiple <code>NULL</code>s don't violate uniqueness.</li>
+    </ul>
+  </div>
+
+  <h2 id="dcl">Data Control Language</h2>
+  <p>For database administrators — granting/revoking permissions. <code>GRANT</code>/<code>REVOKE</code>.
+    Reference: <a href="https://dev.mysql.com/doc/refman/8.0/en/grant.html" target="_blank" rel="noopener">GRANT</a>,
+    <a href="https://dev.mysql.com/doc/refman/8.0/en/revoke.html" target="_blank" rel="noopener">REVOKE</a>.</p>
+
+  <h2 id="case-when">CASE WHEN — conditional expressions</h2>
+  <p>Not in the original notes, but a routine interview/day-to-day tool: inline conditional logic inside a query.</p>
+  <pre><code>SELECT name, rankscore,
+  CASE
+    WHEN rankscore >= 9 THEN 'Excellent'
+    WHEN rankscore >= 7 THEN 'Good'
+    ELSE 'Average or below'
+  END AS rating_bucket
+FROM movies;</code></pre>
+
+  <h2 id="null-functions">NULL-handling functions</h2>
+  <table>
+    <tr><th>Function</th><th>What it does</th></tr>
+    <tr><td><code>COALESCE(a, b, c, ...)</code></td><td>Returns the first non-<code>NULL</code> value in the list</td></tr>
+    <tr><td><code>NULLIF(a, b)</code></td><td>Returns <code>NULL</code> if <code>a = b</code>, otherwise returns <code>a</code> — useful to avoid divide-by-zero</td></tr>
+  </table>
+  <pre><code>-- avoid a divide-by-zero error
+SELECT total / NULLIF(count, 0) FROM stats;
+
+-- default a missing value
+SELECT COALESCE(nickname, first_name) AS display_name FROM actors;</code></pre>
+
+  <h2 id="union">UNION vs. UNION ALL</h2>
+  <p>Both stack the results of two <code>SELECT</code> queries (same number/type of columns required).</p>
+  <table>
+    <tr><th></th><th>Duplicates</th><th>Speed</th></tr>
+    <tr><td><code>UNION</code></td><td>Removed</td><td>Slower — has to de-duplicate</td></tr>
+    <tr><td><code>UNION ALL</code></td><td>Kept</td><td>Faster — no de-duplication pass</td></tr>
+  </table>
+  <p>Use <code>UNION ALL</code> whenever duplicates are known to be impossible or acceptable — it's the more
+    common real-world choice for that reason.</p>
+
+  <h2 id="cte">Common Table Expressions (CTEs) — <code>WITH</code></h2>
+  <p>Not in the original notes — very commonly asked now. A CTE names a subquery so it can be referenced like
+    a temporary table, making complex queries far more readable than deeply nested subqueries.</p>
+  <pre><code>WITH high_rated AS (
+  SELECT id, name, rankscore FROM movies WHERE rankscore > 8
+)
+SELECT name FROM high_rated WHERE rankscore > 9;</code></pre>
+  <p>A <strong>recursive CTE</strong> references itself, used for hierarchical/graph-like data (org charts, category trees):</p>
+  <pre><code>WITH RECURSIVE subordinates AS (
+  SELECT id, manager_id, name FROM employees WHERE id = 1        -- anchor
+  UNION ALL
+  SELECT e.id, e.manager_id, e.name
+  FROM employees e
+  JOIN subordinates s ON e.manager_id = s.id                      -- recursive step
+)
+SELECT * FROM subordinates;</code></pre>
+
+  <h2 id="window-functions">Window functions</h2>
+  <p>Not in the original notes — one of the most commonly asked SQL interview topics at any mid-to-senior
+    level. Unlike <code>GROUP BY</code>, a window function computes a value <strong>per row</strong> while
+    still having access to a set ("window") of related rows — you don't lose the individual row detail.</p>
+  <pre><code>SELECT name, year, rankscore,
+  ROW_NUMBER() OVER (PARTITION BY year ORDER BY rankscore DESC) AS rank_in_year
+FROM movies;</code></pre>
+  <table>
+    <tr><th>Function</th><th>What it does</th></tr>
+    <tr><td><code>ROW_NUMBER()</code></td><td>1, 2, 3... — always unique, even for tied values</td></tr>
+    <tr><td><code>RANK()</code></td><td>Ties share the same rank; the next rank skips (1, 1, 3)</td></tr>
+    <tr><td><code>DENSE_RANK()</code></td><td>Ties share the same rank; the next rank doesn't skip (1, 1, 2)</td></tr>
+    <tr><td><code>LAG(col)</code> / <code>LEAD(col)</code></td><td>Value from the previous / next row in the window — e.g. comparing a row to the one before it, no self-join needed</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">The classic interview framing</div>
+    "Find the top 3 highest-rated movies per year" is a textbook window-function question —
+    <code>GROUP BY</code> alone can't do it (it collapses rows instead of ranking them). <code>PARTITION BY</code>
+    resets the ranking for each group (each year here), the same way <code>GROUP BY</code> groups rows, but
+    without collapsing them into one row per group.
+  </div>
+
+  <h2 id="transactions">Transactions &amp; ACID</h2>
+  <p>Not in the original notes. A transaction groups multiple statements so they succeed or fail together.</p>
+  <pre><code>BEGIN;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;   -- or ROLLBACK; to undo both if something went wrong</code></pre>
+  <table>
+    <tr><th>ACID property</th><th>What it guarantees</th></tr>
+    <tr><td><strong>Atomicity</strong></td><td>All statements in the transaction succeed, or none do</td></tr>
+    <tr><td><strong>Consistency</strong></td><td>The database moves from one valid state to another — constraints always hold</td></tr>
+    <tr><td><strong>Isolation</strong></td><td>Concurrent transactions don't see each other's uncommitted changes</td></tr>
+    <tr><td><strong>Durability</strong></td><td>Once committed, changes survive a crash/power loss</td></tr>
+  </table>
+
+  <h2 id="normalization">Normalization</h2>
+  <p>Not in the original notes — a very standard interview question ("what's 3NF?"). The goal: reduce data
+    redundancy and avoid update anomalies by splitting data into related tables.</p>
+  <table>
+    <tr><th>Form</th><th>Rule</th></tr>
+    <tr><td>1NF</td><td>Every column holds atomic (indivisible) values — no comma-separated lists in one cell</td></tr>
+    <tr><td>2NF</td><td>1NF, plus every non-key column depends on the <em>whole</em> primary key, not just part of it (relevant for composite keys)</td></tr>
+    <tr><td>3NF</td><td>2NF, plus no non-key column depends on another non-key column (no "transitive" dependency)</td></tr>
+  </table>
+  <p>This project's <code>movies</code> / <code>movies_genres</code> split (a movie can have many genres) is a
+    real example of normalization in action — genres live in their own table rather than as a comma-separated
+    column on <code>movies</code>, avoiding exactly the 1NF violation above.</p>
+
+  <h2 id="sql-injection">SQL injection &amp; parameterized queries</h2>
+  <p>Not in the original notes — a security fundamental, and directly relevant to this project's own code.
+    Never build a query by concatenating raw user input into a SQL string:</p>
+  <pre><code>-- NEVER do this — a value like ' OR '1'='1 breaks out of the string entirely
+query := "SELECT * FROM movies WHERE name = '" + userInput + "'"</code></pre>
+  <p>Always use parameterized/placeholder queries instead, which send the value separately from the query
+    structure so it can never be interpreted as SQL:</p>
+  <table>
+    <tr><th>Stack</th><th>Placeholder style</th></tr>
+    <tr><td>Postgres (used directly, e.g. Go's <code>database/sql</code>)</td><td><code>$1</code>, <code>$2</code>, ... — see <a href="../tech/go.html#database">Go → Database</a></td></tr>
+    <tr><td>JDBC (used under Spring Data JPA)</td><td><code>?</code></td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-sql-where-vs-having">
+    <div class="q">What's the difference between WHERE and HAVING?</div>
+    <div class="a"><code>WHERE</code> filters individual rows before grouping happens; <code>HAVING</code>
+      filters groups after <code>GROUP BY</code> has run, and can reference aggregate functions like
+      <code>COUNT(...)</code> that don't exist yet at the <code>WHERE</code> stage.</div>
+  </div>
+  <div class="qa" id="qa-sql-logical-order">
+    <div class="q">What's the logical order SQL clauses actually execute in?</div>
+    <div class="a"><code>FROM</code> → <code>WHERE</code> → <code>GROUP BY</code> → <code>HAVING</code> →
+      <code>SELECT</code> → <code>ORDER BY</code> → <code>LIMIT</code>. This is why <code>WHERE</code> can't
+      use a column alias defined in <code>SELECT</code> (it hasn't run yet), but <code>ORDER BY</code> can.</div>
+  </div>
+  <div class="qa" id="qa-sql-window-vs-groupby">
+    <div class="q">How do window functions differ from GROUP BY?</div>
+    <div class="a"><code>GROUP BY</code> collapses multiple rows into one row per group.
+      A window function (<code>ROW_NUMBER()</code>, <code>RANK()</code>, etc. with <code>OVER (...)</code>)
+      computes a value per row while still having access to a related set of rows — you keep every original
+      row and get a ranking/running-total/comparison alongside it, instead of losing row-level detail.</div>
+  </div>
+  <div class="qa" id="qa-sql-union-vs-unionall">
+    <div class="q">When would you use UNION ALL instead of UNION?</div>
+    <div class="a">Whenever duplicate rows across the two result sets are known to be impossible, or are
+      acceptable — <code>UNION ALL</code> skips the de-duplication pass <code>UNION</code> does, so it's
+      faster. Default to <code>UNION ALL</code> unless you specifically need duplicates removed.</div>
+  </div>
+  <div class="qa" id="qa-sql-injection-fix">
+    <div class="q">How do parameterized queries prevent SQL injection?</div>
+    <div class="a">The query structure and the user-supplied value are sent to the database separately —
+      the database never parses the value as part of the SQL text, so a malicious string like
+      <code>' OR '1'='1</code> is treated as a literal value to search for, not executable SQL. String
+      concatenation is what allows injection in the first place, by letting user input become part of the
+      query's actual syntax.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — general interview reference, not tied to a specific Step. See <a href="../tech/java-spring.html">Java, Spring &amp; Maven</a> and <a href="../tech/go.html">Go</a> for how this project actually uses SQL.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>
