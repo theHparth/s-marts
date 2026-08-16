@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <title>MoveTrack Ops — Request &amp; Failure Flow Map</title>
 <link rel="stylesheet" href="assets/style.css">
+<style>
+  #system-svg .node { cursor: pointer; }
+  #system-svg .node.dim { opacity: 0.28; }
+  #system-svg .node.hl rect { filter: drop-shadow(0 0 3px rgba(26,127,55,0.45)); }
+  #system-svg .edge { transition: opacity 0.15s; }
+  #system-svg .edge.dim { opacity: 0.12; }
+  #system-svg .edge.hl { stroke: #1a7f37 !important; stroke-width: 2.4 !important; }
+  #system-svg .edge.hl-text { fill: #146428 !important; font-weight: 700; }
+</style>
 </head>
 <body>
 <div class="layout">
@@ -60,16 +69,40 @@
     </ul>
   </div>
 
+  <h2 id="port-reference">Port reference — every service, one table</h2>
+  <p>Grows by one row every time a new service or technology joins the project. Matches
+    <code>docker-compose.yml</code> exactly.</p>
+  <table>
+    <tr><th>Port</th><th>Service</th><th>Technology</th><th>What it's for</th></tr>
+    <tr><td>3000</td><td>dashboard</td><td>React + nginx</td><td>The UI a real user opens in a browser</td></tr>
+    <tr><td>8081</td><td>claims-service</td><td>Java / Spring</td><td>Claims REST API</td></tr>
+    <tr><td>8082</td><td>move-entitlement-service</td><td>Java / Spring</td><td>Move requests + entitlement REST API</td></tr>
+    <tr><td>8000</td><td>claims-triage-ml</td><td>Python / FastAPI</td><td>ML prediction API</td></tr>
+    <tr><td>8010</td><td>compliance-service</td><td>Python / FastAPI</td><td>Scan-findings ingestion API</td></tr>
+    <tr><td>8090</td><td>shipment-ingestion</td><td>Go</td><td>Shipment ping ingestion API</td></tr>
+    <tr><td>5432</td><td>postgres</td><td>PostgreSQL</td><td>Shared relational store — 3 databases, 1 container</td></tr>
+    <tr><td>6379</td><td>redis</td><td>Redis</td><td>ML prediction cache</td></tr>
+    <tr><td>27017</td><td>mongodb</td><td>MongoDB</td><td>Scan-findings document store</td></tr>
+    <tr><td>5672</td><td>rabbitmq</td><td>RabbitMQ (AMQP)</td><td>Business-event message broker</td></tr>
+    <tr><td>15672</td><td>rabbitmq</td><td>RabbitMQ management UI</td><td>Browser-based exchange/queue inspection</td></tr>
+    <tr><td>8080</td><td>jenkins</td><td>Jenkins</td><td>CI/CD pipeline UI</td></tr>
+    <tr><td>9092</td><td>kafka</td><td>Kafka (host listener)</td><td>For anything running directly on your machine — <code>go test</code>, local scripts</td></tr>
+    <tr><td>29092</td><td>kafka</td><td>Kafka (Docker-network listener)</td><td>For anything running inside a container — the Go producer, <code>kafka-ui</code>, the Python consumer</td></tr>
+    <tr><td>8089</td><td>kafka-ui</td><td>Kafka UI</td><td>Browser-based topic/message/consumer-group inspection</td></tr>
+  </table>
+
   <h2 id="one-chart">The whole system, one chart</h2>
-  <p>Three ways to read the exact same picture:</p>
+  <p>Three ways to read the exact same picture. <strong>Click any box below</strong> to highlight everything
+    directly connected to it — same interaction as <a href="architecture.html#diagram">Architecture &amp;
+    Progress → System diagram</a>. Click empty space to clear the selection.</p>
   <table>
     <tr><th>If you're...</th><th>Look at...</th></tr>
     <tr><td><strong>a user</strong></td><td>the top two rows — you only ever touch the browser and the dashboard. Everything below that happens without you seeing it.</td></tr>
     <tr><td><strong>a developer</strong></td><td>every box and every port label — this is the real map of what calls what, on which port, storing data where.</td></tr>
-    <tr><td><strong>a stakeholder</strong></td><td>the shape of it — 5 backend services, 4 data stores, 1 CI/CD pipeline, all wired together. The detailed flows further down this page are the evidence each connection actually works, not just a design intent.</td></tr>
+    <tr><td><strong>a stakeholder</strong></td><td>the shape of it — 5 backend services, 4 data stores, a Kafka pipeline, and a CI/CD pipeline, all wired together. The detailed flows further down this page are the evidence each connection actually works, not just a design intent.</td></tr>
   </table>
   <div class="diagram-svg-wrap" style="overflow-x:auto;">
-  <svg viewBox="0 0 1300 700" role="img" aria-label="MoveTrack Ops full system request and data flow chart" style="width:100%; height:auto; min-width:900px; font-family:'Segoe UI',Arial,sans-serif; display:block;">
+  <svg id="system-svg" viewBox="0 0 1300 740" role="img" aria-label="MoveTrack Ops full system request and data flow chart" style="width:100%; height:auto; min-width:900px; font-family:'Segoe UI',Arial,sans-serif; display:block;">
     <defs>
       <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0,0 L10,5 L0,10 z" fill="#5b6663"/>
@@ -77,136 +110,199 @@
     </defs>
 
     <!-- edges: request/data flow (solid) -->
-    <line x1="650" y1="75" x2="650" y2="108" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
-    <line x1="600" y1="163" x2="200" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="380" y="188" font-size="9.5" fill="#5b6663">fetch :8082</text>
-    <line x1="640" y1="163" x2="440" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="560" y="192" font-size="9.5" fill="#5b6663">fetch :8081</text>
+    <g id="edges">
+    <line class="edge" data-edge data-from="browser" data-to="dashboard" x1="650" y1="75" x2="650" y2="108" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
+    <line class="edge" data-edge data-from="dashboard" data-to="moveent" x1="600" y1="163" x2="200" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="dashboard" data-to="moveent" x="380" y="188" font-size="9.5" fill="#5b6663">fetch :8082</text>
+    <line class="edge" data-edge data-from="dashboard" data-to="claims" x1="640" y1="163" x2="440" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="dashboard" data-to="claims" x="560" y="192" font-size="9.5" fill="#5b6663">fetch :8081</text>
 
-    <line x1="130" y1="298" x2="130" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="138" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
-    <line x1="380" y1="298" x2="220" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="280" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
-    <line x1="1150" y1="298" x2="300" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="900" y="345" font-size="9" fill="#5b6663">database/sql</text>
-    <line x1="630" y1="298" x2="465" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="500" y="332" font-size="9" fill="#5b6663">cache get/set</text>
-    <line x1="880" y1="298" x2="690" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="720" y="332" font-size="9" fill="#5b6663">pymongo insert</text>
-    <line x1="200" y1="298" x2="880" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="650" y="315" font-size="9" fill="#5b6663">publish: move.created</text>
-    <line x1="440" y1="298" x2="920" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="600" y="352" font-size="9" fill="#5b6663">publish: claim.filed</text>
-    <line x1="900" y1="298" x2="1000" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
-    <text x="960" y="345" font-size="8.3" fill="#5b6663">publish: finding.detected (HIGH/CRITICAL only)</text>
+    <line class="edge" data-edge data-from="moveent" data-to="postgres" x1="130" y1="298" x2="130" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="moveent" data-to="postgres" x="138" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
+    <line class="edge" data-edge data-from="claims" data-to="postgres" x1="380" y1="298" x2="220" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="claims" data-to="postgres" x="280" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
+    <line class="edge" data-edge data-from="goingest" data-to="postgres" x1="1150" y1="298" x2="300" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="goingest" data-to="postgres" x="900" y="345" font-size="9" fill="#5b6663">database/sql</text>
+    <line class="edge" data-edge data-from="mltriage" data-to="redis" x1="630" y1="298" x2="465" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="mltriage" data-to="redis" x="500" y="332" font-size="9" fill="#5b6663">cache get/set</text>
+    <line class="edge" data-edge data-from="compliance" data-to="mongodb" x1="880" y1="298" x2="690" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="compliance" data-to="mongodb" x="720" y="332" font-size="9" fill="#5b6663">pymongo insert</text>
+    <line class="edge" data-edge data-from="moveent" data-to="rabbitmq" x1="200" y1="298" x2="880" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="moveent" data-to="rabbitmq" x="650" y="315" font-size="9" fill="#5b6663">publish: move.created</text>
+    <line class="edge" data-edge data-from="claims" data-to="rabbitmq" x1="440" y1="298" x2="920" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="claims" data-to="rabbitmq" x="600" y="352" font-size="9" fill="#5b6663">publish: claim.filed</text>
+    <line class="edge" data-edge data-from="compliance" data-to="rabbitmq" x1="900" y1="298" x2="1000" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="compliance" data-to="rabbitmq" x="960" y="345" font-size="8.3" fill="#5b6663">publish: finding.detected (HIGH/CRITICAL only)</text>
+
+    <line class="edge" data-edge data-from="goingest" data-to="kafka" x1="1150" y1="298" x2="150" y2="470" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="goingest" data-to="kafka" x="700" y="460" font-size="9" fill="#5b6663">publish, key=device_id, topic=shipment.tracking</text>
+    <line class="edge" data-edge data-from="kafka" data-to="kafkaui" x1="280" y1="505" x2="300" y2="505" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <line class="edge" data-edge data-from="kafka" data-to="kafkaconsumer" x1="280" y1="522" x2="580" y2="522" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="kafka" data-to="kafkaconsumer" x="330" y="516" font-size="8.3" fill="#5b6663">consumes, group: demo-consumer</text>
 
     <!-- edges: CI/CD build-time flow (dashed) -->
-    <line x1="245" y1="560" x2="270" y2="560" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <line x1="500" y1="560" x2="525" y2="560" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <line x1="500" y1="580" x2="780" y2="580" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <text x="275" y="553" font-size="8.3" fill="#b7791f">docker.sock</text>
-    <line x1="640" y1="518" x2="1130" y2="300" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <text x="850" y="460" font-size="8.3" fill="#b7791f">builds + scans this image</text>
-    <line x1="700" y1="518" x2="880" y2="302" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <text x="720" y="440" font-size="8.3" fill="#b7791f">Report Findings stage POSTs results</text>
-    <line x1="900" y1="518" x2="650" y2="168" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <text x="760" y="270" font-size="8.3" fill="#b7791f">baseline scan http://dashboard:80</text>
+    <line class="edge" data-edge data-from="jenkins" data-to="dockerengine" x1="245" y1="634" x2="270" y2="634" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <line class="edge" data-edge data-from="dockerengine" data-to="trivy" x1="500" y1="634" x2="525" y2="634" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <line class="edge" data-edge data-from="dockerengine" data-to="zap" x1="500" y1="654" x2="780" y2="654" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="jenkins" data-to="dockerengine" x="275" y="627" font-size="8.3" fill="#b7791f">docker.sock</text>
+    <line class="edge" data-edge data-from="dockerengine" data-to="goingest" x1="640" y1="592" x2="1130" y2="300" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="dockerengine" data-to="goingest" x="850" y="470" font-size="8.3" fill="#b7791f">builds + scans this image</text>
+    <line class="edge" data-edge data-from="trivy" data-to="compliance" x1="700" y1="592" x2="880" y2="302" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="trivy" data-to="compliance" x="720" y="410" font-size="8.3" fill="#b7791f">Report Findings stage POSTs results</text>
+    <line class="edge" data-edge data-from="zap" data-to="dashboard" x1="900" y1="592" x2="650" y2="168" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text class="edge edge-text" data-edge data-from="zap" data-to="dashboard" x="760" y="270" font-size="8.3" fill="#b7791f">baseline scan http://dashboard:80</text>
+    </g>
 
     <!-- browser -->
+    <g class="node" data-node="browser">
     <rect x="520" y="20" width="260" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5"/>
     <text x="650" y="42" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Browser — the user</text>
     <text x="650" y="58" text-anchor="middle" font-size="10" fill="#1f2523">localhost:3000</text>
+    </g>
 
     <!-- dashboard -->
+    <g class="node" data-node="dashboard">
     <rect x="520" y="110" width="260" height="55" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="650" y="132" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">React Dashboard</text>
     <text x="650" y="148" text-anchor="middle" font-size="10" fill="#1f2523">nginx :3000 → static build</text>
+    </g>
 
     <!-- backend row -->
+    <g class="node" data-node="moveent">
     <rect x="15" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="132" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Move &amp; Entitlement</text>
     <text x="132" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Java / Spring — :8082</text>
     <text x="132" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /api/move-requests</text>
     <text x="132" y="272" text-anchor="middle" font-size="9" fill="#1f2523">CORS: localhost:3000 only</text>
     <text x="132" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes move.created</text>
+    </g>
 
+    <g class="node" data-node="claims">
     <rect x="265" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="382" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Claims Service</text>
     <text x="382" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Java / Spring — :8081</text>
     <text x="382" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /api/claims</text>
     <text x="382" y="272" text-anchor="middle" font-size="9" fill="#1f2523">adjuster/supervisor decision</text>
     <text x="382" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes claim.filed</text>
+    </g>
 
+    <g class="node" data-node="mltriage">
     <rect x="515" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="632" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Claims Triage ML</text>
     <text x="632" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Python / FastAPI — :8000</text>
     <text x="632" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /predict</text>
     <text x="632" y="272" text-anchor="middle" font-size="9" fill="#1f2523">scikit-learn pipeline</text>
     <text x="632" y="286" text-anchor="middle" font-size="9" fill="#1f2523">not called by dashboard directly</text>
+    </g>
 
+    <g class="node" data-node="compliance">
     <rect x="765" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="882" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Compliance / Findings</text>
     <text x="882" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Python / FastAPI — :8010</text>
     <text x="882" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST/GET /findings</text>
     <text x="882" y="272" text-anchor="middle" font-size="9" fill="#1f2523">called by Jenkins, not dashboard</text>
     <text x="882" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes finding.detected</text>
+    </g>
 
+    <g class="node" data-node="goingest">
     <rect x="1015" y="208" width="270" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="1150" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
     <text x="1150" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Go — :8090</text>
     <text x="1150" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST/GET /ingest</text>
     <text x="1150" y="272" text-anchor="middle" font-size="9" fill="#1f2523">called by carrier devices</text>
     <text x="1150" y="286" text-anchor="middle" font-size="9" fill="#1f2523">the image Trivy scans</text>
+    </g>
 
     <!-- data row -->
+    <g class="node" data-node="postgres">
     <rect x="15" y="358" width="330" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="180" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">PostgreSQL (shared) — :5432</text>
     <text x="180" y="396" text-anchor="middle" font-size="9.5" fill="#1f2523">move_entitlement_db · claims_db · shipment_ingestion</text>
     <text x="180" y="411" text-anchor="middle" font-size="9" fill="#1f2523">one container, database-per-service</text>
     <text x="180" y="425" text-anchor="middle" font-size="9" fill="#1f2523">source of truth, relational</text>
+    </g>
 
+    <g class="node" data-node="redis">
     <rect x="360" y="358" width="210" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="465" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Redis — :6379</text>
     <text x="465" y="396" text-anchor="middle" font-size="9" fill="#1f2523">prediction cache, 5-min TTL</text>
     <text x="465" y="411" text-anchor="middle" font-size="9" fill="#1f2523">not a system of record</text>
+    </g>
 
+    <g class="node" data-node="mongodb">
     <rect x="585" y="358" width="210" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="690" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">MongoDB — :27017</text>
     <text x="690" y="396" text-anchor="middle" font-size="9" fill="#1f2523">variable-shape scan findings</text>
     <text x="690" y="411" text-anchor="middle" font-size="9" fill="#1f2523">document store</text>
+    </g>
 
+    <g class="node" data-node="rabbitmq">
     <rect x="810" y="358" width="280" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
     <text x="950" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">RabbitMQ — :5672 (AMQP) + :15672 (UI)</text>
     <text x="950" y="396" text-anchor="middle" font-size="9" fill="#1f2523">"compliance" topic exchange</text>
     <text x="950" y="411" text-anchor="middle" font-size="9" fill="#1f2523">no queue bound yet — publishes, then discards</text>
+    </g>
+
+    <!-- streaming row -->
+    <text x="15" y="463" font-size="11" font-weight="700" fill="#5b6663">Event streaming — Kafka (Phase 10)</text>
+    <g class="node" data-node="kafka">
+    <rect x="15" y="470" width="265" height="70" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="147" y="492" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Kafka — :9092 (host) / :29092 (Docker)</text>
+    <text x="147" y="507" text-anchor="middle" font-size="9" fill="#1f2523">topic: shipment.tracking, 3 partitions</text>
+    <text x="147" y="521" text-anchor="middle" font-size="9" fill="#1f2523">key: device_id</text>
+    <text x="147" y="534" text-anchor="middle" font-size="9" fill="#1f2523">durable, replayable log</text>
+    </g>
+
+    <g class="node" data-node="kafkaui">
+    <rect x="300" y="470" width="260" height="70" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="430" y="492" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Kafka UI — :8089</text>
+    <text x="430" y="507" text-anchor="middle" font-size="9" fill="#1f2523">browse topics, messages, consumer lag</text>
+    <text x="430" y="521" text-anchor="middle" font-size="9" fill="#1f2523">humans only — not part of any request path</text>
+    </g>
+
+    <g class="node" data-node="kafkaconsumer">
+    <rect x="580" y="470" width="300" height="70" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="730" y="492" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">kafka-demo-consumer</text>
+    <text x="730" y="507" text-anchor="middle" font-size="9" fill="#1f2523">Python — group: demo-consumer</text>
+    <text x="730" y="521" text-anchor="middle" font-size="9" fill="#1f2523">stand-in for Phase 9's live dashboard feed</text>
+    <text x="730" y="534" text-anchor="middle" font-size="9" fill="#1f2523">confirmed: 0 lag, STABLE</text>
+    </g>
 
     <!-- CI/CD lane -->
-    <text x="15" y="502" font-size="11" font-weight="700" fill="#5b6663">CI/CD — build-time, not part of any user's request</text>
-    <rect x="15" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
-    <text x="130" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Jenkins — :8080</text>
-    <text x="130" y="557" text-anchor="middle" font-size="9" fill="#1f2523">Checkout → Build → Trivy →</text>
-    <text x="130" y="570" text-anchor="middle" font-size="9" fill="#1f2523">Report Findings → ZAP → Archive</text>
+    <text x="15" y="576" font-size="11" font-weight="700" fill="#5b6663">CI/CD — build-time, not part of any user's request</text>
+    <g class="node" data-node="jenkins">
+    <rect x="15" y="592" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="130" y="614" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Jenkins — :8080</text>
+    <text x="130" y="629" text-anchor="middle" font-size="9" fill="#1f2523">Checkout → Build → Trivy →</text>
+    <text x="130" y="642" text-anchor="middle" font-size="9" fill="#1f2523">Report Findings → ZAP → Archive</text>
+    </g>
 
-    <rect x="270" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
-    <text x="385" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Docker Engine (host)</text>
-    <text x="385" y="557" text-anchor="middle" font-size="9" fill="#1f2523">reached via mounted socket</text>
-    <text x="385" y="570" text-anchor="middle" font-size="9" fill="#1f2523">(DooD — see docker.html)</text>
+    <g class="node" data-node="dockerengine">
+    <rect x="270" y="592" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="385" y="614" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Docker Engine (host)</text>
+    <text x="385" y="629" text-anchor="middle" font-size="9" fill="#1f2523">reached via mounted socket</text>
+    <text x="385" y="642" text-anchor="middle" font-size="9" fill="#1f2523">(DooD — see docker.html)</text>
+    </g>
 
-    <rect x="525" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
-    <text x="640" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Trivy (ephemeral)</text>
-    <text x="640" y="557" text-anchor="middle" font-size="9" fill="#1f2523">image vulnerability scan</text>
-    <text x="640" y="570" text-anchor="middle" font-size="9" fill="#1f2523">gate: exit 1 on HIGH/CRITICAL</text>
+    <g class="node" data-node="trivy">
+    <rect x="525" y="592" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="640" y="614" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Trivy (ephemeral)</text>
+    <text x="640" y="629" text-anchor="middle" font-size="9" fill="#1f2523">image vulnerability scan</text>
+    <text x="640" y="642" text-anchor="middle" font-size="9" fill="#1f2523">gate: exit 1 on HIGH/CRITICAL</text>
+    </g>
 
-    <rect x="780" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
-    <text x="895" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">OWASP ZAP (ephemeral)</text>
-    <text x="895" y="557" text-anchor="middle" font-size="9" fill="#1f2523">passive baseline scan</text>
-    <text x="895" y="570" text-anchor="middle" font-size="9" fill="#1f2523">advisory only, never blocks</text>
+    <g class="node" data-node="zap">
+    <rect x="780" y="592" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="895" y="614" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">OWASP ZAP (ephemeral)</text>
+    <text x="895" y="629" text-anchor="middle" font-size="9" fill="#1f2523">passive baseline scan</text>
+    <text x="895" y="642" text-anchor="middle" font-size="9" fill="#1f2523">advisory only, never blocks</text>
+    </g>
 
     <!-- legend -->
-    <line x1="15" y1="650" x2="60" y2="650" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
-    <text x="70" y="654" font-size="10" fill="#1f2523">real-time request / data flow</text>
-    <line x1="15" y1="672" x2="60" y2="672" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
-    <text x="70" y="676" font-size="10" fill="#1f2523">CI/CD build-time flow (Jenkins-triggered, not user-triggered)</text>
+    <line x1="15" y1="690" x2="60" y2="690" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
+    <text x="70" y="694" font-size="10" fill="#1f2523">real-time request / data flow</text>
+    <line x1="15" y1="712" x2="60" y2="712" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="70" y="716" font-size="10" fill="#1f2523">CI/CD build-time flow (Jenkins-triggered, not user-triggered)</text>
   </svg>
   </div>
   <p>Ports, arrows, and boxes here are all real — pulled directly from <code>docker-compose.yml</code> and the
@@ -215,13 +311,15 @@
 
   <h2 id="toc">On this page</h2>
   <ul>
-    <li><a href="#one-chart">The whole system, one chart</a> — every service, port, and connection at a glance</li>
+    <li><a href="#port-reference">Port reference</a> — every service's port, one table</li>
+    <li><a href="#one-chart">The whole system, one chart</a> — every service, port, and connection at a glance, click to highlight</li>
     <li><a href="#flow-move-request">Move Request submission</a> — React → Java → Postgres → RabbitMQ</li>
     <li><a href="#flow-claim-filing">Claim filing + approval state machine</a> — React → Java → Postgres → RabbitMQ</li>
     <li><a href="#flow-shipment-ingestion">Shipment ingestion</a> — Go service, Postgres</li>
     <li><a href="#flow-ml-predict">Claims triage prediction</a> — Python/FastAPI, Redis cache</li>
     <li><a href="#flow-cicd">CI/CD pipeline</a> — Jenkins, Trivy gate, ZAP, Report Findings</li>
     <li><a href="#flow-findings-ingestion">Findings ingestion + severity branch</a> — Compliance Service, MongoDB, RabbitMQ</li>
+    <li><a href="#flow-kafka-tracking">Kafka shipment tracking</a> — Go producer, Python consumer, dual listeners</li>
     <li><a href="#failure-signatures">Common failure signatures, cross-cutting reference</a></li>
     <li><a href="#growth">How this page grows with each new phase</a></li>
   </ul>
@@ -323,7 +421,7 @@ Browser — "Claim #1 — ADJUSTER_REVIEW" renders</div>
   <p>Confirmed built — <a href="steps.html#phase6">Steps page → Phase 6</a>. No CORS branch here — this
     service is only ever called machine-to-machine (carrier devices, or Jenkins/tests), never from the
     browser dashboard directly.</p>
-  <div class="diagram">Carrier device / simulated client — POST :8090/ingest  { shipment_id, lat, lon, recorded_at }
+  <div class="diagram">Carrier device / simulated client — POST :8090/ingest  { device_id, latitude, longitude, timestamp }
   │
   ▼
 main.go handleIngest() — json.Decode into a ShipmentPing struct
@@ -333,9 +431,10 @@ main.go handleIngest() — json.Decode into a ShipmentPing struct
   ▼ decodes fine
 validatePing(ping) — checked BEFORE touching the database
   │
-  ├─ required field missing ───► FAILURE: HTTP 400. Deliberately checked before any db call —
-  │                               an earlier version of this handler let a nil/invalid ping reach
-  │                               insertPing() first and panicked instead of returning a clean 400.
+  ├─ device_id is empty ───────► FAILURE: HTTP 400 "device_id is required". Deliberately checked
+  │                               before any db call — an earlier version of this handler let a
+  │                               nil/invalid ping reach insertPing() first and panicked instead
+  │                               of returning a clean 400.
   │
   ▼ valid
 insertPing(db, ping) — parameterized SQL INSERT into shipment_ingestion.pings
@@ -343,7 +442,7 @@ insertPing(db, ping) — parameterized SQL INSERT into shipment_ingestion.pings
   ├─ Postgres unreachable ─────► FAILURE: HTTP 500, connection refused
   │
   ▼ insert succeeds
-HTTP 201 { id, shipment_id, lat, lon, recorded_at }
+HTTP 201 { device_id, latitude, longitude, timestamp }
 
 Separately — GET :8090/ingest
   │
@@ -454,6 +553,53 @@ should_publish(severity)?
   ▼
 HTTP 200 { id }  (returned either way — publishing is fire-and-forget, never blocks the response)</div>
 
+  <h2 id="flow-kafka-tracking">Kafka shipment tracking — producer + consumer</h2>
+  <p>Confirmed built — <a href="steps.html#phase10">Steps page → Phase 10</a>. Full concept explanation on
+    <a href="tech/kafka.html">Kafka</a>. This phase hit the densest run of real gotchas so far — nearly every
+    branch below is a real bug hit while building it, not a hypothetical.</p>
+  <div class="diagram">Carrier device — POST :8090/ingest  { device_id, latitude, longitude, timestamp }
+  │
+  ▼  (same validate → insert flow as the Shipment Ingestion diagram above)
+insertPing(db, ping) — PostgreSQL :5432
+  │
+  ▼ insert succeeds
+writer.WriteMessages() — kafka-go, Addr: kafka:29092, key=device_id, topic=shipment.tracking
+  │
+  ├─ Kafka's advertised listener pointed at the wrong address ─► FAILURE (hit twice, from
+  │      opposite directions): first `dial tcp [::1]:9092: connect: connection refused` when
+  │      the listener advertised `localhost` to a container; later `lookup kafka: no such
+  │      host` when it advertised `kafka` to a host-machine process. Fixed with two separate
+  │      listeners — one per audience. Full story: tech/kafka.html#kafka-listeners
+  │
+  ▼ publish succeeds — Kafka picks the partition by hashing device_id,
+  │  so this device's pings always land on the same partition, in order
+  ▼
+HTTP 201 (response to the carrier device doesn't wait on Kafka at all —
+publish happens after the response-worthy work, same fire-and-forget
+shape as RabbitMQ in Phase 4)
+
+Separately, continuously running —
+kafka-demo-consumer (Python) — subscribed to shipment.tracking, group_id="demo-consumer"
+  │
+  ├─ single-broker cluster couldn't create __consumer_offsets (wanted 3 replicas,
+  │  only 1 broker exists) ─► FAILURE: every consumer-group operation silently stalled
+  │  for as long as this was misconfigured — zero crashes, zero errors, just nothing
+  │  ever arriving. Producing kept working fine the entire time, which is what made
+  │  it confusing. Fixed with KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1.
+  │
+  ├─ Python's stdout fully buffered inside the container ─► FAILURE (looked like):
+  │  the consumer WAS working, but print() output never reached `docker logs` until
+  │  the buffer filled. Fixed with ENV PYTHONUNBUFFERED=1.
+  │
+  ▼ all fixed
+for message in consumer: print(partition, offset, value)
+  │
+  ├─ consumer container restarts ─► resumes from its last committed offset per
+  │                                  partition — no messages lost or reprocessed
+  ▼
+Confirmed via Kafka UI (http://localhost:8089 → Consumers → demo-consumer):
+State: STABLE, 3/3 partitions assigned, Total lag: 0</div>
+
   <h2 id="failure-signatures">Common failure signatures — cross-cutting reference</h2>
   <p>The same handful of failure shapes keep recurring across totally different technologies. This table is
     the fast way to recognize which one you're looking at.</p>
@@ -468,6 +614,8 @@ HTTP 200 { id }  (returned either way — publishing is fire-and-forget, never b
     <tr><td><code>fatal: couldn't find remote ref</code></td><td>Jenkins Checkout stage</td><td>Branch was renamed or deleted — often because it was already squash-merged</td><td><a href="tech/git.html#branch-deleted-after-merge">git.html#branch-deleted-after-merge</a></td></tr>
     <tr><td><code>NoClassDefFoundError</code> on app startup</td><td>Java service using a hand-built message converter</td><td>A newer library API called than what's actually resolved on the classpath</td><td><a href="tech/rabbitmq-mongodb.html#java-jackson-gotchas">rabbitmq-mongodb.html#java-jackson-gotchas</a></td></tr>
     <tr><td><code>ModuleNotFoundError: No module named 'app'</code></td><td>pytest, any Python service</td><td>Missing <code>tests/__init__.py</code>, or pytest run from the wrong directory</td><td><a href="tech/python-fastapi.html#pytest-module-not-found">python-fastapi.html#pytest-module-not-found</a></td></tr>
+    <tr><td><code>dial tcp [::1]:9092</code> / <code>lookup kafka: no such host</code></td><td>Any Kafka client, container or host</td><td>A single advertised listener can never be correct for both audiences at once</td><td><a href="tech/kafka.html#kafka-listeners">kafka.html#kafka-listeners</a></td></tr>
+    <tr><td>Consumer connects with no crash, but never receives anything</td><td>Kafka consumer groups, single-broker dev cluster</td><td><code>__consumer_offsets</code> stuck trying to create 3 replicas with only 1 broker available</td><td><a href="tech/kafka.html#single-broker-offsets">kafka.html#single-broker-offsets</a></td></tr>
   </table>
 
   <h2 id="growth">How this page grows with each new phase</h2>
@@ -477,37 +625,10 @@ HTTP 200 { id }  (returned either way — publishing is fire-and-forget, never b
     confirmed working, the diagram gets replaced with the normal style, corrected to match what was actually
     built (including whatever real failure branches got hit along the way, the same as every flow above).</p>
   <div class="box warn">
-    <div class="box-title">PLANNED — Phase 10 (Kafka), not yet built</div>
-    <p>Written ahead of the build. Full concept explanation on <a href="tech/kafka.html">Kafka</a>.</p>
-    <div class="diagram">Carrier device — POST :8090/ingest  { shipment_id, lat, lon, recorded_at }
-  │
-  ▼  (same validate → insert flow as the confirmed diagram above)
-insertPing(db, ping) — PostgreSQL :5432
-  │
-  ▼ insert succeeds
-writer.WriteMessages() — kafka-go, key=shipment_id, topic=shipment.tracking
-  │
-  ├─ Kafka broker unreachable ─► PLANNED FAILURE: publish call errors/times out.
-  │                                Unlike the Postgres insert above, nothing has
-  │                                rolled back — the ping is safely stored either way.
-  │
-  ▼ publish succeeds — Kafka picks the partition by hashing shipment_id,
-  │  so this shipment's pings always land on the same partition, in order
-  ▼
-HTTP 201 (response to the carrier device doesn't wait on Kafka at all —
-publish happens after the response-worthy work, same fire-and-forget
-shape as RabbitMQ in Phase 4)
-
-Separately, continuously running —
-kafka-demo-consumer (Python) — subscribed to shipment.tracking, group_id="demo-consumer"
-  │
-  ▼
-for message in consumer: print(partition, offset, value)
-  │
-  ├─ consumer container restarts ─► PLANNED: resumes from its last committed
-  │                                  offset per partition — no messages lost
-  │                                  or reprocessed, the core guarantee this
-  │                                  phase exists to prove works</div>
+    <div class="box-title">No phase currently planned/in-progress</div>
+    Phase 10 (Kafka) is the most recently completed phase as of this page's last update — see
+    <a href="#flow-kafka-tracking">Kafka shipment tracking</a> above for its confirmed flow. The next phase's
+    planned flow diagram will appear here the moment a new phase is picked.
   </div>
 
   <footer class="page-footer">MoveTrack Ops — companion to Architecture &amp; Progress. That page shows what
@@ -515,6 +636,52 @@ for message in consumer: print(partition, offset, value)
     (and, briefly, one planned flow) every phase.</footer>
 </main>
 </div>
+<script>
+(function () {
+  var svg = document.getElementById('system-svg');
+  if (!svg) return;
+  var nodes = svg.querySelectorAll('.node');
+  var edges = svg.querySelectorAll('.edge');
+
+  function clearHighlight() {
+    nodes.forEach(function (n) { n.classList.remove('hl', 'dim'); });
+    edges.forEach(function (e) { e.classList.remove('hl', 'dim'); });
+  }
+
+  function selectNode(id) {
+    clearHighlight();
+    var connected = {};
+    connected[id] = true;
+    edges.forEach(function (e) {
+      var from = e.getAttribute('data-from');
+      var to = e.getAttribute('data-to');
+      if (from === id || to === id) {
+        e.classList.add('hl');
+        connected[from] = true;
+        connected[to] = true;
+      } else {
+        e.classList.add('dim');
+      }
+    });
+    nodes.forEach(function (n) {
+      var nid = n.getAttribute('data-node');
+      if (connected[nid]) n.classList.add('hl');
+      else n.classList.add('dim');
+    });
+  }
+
+  nodes.forEach(function (n) {
+    n.addEventListener('click', function (e) {
+      e.stopPropagation();
+      selectNode(n.getAttribute('data-node'));
+    });
+  });
+
+  svg.addEventListener('click', function () {
+    clearHighlight();
+  });
+})();
+</script>
 <script src="assets/page-nav.js"></script>
 </body>
 </html>

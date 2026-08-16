@@ -207,11 +207,11 @@
         </g>
 
         <g class="node" data-node="kafka">
-          <rect x="915" y="380" width="230" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <rect x="915" y="380" width="230" height="68" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
           <text x="1030" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">Kafka</text>
           <text x="1030" y="413" text-anchor="middle" font-size="10" fill="#1f2523">topic: shipment.tracking</text>
           <text x="1030" y="425" text-anchor="middle" font-size="10" fill="#1f2523">from: Go Ingestion</text>
-          <text x="1030" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Steps 75-83</text>
+          <text x="1030" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 75-83 done, containerized, running</text>
         </g>
 
         <g class="node" data-node="ml">
@@ -273,7 +273,7 @@
     <tr><td>6</td><td><a href="steps.html#phase6">Go Ingestion Service (REST)</a></td><td>41–52</td><td>12</td><td class="mark">Done</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
     <tr><td>7</td><td>SOAP Legacy Adapter</td><td>TBD</td><td>~8</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
     <tr><td>9</td><td>WebSocket live feed</td><td>TBD</td><td>~6</td><td>Not started</td><td>Needs: Phases 1, 2 &amp; 3 (dashboard + both service APIs)</td></tr>
-    <tr><td>10</td><td><a href="steps.html#phase10">Kafka</a></td><td>75–83</td><td>9</td><td class="prog">In progress</td><td>Needs: Phase 6 (Go service to publish to it, already done). Feeds: Phase 8's ML pipeline, Phase 9's live feed once those exist</td></tr>
+    <tr><td>10</td><td><a href="steps.html#phase10">Kafka</a></td><td>75–83</td><td>9</td><td class="mark">Done</td><td>Needs: Phase 6 (Go service to publish to it, already done). Feeds: Phase 8's ML pipeline, Phase 9's live feed once those exist</td></tr>
     <tr><td>11</td><td>Svelte micro-widget</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 3 (embeds into the React shell)</td></tr>
     <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>TBD</td><td>~4</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
     <tr><td>13</td><td>Raw sockets + WireGuard + failover</td><td>TBD</td><td>~12</td><td>Not started</td><td>Extends Phase 6's Go service directly, not a separate service</td></tr>
@@ -456,20 +456,20 @@
       ]
     },
     kafka: {
-      name: "Kafka", tech: "Distributed log, topic: shipment.tracking", status: "in-progress",
-      port: "9092 (planned)", input: "High-volume telemetry published by the Go Ingestion Service",
-      output: "Consumed by a demo Python consumer this phase; the WebSocket gateway (Phase 9) and Claims Triage ML path consume it for real later",
+      name: "Kafka", tech: "Distributed log, topic: shipment.tracking", status: "done",
+      port: "9092 (host clients) + 29092 (Docker-network clients)", input: "High-volume telemetry published by the Go Ingestion Service",
+      output: "Consumed by a demo Python consumer this phase (0 lag, confirmed); the WebSocket gateway (Phase 9) and Claims Triage ML path consume it for real later",
       why: "Shipment tracking is high-volume and benefits from a durable, ordered, replayable log — genuinely a different traffic shape than RabbitMQ's business events.",
       steps: [
-        {n:"Step 75", t:"Kafka running in Docker (KRaft mode, no Zookeeper)", href:null, done:false},
-        {n:"Step 76", t:"Create the shipment.tracking topic", href:null, done:false},
-        {n:"Step 77", t:"Go Ingestion Service publishes to Kafka on every successful ping", href:null, done:false},
-        {n:"Step 78", t:"Verify with a console consumer that messages actually arrive", href:null, done:false},
-        {n:"Step 79", t:"Python demo consumer — subscribes, logs every message", href:null, done:false},
-        {n:"Step 80", t:"Unit tests — Go producer", href:null, done:false},
-        {n:"Step 81", t:"Integration test — produce then consume round trip", href:null, done:false},
-        {n:"Step 82", t:"Dockerize the Python consumer", href:null, done:false},
-        {n:"Step 83", t:"Wire into docker-compose.yml, verify end-to-end, merge", href:null, done:false}
+        {n:"Step 75", t:"Kafka running in Docker (KRaft mode, no Zookeeper)", href:"steps.html#step75", done:true},
+        {n:"Step 76", t:"Create the shipment.tracking topic", href:"steps.html#step76", done:true},
+        {n:"Step 77", t:"Go Ingestion Service publishes to Kafka on every successful ping", href:"steps.html#step77", done:true},
+        {n:"Step 78", t:"Verify with a console consumer that messages actually arrive", href:"steps.html#step78", done:true},
+        {n:"Step 79", t:"Python demo consumer — subscribes, logs every message", href:"steps.html#step79", done:true},
+        {n:"Step 80", t:"Unit tests — Go producer", href:"steps.html#step80", done:true},
+        {n:"Step 81", t:"Integration test — produce then consume round trip", href:"steps.html#step81", done:true},
+        {n:"Step 82", t:"Dockerize the Python consumer", href:"steps.html#step82", done:true},
+        {n:"Step 83", t:"Wire into docker-compose.yml, verify end-to-end, merge", href:"steps.html#step83", done:true}
       ]
     },
     ml: {

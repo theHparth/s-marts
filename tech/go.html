@@ -51,6 +51,15 @@
     below, not just the clean final version of the code.
   </div>
 
+  <h2 id="why-this-here">Why Go is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use Go at all?</td><td>Shipment tracking means holding many, mostly-idle device connections open at once — goroutines make that cheap; a JVM thread-per-request model (the two Java services) gets expensive at that scale. The language choice and this service's whole reason to exist are the same fact.</td></tr>
+    <tr><td>What does it actually do here?</td><td>Runs Shipment Ingestion — receives location pings from carrier devices, validates and persists them, and (as of Phase 10) publishes each one to Kafka.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Never called by the dashboard directly — only by carrier devices/simulated clients and by Jenkins (the image it scans). See <a href="../architecture-2.html#flow-shipment-ingestion">Request &amp; Failure Flow Map → Shipment ingestion</a> for the full request trace.</td></tr>
+    <tr><td>When would you reach for this instead of Java or Python?</td><td>When the bottleneck is holding open many concurrent connections cheaply, not complex business rules — the opposite tradeoff from Move &amp; Entitlement/Claims. See <a href="comparison.html#stack-overview">Cross-Tech Comparison</a> for the full side-by-side.</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

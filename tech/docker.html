@@ -39,6 +39,15 @@
   <h1>Docker &amp; Compose</h1>
   <p class="subtitle">Fundamentals + how this project actually uses it. For when each piece was introduced, see the <a href="../steps.html">Steps page</a>.</p>
 
+  <h2 id="why-this-here">Why Docker is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use Docker at all?</td><td>Every service in this project is a different language/runtime (Java, Python, Go, Node) — Docker is what lets all of them run together, on the same machine, without each one's dependencies conflicting with the others.</td></tr>
+    <tr><td>What does it actually do here?</td><td>Packages each service into a self-contained image (its own runtime + code, nothing borrowed from the host), and Docker Compose starts/networks all of them together with one command.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Underneath everything — every service, database, and infra tool in this project (Postgres, Mongo, RabbitMQ, Kafka, Jenkins, all 5 backend services, the dashboard) runs as a container.</td></tr>
+    <tr><td>When did this project start using it, and why not later?</td><td>From Step 2 (Phase 1) — a local Postgres via Compose, before any real backend code existed. Reproducibility mattered from day one: the exact same setup works on any machine, not just "it works on mine."</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

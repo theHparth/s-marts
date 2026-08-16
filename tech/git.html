@@ -39,6 +39,15 @@
   <h1>Git &amp; GitHub</h1>
   <p class="subtitle">Fundamentals first, grows every time the build introduces a new command. Local git first, GitHub (remote) second. For the actual order things were run in, see the <a href="../steps.html">Steps page</a> — this page is organized by concept, not by when it happened.</p>
 
+  <h2 id="why-this-here">Why Git/GitHub is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use Git/GitHub at all?</td><td>Version control and a real, public commit history are the whole point of this being a resume-facing project — a real interviewer can open the actual repo and see real branches, PRs, and commit messages, not just a finished result.</td></tr>
+    <tr><td>What does it actually do here?</td><td>Tracks every change to every file locally (Git), and hosts a public copy with branch protection, pull requests, and issue tracking (GitHub) — every step in this whole project produces a real commit.</td></tr>
+    <tr><td>Where does it sit in the workflow?</td><td>Before and after every single step — branch first, commit as you go, PR and merge at the end of each unit of work (a PR-group in early phases, a whole phase from Phase 5 onward).</td></tr>
+    <tr><td>When/why did the workflow itself change partway through?</td><td>Simplified starting Phase 5 — no more <code>gh issue create</code>, short commit messages, one branch per whole phase instead of per PR-group. See <a href="#branching">Branching &amp; Pull Request Workflow</a> for the full before/after.</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

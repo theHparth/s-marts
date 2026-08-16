@@ -39,6 +39,15 @@
   <h1>Java, Spring Boot &amp; Maven</h1>
   <p class="subtitle">Fundamentals first. Covers every Java/Spring/Maven service in this project (Move &amp; Entitlement, Claims, the SOAP Legacy Adapter). For when each piece was actually introduced, see the <a href="../steps.html">Steps page</a> — this page is organized by concept, not by timeline.</p>
 
+  <h2 id="why-this-here">Why this stack is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use Java/Spring at all?</td><td>It's a core requirement of the job posting this project targets, and it's still the dominant stack for structured, transactional backend business logic in real enterprise environments — worth having genuine depth in, not just familiarity.</td></tr>
+    <tr><td>What does it actually do in this project?</td><td>Runs the two services with real business rules and money/compliance implications — Move &amp; Entitlement (JTR weight-allowance calculations, change-control audit logging) and Claims (two-step adjuster/supervisor approval workflow).</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Directly behind the React dashboard — every move request and claim the UI submits lands here first, before touching Postgres.</td></tr>
+    <tr><td>When would you reach for this instead of, say, Python/FastAPI?</td><td>When the domain has real invariants worth a strongly-typed, compiler-checked model (an entitlement calculation, an approval state machine) — see <a href="comparison.html#stack-overview">Cross-Tech Comparison</a> for how this differs from where this project chose Python instead.</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

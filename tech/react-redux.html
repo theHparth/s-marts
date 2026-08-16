@@ -39,6 +39,15 @@
   <h1>React, Redux &amp; TypeScript</h1>
   <p class="subtitle">Fundamentals + how the dashboard actually uses each one. For when each piece was introduced, see the <a href="../steps.html">Steps page</a>.</p>
 
+  <h2 id="why-this-here">Why this stack is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use React/Redux at all?</td><td>By Phase 3, two backend services existed with no way for a real person to use them — the job posting also expects React specifically, the dominant real-world choice for this kind of admin/operations UI.</td></tr>
+    <tr><td>What does it actually do here?</td><td>The one screen movers, TSP coordinators, and claims adjusters actually touch — submitting move requests, filing and deciding claims, everything else in this project happens invisibly behind it.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>The very top of the request chain — every backend call in this project starts with a click here. See <a href="../architecture-2.html#one-chart">Request &amp; Failure Flow Map → the whole system, one chart</a> for exactly which service it calls on which port.</td></tr>
+    <tr><td>When did this project add it, and why not earlier?</td><td>Phase 3, deliberately after both backend services (Phases 1-2) already had real REST APIs — nothing to actually call from the UI before that point.</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

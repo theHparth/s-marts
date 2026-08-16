@@ -50,6 +50,15 @@
     reflects what was actually built and tested, not just the original plan.
   </div>
 
+  <h2 id="why-this-here">Why this stack is here, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project use Python/scikit-learn at all?</td><td>Predicting a claim's triage priority from historical patterns is a genuinely different problem shape from fixed business rules — Python's ML ecosystem (scikit-learn, pandas) is built for exactly that, nothing comparable exists cleanly in Java or Go.</td></tr>
+    <tr><td>What does it actually do here?</td><td>Runs Claims Triage ML — takes claim features (amount, days since incident, type, description length), predicts a priority via a trained scikit-learn pipeline, caches repeated predictions in Redis.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Not called by the dashboard directly today — a standalone prediction API, meant to eventually consume claim events in real time once Phase 10's Kafka pipeline extends to it.</td></tr>
+    <tr><td>When would you reach for this instead of Java?</td><td>When the actual task is statistical prediction from data, not encoding fixed rules — see <a href="comparison.html#stack-overview">Cross-Tech Comparison</a> for the fuller side-by-side, including the second Python service (Compliance, Phase 4) that reused this same stack for a completely different reason (fast to stand up an ingestion endpoint, not ML).</td></tr>
+  </table>
+
   <h2>What each one is, in one line</h2>
   <table>
     <tr><th>Term</th><th>What it is</th></tr>

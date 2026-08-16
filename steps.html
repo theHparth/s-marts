@@ -222,6 +222,15 @@ git branch -M main</code></pre>
     <p><strong>Goal (PR #1, Steps 1–2):</strong> a buildable Spring Boot project that can connect to a
     local Postgres instance — nothing functional yet, just a working foundation the rest of the service
     gets built on.</p>
+    <p><strong>Why this step, in plain terms:</strong> every later step needs somewhere to actually put
+      code — this is the empty container that becomes Move &amp; Entitlement. Nothing here is functional
+      yet on purpose; a working skeleton that compiles and boots is worth confirming before writing a
+      single line of real business logic on top of it.</p>
+    <p><strong>Why Java/Spring specifically, for this service:</strong> this is the first backend service
+      in the project, and the job posting this project targets lists Java/Spring as a core requirement —
+      Move &amp; Entitlement (dollar-value entitlement calculations, change-control audit logging) is
+      exactly the kind of structured, transactional business logic Spring Boot's ecosystem (JPA,
+      validation, dependency injection) is built for.</p>
 
     <h3>Repo layout established this step</h3>
     <div class="diagram">
@@ -340,6 +349,11 @@ git commit -m "feat: scaffold move-entitlement-service with spring initializr"</
     </div>
     <p><strong>Goal:</strong> a local Postgres container the service connects to, plus
       <code>application.properties</code> wired to it. Closes out PR #1.</p>
+    <p><strong>Why Postgres specifically:</strong> entitlement calculations and change-control records have
+      real invariants (a weight allowance belongs to exactly one rank, a change record must reference a
+      real move) that a relational database enforces structurally — a document store would let those
+      relationships silently drift. Docker Compose over a local install keeps the exact same setup
+      reproducible on any machine, matching how every other data store in this project gets run.</p>
 
     <h3>Checked tooling first</h3>
     <p><code>docker --version</code> → 29.6.2, <code>docker compose version</code> → v5.3.1 — both current, nothing to install.</p>
@@ -643,6 +657,9 @@ git push</code></pre>
       <code>ClaimStatus</code> using Step 6's threshold. First <code>@Service</code> class in the project;
       layer comparison (entity vs. repository vs. service vs. config) on
       <a href="tech/java-spring.html#layers">Java, Spring &amp; Maven → Layers</a>.</p>
+    <p><strong>Why this step:</strong> this is the actual two-step approval workflow this whole service
+      exists to run — everything before it (entity, status enum, threshold config) was just the data shape
+      and rules this logic needed to exist first.</p>
     <ul>
       <li>Constructor injection, not field <code>@Autowired</code> — dependencies are <code>final</code>, testable without Spring running.</li>
       <li><code>BigDecimal.compareTo()</code>, not <code>&gt;</code> — <code>BigDecimal</code> is an object, <code>&gt;</code> won't compile on it.</li>
@@ -701,6 +718,10 @@ git pull</code></pre>
     <p><strong>Goal:</strong> expose the approval workflow over HTTP — <code>ClaimController</code> plus
       three DTOs. First REST layer in the project; full annotation table and the DTO-vs-entity reasoning on
       <a href="tech/java-spring.html#rest-controller">Java, Spring &amp; Maven → REST controller basics</a>.</p>
+    <p><strong>Why these four endpoints specifically:</strong> they're a direct 1:1 mirror of the real
+      workflow — file a claim, look one up, an adjuster's decision, and (only when Step 7's threshold logic
+      escalates it) a supervisor's decision. Nothing generic; each route exists because a real step of the
+      process needs to happen over HTTP.</p>
     <ul>
       <li><code>POST /api/claims</code>, <code>GET /api/claims/{id}</code>, <code>POST /api/claims/{id}/adjuster-decision</code>, <code>POST /api/claims/{id}/supervisor-decision</code></li>
       <li>One small addition to <code>ClaimApprovalService</code> — a <code>getClaim(id)</code> lookup, needed for the GET endpoint</li>
@@ -815,6 +836,10 @@ git pull</code></pre>
     <p><strong>Goal:</strong> first real domain code for this service — only the skeleton + DB (Steps 1–2)
       existed before. Same entity/repository pattern as Claims' Step 5; see
       <a href="tech/java-spring.html#layers">Java, Spring &amp; Maven → Layers</a> if that needs a refresher.</p>
+    <p><strong>Why an enum for <code>Rank</code>, not a lookup table:</strong> military pay grades are a
+      fixed, small, rarely-changing set — an enum gives compile-time checking (a typo'd rank fails the
+      build, not a runtime query) for data that genuinely doesn't need to be editable at runtime the way
+      weight allowances (Step 14) do.</p>
     <ul>
       <li><code>Rank</code> enum — E1–E9, O1–O10, a representative subset of real JTR pay grades, not exhaustive</li>
       <li><code>MoveRequest</code> entity + <code>MoveRequestRepository</code> — no entitlement/weight field yet, that needs a JTR weight-allowance lookup table that doesn't exist until a later step</li>
@@ -865,6 +890,9 @@ git push</code></pre>
     </div>
     <p><strong>Goal:</strong> the audit-trail entity — what changed, old/new value, who, when. Same shape
       as every other entity+repository pair so far.</p>
+    <p><strong>Why this exists at all:</strong> this is a government/military system — a weight-allowance
+      number silently changing with no record of who changed it or why is a real compliance problem, not
+      just a nice-to-have. This entity is the data shape Step 17's actual logging service writes into.</p>
     <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/ChangeControlRecord.java services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/ChangeControlRecordRepository.java
 git commit -m "feat: add change control record entity and repository"
 git push</code></pre>
@@ -1011,6 +1039,12 @@ git pull</code></pre>
     <p><strong>Goal:</strong> generate the frontend project skeleton. Full concept reference — what Vite/
       React/TypeScript/Redux Toolkit each are, the scaffold command — on
       <a href="tech/react-redux.html#scaffold">React, Redux &amp; TypeScript → Generating the project</a>.</p>
+    <p><strong>Why this step, and why this stack:</strong> every backend service built so far (Phases 1-2)
+      has no UI at all — a mover, coordinator, or adjuster can't actually use any of it yet. React because
+      it's the dominant real-world choice and the job posting expects it; TypeScript over plain JavaScript
+      so a typo in a field name fails at build time, not silently in the browser; Redux Toolkit because two
+      backend services' worth of state (moves, claims) needs one predictable place to live, not scattered
+      across component state.</p>
     <pre><code>node --version
 npm --version
 npm install -g npm@latest
@@ -1042,6 +1076,10 @@ git push -u origin feat/dashboard-skeleton</code></pre>
     <p><strong>Goal:</strong> wire up the Redux store and connect it to React via <code>&lt;Provider&gt;</code>.
       Full explanation on
       <a href="tech/react-redux.html#redux-concepts">React, Redux &amp; TypeScript → Redux Toolkit concepts</a>.</p>
+    <p><strong>Why Redux instead of just React's built-in state:</strong> moves and claims data needs to be
+      readable from multiple, unrelated components (the form that submits it, a future summary view) —
+      plain <code>useState</code> only lives inside one component, and passing it down through props gets
+      unmanageable fast once more than one or two components need the same data.</p>
     <pre><code>git add frontend/dashboard/src/app/ frontend/dashboard/src/main.tsx
 git commit -m "feat: add redux store and wire provider"
 git push</code></pre>
@@ -1239,6 +1277,10 @@ git pull</code></pre>
     </div>
     <p><strong>Goal:</strong> isolate the service's dependencies the Python way. Full explanation on
       <a href="tech/python-fastapi.html#venv">Python, FastAPI &amp; scikit-learn → Virtual environments &amp; requirements.txt</a>.</p>
+    <p><strong>Why this step, and why Python specifically:</strong> this service predicts a claim's triage
+      priority from historical patterns — a genuinely different problem shape from Move &amp;
+      Entitlement/Claims' fixed business rules, and one Python's ML ecosystem (scikit-learn, pandas) is
+      built for. Neither Java nor Go has anything comparable without reaching for far heavier tooling.</p>
     <pre><code>mkdir -p services/claims-triage-ml
 cd services/claims-triage-ml
 python -m venv venv
@@ -1377,6 +1419,10 @@ git commit -m "feat: add FastAPI predict endpoint for claims triage"</code></pre
     </div>
     <p><strong>Goal:</strong> cache repeated predictions in Redis. Full explanation on
       <a href="tech/python-fastapi.html#redis-caching">Python, FastAPI &amp; scikit-learn → Caching predictions</a>.</p>
+    <p><strong>Why Redis, first cache layer in this project:</strong> re-running a trained model is real CPU
+      work — an identical request coming in twice shouldn't pay that cost twice. Redis is read/written far
+      more often than it changes for this exact use case, the textbook case for an in-memory cache in front
+      of an expensive computation rather than a database in front of it.</p>
     <pre><code># write app/cache.py, update app/main.py to check/set the cache
 
 docker run -d --name redis-dev -p 6379:6379 redis:alpine
@@ -1523,6 +1569,11 @@ movetrack_ops-redis-1                redis                      0.0.0.0:6379-&gt
     <p><strong>Goal:</strong> a bare Go module with a working <code>/health</code> endpoint. Full explanation
       on <a href="tech/go.html#modules-commands">Go → Modules &amp; commands</a> and
       <a href="tech/go.html#http-server">→ HTTP server &amp; routing</a>.</p>
+    <p><strong>Why this step, and why Go specifically:</strong> shipment tracking means many devices holding
+      open, mostly-idle connections at once — exactly the shape Go's goroutines handle cheaply, where a
+      JVM thread-per-request model (like the two Java services) gets expensive fast at that scale. The
+      language choice and this whole service's reason to exist are the same underlying fact, which is why
+      it gets its own dedicated stack instead of becoming a third Spring Boot service.</p>
     <pre><code>git checkout main
 git pull origin main
 git checkout -b feature/go-ingest-skeleton
@@ -1912,6 +1963,12 @@ movetrack_ops-shipment-ingestion-1   shipment-ingestion         0.0.0.0:8090-&gt
     </div>
     <p><strong>Goal:</strong> Jenkins itself up and reachable, with a real admin account. Full explanation on
       <a href="tech/jenkins.html#jenkins-basics">Jenkins, Trivy &amp; OWASP ZAP → Jenkins basics</a>.</p>
+    <p><strong>Why this step, and why Jenkins specifically:</strong> up to this point, nothing checks
+      whether a code change is actually safe before it ships — Jenkins is the automated inspector that
+      changes that. Chosen deliberately over GitHub Actions (already available in this project's own repo)
+      because it's still extremely common in real enterprise environments, especially outside cloud-native
+      shops — a genuinely different, resume-worthy skill from GitHub Actions, not a redundant one. Full
+      comparison on <a href="tech/jenkins.html#jenkins-basics">Jenkins, Trivy &amp; OWASP ZAP → Jenkins vs. GitHub Actions</a>.</p>
     <pre><code>git checkout main
 git pull origin main
 git checkout -b feature/jenkins-compliance-gate
@@ -2099,6 +2156,10 @@ git push</code></pre>
     </div>
     <p><strong>Goal:</strong> turn the scan from a report into an actual gate. Full explanation on
       <a href="tech/jenkins.html#trivy">Jenkins, Trivy &amp; OWASP ZAP → Trivy</a>.</p>
+    <p><strong>Why this step is the actual point of the whole phase:</strong> Step 57 proved Trivy could
+      find vulnerabilities, but a scan nobody acts on is just a report sitting in a log — <code>--exit-code
+      1</code> is what turns "we noticed a problem" into "the build actually stops," the real difference
+      between a DevSecOps gate and a DevSecOps suggestion.</p>
     <pre><code># update the Trivy Scan stage's sh command to add the gate flags:
 #                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion'
 
@@ -2263,6 +2324,11 @@ git pull origin main</code></pre>
     </div>
     <p><strong>Goal:</strong> a bare FastAPI service, second Python service in this project after Claims
       Triage ML. Full explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>.</p>
+    <p><strong>Why Python here, not Java like the other two backend services:</strong> this service exists
+      to close a loop Phase 5 opened — ingesting Trivy/ZAP scan output and reacting to it — not to run
+      structured business rules with the kind of invariants Move &amp; Entitlement/Claims have. FastAPI
+      gets a working ingestion endpoint stood up fast, matching the pattern already proven with Claims
+      Triage ML rather than introducing a third stack for no reason.</p>
     <pre><code>git checkout main
 git pull origin main
 git checkout -b feature/compliance-service
@@ -2297,6 +2363,11 @@ git commit -m "scaffold compliance service"</code></pre>
     </div>
     <p><strong>Goal:</strong> first MongoDB usage in this project. Full explanation on
       <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → MongoDB core concepts</a>.</p>
+    <p><strong>Why MongoDB and not another Postgres database:</strong> a Trivy finding and a ZAP finding
+      have almost nothing in common shape-wise (CVE ID/package/severity vs. URL/risk/evidence) — forcing
+      both into fixed relational columns means either a wide table of mostly-null fields or a migration
+      every time a new scanner type gets added later. A document store stores each finding as-is, whatever
+      shape it happens to be.</p>
     <pre><code># add to docker-compose.yml: a mongodb service (image: mongo:7) + mongo_data volume
 
 docker compose up -d mongodb
@@ -2679,24 +2750,31 @@ git pull origin main</code></pre>
 
   <h2 id="phase10">Phase 10 — Kafka</h2>
   <p class="pill">9 steps (75–83), 1 branch. First Kafka usage in this project — a genuinely different tool
-    from Phase 4's RabbitMQ, not a second copy of the same idea. Written as <strong>pre-study
-    material</strong>, ahead of the actual build — status flips to Done and content gets corrected once each
-    step is really built and tested. Full concept explanation on <a href="tech/kafka.html">Kafka</a>, written
-    from zero for anyone who's never touched it before.</p>
+    from Phase 4's RabbitMQ, not a second copy of the same idea. <strong>Complete</strong> — Kafka runs as an
+    11th, 12th, and 13th container (broker, UI, demo consumer), the Go Ingestion Service publishes every
+    shipment ping, a Python consumer proves real cross-language consumption with zero lag. This phase hit the
+    densest run of real infrastructure gotchas yet — every one documented inline below and on
+    <a href="tech/kafka.html">Kafka</a>.</p>
 
   <div class="step" id="step75">
     <div class="step-header">
       <span class="step-num">STEP 75</span>
       <span class="step-title">Kafka running in Docker — KRaft mode, no ZooKeeper</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> a single-broker Kafka instance for local development. Full explanation on
-      <a href="tech/kafka.html#kafka-docker">Kafka → Kafka in Docker</a>.</p>
+    <p><strong>Why this step, in plain terms:</strong> every later step in this phase needs somewhere to
+      actually send messages to — this is that "somewhere." Kafka itself is just a server process (a
+      <em>broker</em>) that has to exist before anything can publish or subscribe to anything. Full
+      explanation on <a href="tech/kafka.html#kafka-docker">Kafka → Kafka in Docker</a>.</p>
+    <p><strong>Why Kafka specifically, not another RabbitMQ-style queue:</strong> shipment pings are
+      high-volume and need to be replayable by more than one future reader (a live dashboard, an ML
+      pipeline) — see <a href="tech/kafka.html#why-this-phase">Kafka → Why this phase exists</a> for the full
+      RabbitMQ-vs-Kafka reasoning.</p>
     <pre><code>git checkout main
 git pull origin main
 git checkout -b feature/kafka-tracking
 
-# add to docker-compose.yml: a kafka service (image: apache/kafka:3.8.0), KRaft env vars, port 9092
+# add to docker-compose.yml: a kafka service (image: apache/kafka:3.8.0), KRaft env vars, dual listeners
 
 docker compose up -d kafka
 docker compose logs kafka
@@ -2710,10 +2788,11 @@ git commit -m "add kafka broker"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 76</span>
       <span class="step-title">Create the shipment.tracking topic</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> create the topic explicitly (3 partitions, replication factor 1) rather than
-      relying on auto-creation. Full explanation on
+    <p><strong>Why this step:</strong> a broker with no topics is an empty warehouse — this creates the one
+      actual shelf (<code>shipment.tracking</code>) this whole phase revolves around, with 3 partitions
+      chosen deliberately instead of left to auto-creation defaults. Full explanation on
       <a href="tech/kafka.html#kafka-concepts">Kafka → Topics, partitions, and offsets</a>.</p>
     <pre><code>docker exec -it movetrack-kafka /opt/kafka/bin/kafka-topics.sh --create --topic shipment.tracking \
   --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
@@ -2726,43 +2805,68 @@ docker exec -it movetrack-kafka /opt/kafka/bin/kafka-topics.sh --describe --topi
     <div class="step-header">
       <span class="step-num">STEP 77</span>
       <span class="step-title">Go Ingestion Service publishes to Kafka on every successful ping</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> retrofit a Kafka producer into the existing Go service, keyed by
-      <code>shipment_id</code> so one shipment's history always lands on the same partition. Full
-      explanation on <a href="tech/kafka.html#kafka-go-producer">Kafka → Publishing from Go</a>.</p>
+    <p><strong>Why this step:</strong> this is the actual producer — the one place in the whole project
+      where a real event (a device's location ping) gets turned into a Kafka message. Everything in Steps
+      75-76 exists solely to give this step somewhere to write to.</p>
+    <p><strong>What request comes in, what happens next:</strong> a carrier device sends
+      <code>POST /ingest</code> with <code>{device_id, latitude, longitude, timestamp}</code> → validated →
+      saved to Postgres (unchanged from Phase 6) → <em>new this phase</em>: the same ping, as JSON, gets
+      published to <code>shipment.tracking</code>, keyed by <code>device_id</code> so one device's history
+      always lands on the same partition. Full explanation on
+      <a href="tech/kafka.html#kafka-go-producer">Kafka → Publishing from Go</a>.</p>
     <pre><code>cd services/shipment-ingestion
 go get github.com/segmentio/kafka-go
 
-# new kafka.go — a *kafka.Writer, Addr pointing at kafka:9092, Balancer: &amp;kafka.Hash{}
-# handleIngest() publishes the ping (JSON, keyed by shipment_id) after the Postgres insert succeeds
+# new kafka.go — a *kafka.Writer, Addr pointing at kafka:29092, Balancer: &amp;kafka.Hash{}
+# handleIngest() publishes the ping (JSON, keyed by device_id) after the Postgres insert succeeds
 
 git add services/shipment-ingestion
 git commit -m "publish shipment pings to kafka"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>KAFKA_ADVERTISED_LISTENERS</code> pointed at <code>localhost</code></div>
+      First attempt produced <code>dial tcp [::1]:9092: connect: connection refused</code> from inside the
+      Go container. Kafka doesn't just accept a connection — right after connecting, the broker tells every
+      client "here's the real address to use for actual reads/writes," taken from
+      <code>KAFKA_ADVERTISED_LISTENERS</code>. That was set to <code>localhost:9092</code>, which means
+      "myself" from inside every <em>other</em> container too — so <code>shipment-ingestion</code> kept
+      trying to reach itself instead of Kafka. Full explanation, including the eventual proper two-listener
+      fix: <a href="tech/kafka.html#kafka-listeners">Kafka → Host vs. Docker-network listeners</a>.
+    </div>
   </div>
 
   <div class="step" id="step78">
     <div class="step-header">
       <span class="step-num">STEP 78</span>
       <span class="step-title">Verify with a console consumer that messages actually arrive</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> prove the producer really works before writing any consumer code.</p>
+    <p><strong>Why this step:</strong> prove the producer really works using Kafka's own official tooling,
+      before writing a single line of consumer code — isolates "is my code broken" from "is Kafka itself
+      even working," the same debugging discipline as Phase 6's <code>validatePing</code>-before-<code>insertPing</code>
+      ordering.</p>
     <pre><code>docker exec -it movetrack-kafka /opt/kafka/bin/kafka-console-consumer.sh \
   --topic shipment.tracking --bootstrap-server localhost:9092 --from-beginning
 
 # in another terminal, POST a ping to the Go service, watch it appear in the consumer output</code></pre>
+    <p>A round of <code>WARN ... Connection to node 1 ... could not be established</code> right after
+      restarting the Kafka container is expected, not a failure — the client auto-retries for the couple of
+      seconds it takes the broker to finish starting up.</p>
   </div>
 
   <div class="step" id="step79">
     <div class="step-header">
       <span class="step-num">STEP 79</span>
       <span class="step-title">Python demo consumer — subscribes, logs every message</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> a small standalone script proving real end-to-end consumption, not a full
-      service — Phase 9's WebSocket gateway is the real future consumer. Full explanation on
-      <a href="tech/kafka.html#kafka-python-consumer">Kafka → Consuming from Python</a>.</p>
+    <p><strong>Why this step:</strong> a small standalone script standing in for Phase 9's future live
+      dashboard — proves a completely different program, in a different language, can independently read the
+      same shelf. Full explanation on <a href="tech/kafka.html#kafka-python-consumer">Kafka → Consuming from Python</a>.</p>
+    <p><strong>What it does:</strong> subscribes to <code>shipment.tracking</code> as consumer group
+      <code>demo-consumer</code>, and for every message, prints its partition, offset, and content — the
+      simplest possible proof a Kafka consumer actually works.</p>
     <pre><code>mkdir services/kafka-demo-consumer
 cd services/kafka-demo-consumer
 python -m venv venv
@@ -2774,16 +2878,44 @@ pip freeze &gt; requirements.txt
 
 git add services/kafka-demo-consumer
 git commit -m "add kafka demo consumer"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real incident — the single-broker <code>__consumer_offsets</code> trap</div>
+      Every consumer group needs Kafka's own internal <code>__consumer_offsets</code> topic to function.
+      By default Kafka wants 3 replicas of it — impossible to satisfy with only 1 broker running, so it got
+      stuck endlessly retrying its creation, silently breaking every consumer-group operation (this script,
+      the built-in group Kafka's own console-consumer uses, even the admin CLI checking consumer groups) —
+      while plain publish/produce kept working fine the whole time, which made this genuinely confusing to
+      track down. Fixed with <code>KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1</code> (plus the matching
+      transaction-log settings). Full explanation:
+      <a href="tech/kafka.html#single-broker-offsets">Kafka → The single-broker offsets-topic trap</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — Python's stdout buffering hid working output</div>
+      After fixing the connection, the container ran with zero crashes and zero output — because Python
+      fully buffers <code>print()</code> when stdout isn't an interactive terminal (exactly the case inside a
+      container). Fixed with <code>ENV PYTHONUNBUFFERED=1</code> in the Dockerfile. Full explanation:
+      <a href="tech/kafka.html#python-buffering">Kafka → Python's stdout buffering inside Docker</a>.
+    </div>
+    <div class="box why">
+      <div class="box-title">Added mid-phase — Kafka UI, for the same reason RabbitMQ got one in Phase 4</div>
+      Debugging this phase entirely through <code>kafka-topics.sh</code>/<code>kafka-console-consumer.sh</code>
+      commands was genuinely hard to follow. Added <code>provectuslabs/kafka-ui</code> at
+      <code>http://localhost:8089</code> — browse topics, read real message contents, and watch consumer
+      group lag, all visually. See Step 83 for where it's confirmed fully working.
+    </div>
   </div>
 
   <div class="step" id="step80">
     <div class="step-header">
       <span class="step-num">STEP 80</span>
       <span class="step-title">Unit tests — Go producer</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
+    <p><strong>Why this step:</strong> tests the pure "build a Kafka message from a ping" logic in complete
+      isolation — no network, no Docker, no Kafka needed to run it, the same "separate pure logic from I/O"
+      discipline as <code>validatePing</code>.</p>
     <pre><code>cd services/shipment-ingestion
-# table-driven test for the message-building logic (key/value shape), same pattern as
+# table-driven test asserting the message key equals device_id, same pattern as
 # Phase 6's existing tests — no real Kafka connection needed for this one
 
 go test ./...
@@ -2796,28 +2928,49 @@ git commit -m "add unit tests for kafka producer"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 81</span>
       <span class="step-title">Integration test — produce then consume round trip</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <pre><code># a test that writes a message with the real kafka-go Writer, then reads it back with a
-# kafka-go Reader, asserting the value matches — needs the real kafka container running
+    <p><strong>Why this step:</strong> Step 80 tested message-<em>building</em>; this test genuinely talks to
+      the real broker, writing a message and reading it back, proving the actual network code works — the
+      only test in this phase that needs Kafka running to pass.</p>
+    <pre><code># a test that writes a unique, timestamped message with the real kafka-go Writer, then
+# reads the topic from the beginning with a Reader until it finds that exact message —
+# skips itself cleanly if Kafka isn't reachable, no build tag needed (this codebase
+# doesn't use build tags anywhere else, so this stays consistent with that)
 
-go test ./... -tags=integration
+go test ./... -v -run TestKafkaProduceConsumeRoundTrip
 
 git add services/shipment-ingestion
 git commit -m "add kafka integration test"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the SAME advertised-listener problem, from a new angle</div>
+      This test runs directly on the host machine (not in Docker), and hit
+      <code>dial tcp: lookup kafka: no such host</code> — the exact same root cause as Step 77's gotcha, just
+      surfacing from the opposite direction: <code>kafka:9092</code> only resolves <em>inside</em> Docker's
+      network, so anything running on the bare host (this test, a quick local script) can never reach it.
+      This was the third time this exact class of bug appeared, which is what finally justified the proper
+      fix: two separate listeners — <code>localhost:9092</code> for host-machine clients,
+      <code>kafka:29092</code> for container clients. Full explanation:
+      <a href="tech/kafka.html#kafka-listeners">Kafka → Host vs. Docker-network listeners</a>.
+    </div>
   </div>
 
   <div class="step" id="step82">
     <div class="step-header">
       <span class="step-num">STEP 82</span>
       <span class="step-title">Dockerize the Python consumer</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <pre><code># write Dockerfile, .dockerignore matching compliance-service's single-stage pattern
+    <p><strong>Why this step:</strong> makes the demo consumer a permanent, always-running part of the
+      stack instead of something manually started for a one-off test — same reasoning as every other
+      service's containerize step.</p>
+    <pre><code># Dockerfile, .dockerignore matching compliance-service's single-stage pattern,
+# ENV PYTHONUNBUFFERED=1 so its print() output is actually visible in `docker compose logs`
+# consumer.py bootstrap_servers set to kafka:29092 (the Docker-network listener from Step 81)
 
 docker build -t kafka-demo-consumer services/kafka-demo-consumer
 
-git add services/kafka-demo-consumer/Dockerfile services/kafka-demo-consumer/.dockerignore
+git add services/kafka-demo-consumer/Dockerfile services/kafka-demo-consumer/.dockerignore services/kafka-demo-consumer/consumer.py
 git commit -m "containerize kafka demo consumer"</code></pre>
   </div>
 
@@ -2825,23 +2978,49 @@ git commit -m "containerize kafka demo consumer"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 83</span>
       <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <pre><code># add kafka-demo-consumer to docker-compose.yml, depends_on kafka
 
 docker compose up -d --build
 docker compose ps
-# expect 12 containers now: the 10 from Phase 4 plus kafka and kafka-demo-consumer
-
-docker compose logs -f kafka-demo-consumer
-# POST a ping to the Go service, watch it appear in this container's logs too
+# 13 containers total, all Up: the 10 from Phase 4 plus kafka, kafka-ui, and kafka-demo-consumer
 
 git push -u origin feature/kafka-tracking
 gh pr create --title "Add Kafka shipment tracking"
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
-    <p><strong>This completes Phase 10</strong> once verified — 9 steps, 75–83.</p>
+    <p><strong>Final verification — done entirely through the Kafka UI, no terminal commands:</strong>
+      <code>http://localhost:8089</code> → Consumers → <code>demo-consumer</code> showed
+      <strong>State: STABLE</strong>, 1 member, all 3 partitions assigned, and — the number that actually
+      proves the whole pipeline works — <strong>Total lag: 0</strong>. Every ping produced by Go had already
+      been read by the Python consumer, with nothing left unprocessed.</p>
+    <p><strong>This completes Phase 10</strong> — 9 steps, 75–83. The densest run of real infrastructure
+      debugging in the project so far: an advertised-listener bug that manifested twice from opposite
+      directions, a single-broker replication-factor trap that silently broke every consumer-group feature
+      while producing kept working fine, and a Python output-buffering gotcha — each one a genuinely common,
+      real-world Kafka-in-Docker problem, not an artificial exercise.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-kafka-advertised-listener-twice">
+      <div class="q">Why did the same "advertised listener" bug show up twice in this phase, from two different services?</div>
+      <div class="a">Because it's really one misconfiguration with two independent victims. Kafka only had a
+        single advertised address (<code>kafka:9092</code>), correct for anything inside Docker's network but
+        meaningless to anything outside it. The Go service (in Docker) broke first when that address was
+        wrong for containers; fixing it for containers then broke the integration test (on the bare host) the
+        opposite way. The real fix wasn't patching each symptom — it was giving Kafka two separate advertised
+        listeners, one per audience.</div>
+    </div>
+    <div class="qa" id="qa-kafka-offsets-vs-produce">
+      <div class="q">Why did publishing to Kafka keep working the whole time the single-broker offsets bug was active, while every consumer silently failed?</div>
+      <div class="a">Producing a message to a normal topic doesn't need <code>__consumer_offsets</code> at
+        all — the producer just writes to the topic's own partitions directly. Consumer <em>groups</em>
+        specifically need that internal topic to track "which member has read up to where." Since it could
+        never finish being created (blocked on an impossible 3-replica requirement with 1 broker), every
+        group-coordinator-dependent path silently stalled, while the completely separate write path kept
+        working the entire time — which is exactly what made this bug so confusing to isolate.</div>
+    </div>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

@@ -5,13 +5,9 @@ Not linked from any page's sidebar, not part of the polished site.
 
 ---
 
-(Empty — last full pass covered Phase 10 KICKOFF (pre-study), Steps 75-83, written ahead of the real build:
-architecture.html kafka node flipped to in-progress with full step array; NEW page tech/kafka.html created
-in full, written from zero (broker/topic/partition/offset/producer/consumer/consumer-group/KRaft concepts,
-Kafka-vs-RabbitMQ restated from Kafka's side, Go kafka-go producer example, Python kafka-python consumer
-example, 3 Interview Q&As); steps.html Phase 10 section written (all 9 steps, Planned); interview.html
-"From Kafka" section added (3 Q&As mirrored from tech/kafka.html); architecture-2.html's #growth section
-updated with a PLANNED amber flow diagram for the Kafka producer+consumer path (big SVG chart itself left
-as-is until Phase 10 completion, per updated standing rule — see feedback_movetrack_flow_map_page memory);
-all 19 sidebars re-verified (kafka.html added as a 19th page). Nothing built/tested yet — no real gotchas
-exist. Next entries go here once the user starts building and hits real steps/errors, same as Phase 4.)
+(Empty — last full pass covered Phase 10 COMPLETION (Steps 75-83, real gotcha boxes, tech/kafka.html
+rewrite, architecture.html/interview.html flipped) plus a larger architecture-2.html upgrade (port-reference
+table, click-to-highlight SVG interactivity, Kafka nodes added, Kafka flow moved to confirmed) plus the
+full retroactive "why this step / why this technology" rewrite across all 8 completed phases (1,2,3,4,5,6,
+8,10) and 6 tech pages (java-spring, docker, git, react-redux, go, python-fastapi). That retroactive rewrite
+is now fully done, not pending anymore. Next entries go here once a new phase starts.)

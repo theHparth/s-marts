@@ -736,7 +736,7 @@
   </div>
   <p class="pill">↳ <a href="tech/rabbitmq-mongodb.html#qa-rabbitmq-exchange-vs-queue">RabbitMQ &amp; MongoDB</a></p>
 
-  <h2 id="from-kafka">From Kafka <span class="tag">Phase 10 — planned</span></h2>
+  <h2 id="from-kafka">From Kafka <span class="tag">Phase 10</span></h2>
 
   <div class="qa">
     <div class="q">Why does Kafka split a topic into partitions instead of just one ordered log?</div>
@@ -764,6 +764,28 @@
       have at all — a consumed RabbitMQ message is simply gone.</div>
   </div>
   <p class="pill">↳ <a href="tech/kafka.html#qa-kafka-replay">Kafka</a></p>
+
+  <div class="qa">
+    <div class="q">Why did the same "advertised listener" bug show up twice in this phase, from two different services?</div>
+    <div class="a">Because it's really one misconfiguration with two independent victims. Kafka only had a
+      single advertised address (<code>kafka:9092</code>), correct for anything inside Docker's network but
+      meaningless to anything outside it. The Go service (in Docker) broke first when that address was wrong
+      for containers; fixing it for containers then broke the integration test (on the bare host) the
+      opposite way. The real fix wasn't patching each symptom — it was giving Kafka two separate advertised
+      listeners, one per audience.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-kafka-advertised-listener-twice">Steps — Phase 10</a></p>
+
+  <div class="qa">
+    <div class="q">Why did publishing to Kafka keep working the whole time the single-broker offsets bug was active, while every consumer silently failed?</div>
+    <div class="a">Producing a message to a normal topic doesn't need <code>__consumer_offsets</code> at all
+      — the producer just writes to the topic's own partitions directly. Consumer <em>groups</em>
+      specifically need that internal topic to track "which member has read up to where." Since it could
+      never finish being created (blocked on an impossible 3-replica requirement with 1 broker), every
+      group-coordinator-dependent path silently stalled, while the completely separate write path kept
+      working the entire time — which is exactly what made this bug so confusing to isolate.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-kafka-offsets-vs-produce">Steps — Phase 10</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>
