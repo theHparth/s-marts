@@ -39,11 +39,36 @@
     <a href="../steps.html#phase5">Steps page → Phase 5</a>.
   </p>
 
-  <div class="box warn">
-    <div class="box-title">Status: written ahead of the build</div>
-    Phase 5 (Trivy/ZAP/Jenkins compliance gate) is in progress. Everything on this page reflects the
-    <em>planned</em> implementation — read it now to get familiar with the tools before writing code, then it
-    gets corrected/confirmed once each step is really built and tested.
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 62</div>
+    Phase 5 (Trivy/ZAP/Jenkins compliance gate) is complete. Jenkins runs as an 8th container alongside
+    everything from Phases 1-6, with a working pipeline: checkout → build → Trivy scan (gated) → ZAP baseline
+    scan → archive reports. This phase hit more real gotchas than any other — every one is documented inline
+    below.
+  </div>
+
+  <h2 id="why-this-exists">Why this exists — the plain-language version</h2>
+  <p>Before any of the technical terms, the actual problem being solved:</p>
+  <div class="diagram">WITHOUT this phase:
+  code change → build it → ship it straight to users
+  (nobody checks whether the build is actually safe)
+
+WITH this phase:
+  code change → build it → an automatic inspector checks it → only ships if it passes
+  (Jenkins is the inspector; Trivy and ZAP are what it checks)</div>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td>Jenkins</td><td>The inspector itself — shows up automatically every time something new is built, before it's allowed through</td></tr>
+    <tr><td>Trivy</td><td>Checks the <em>ingredients</em> — every software package baked into the image, compared against a public "known dangerous" list</td></tr>
+    <tr><td>OWASP ZAP</td><td>Checks the <em>running thing itself</em> — actually pokes at the live dashboard the way an attacker would, not just reading a label</td></tr>
+    <tr><td>The gate (<code>--exit-code 1</code>)</td><td>What makes a bad finding actually <em>stop</em> the release, instead of just leaving a note nobody reads</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why THIS project specifically needed it</div>
+    Phase 6 built <code>shipment-ingestion</code> — a real service that gets rebuilt every time its code
+    changes. Without this phase, nothing stood between "someone changes the code" and "that change goes live" —
+    no automatic check for whether the change introduced something genuinely unsafe. Jenkins/Trivy/ZAP is
+    that missing checkpoint, wrapped around exactly that service.
   </div>
 
   <h2 id="overview">What each piece is, in one line</h2>
@@ -80,6 +105,30 @@
       <tr><td>Trigger</td><td>Manual, polling, or a webhook you configure yourself</td><td>Native GitHub event triggers (push, PR, etc.), zero extra setup</td></tr>
       <tr><td>Why Jenkins here</td><td colspan="2">Deliberately chosen for this phase specifically because it's still extremely common in real enterprise environments (especially pre-cloud-native shops) — genuinely different skill from GitHub Actions, worth having both on a resume.</td></tr>
     </table>
+  </div>
+
+  <h2 id="ui-walkthrough">The Jenkins UI, step by step — where the real confusion happens</h2>
+  <p>Jenkins's web UI is genuinely unintuitive the first time — every point below is somewhere this project's
+    own build actually got stuck.</p>
+  <table>
+    <tr><th>Screen</th><th>What you're doing there</th></tr>
+    <tr><td>Dashboard (<code>localhost:8080</code>)</td><td>The home page — lists every job (pipeline) that exists. Empty the first time.</td></tr>
+    <tr><td>"New Item"</td><td>Create a new job. Give it a name, choose <strong>Pipeline</strong> as the type (not "Freestyle project" — Pipeline is the code-defined, Jenkinsfile-based kind used in this project).</td></tr>
+    <tr><td>Job's "Configure" page → "Pipeline" section</td><td>Where you tell Jenkins <em>where the Jenkinsfile actually comes from</em>. This is the part that caused real confusion — see the box below.</td></tr>
+    <tr><td>"Build Now"</td><td>The button that actually triggers a run, in the left sidebar of a job's page. Every single step in this phase ends with clicking this.</td></tr>
+    <tr><td>Build number (e.g. <code>#1</code>) → "Console Output"</td><td>The full log of that specific run — every shell command's real output, in order. This is where you actually verify anything happened, not the pass/fail color alone.</td></tr>
+    <tr><td>Build number → "Build Artifacts"</td><td>Files saved by <code>archiveArtifacts</code> — only appears after Step 60, and only if the archive step actually ran.</td></tr>
+  </table>
+  <div class="box gotcha">
+    <div class="box-title">The "Pipeline" configuration section specifically — a dropdown, not a text field</div>
+    The "Definition" control at the top of the Pipeline section is a <strong>dropdown</strong> — default
+    value "Pipeline script," which shows a raw code-editor textarea below it for pasting a Jenkinsfile
+    directly. The setting this project actually uses, <strong>"Pipeline script from SCM,"</strong> has to be
+    <em>selected from that dropdown</em> — typing the words "Pipeline script from SCM" into the textarea
+    below it does nothing useful. Once genuinely selected, the whole form changes: the textarea disappears,
+    replaced by real fields (SCM type, Repository URL, Credentials, Branches to build, Script Path). The
+    "Branches to build" field in particular sits low enough on that form to look missing entirely if you
+    don't scroll down.
   </div>
 
   <h2 id="jenkinsfile-syntax">Jenkinsfile — declarative pipeline syntax</h2>
@@ -140,18 +189,34 @@
   <p>ZAP needs something actually <em>running</em> to attack — unlike Trivy, which only inspects a static
     image. The simplest way to run it in a pipeline is ZAP's own "baseline scan" Docker image, pointed at a
     running service's URL:</p>
-  <pre><code>docker run --network movetrack_ops_default -t zaproxy/zap-stable zap-baseline.py \
+  <pre><code>docker run --rm --network movetrack_ops_default -v movetrack_ops_jenkins_home:/zap/wrk/:rw -t zaproxy/zap-stable zap-baseline.py \
   -t http://dashboard:80 \
-  -r zap-report.html</code></pre>
+  -r zap-report.html || true</code></pre>
   <table>
     <tr><th>Flag</th><th>What it does</th></tr>
     <tr><td><code>--network movetrack_ops_default</code></td><td>Puts the ZAP container on the same Docker network as this project's other containers — same container-networking rule as everywhere else, ZAP reaches the dashboard by service name, not <code>localhost</code></td></tr>
+    <tr><td><code>-v movetrack_ops_jenkins_home:/zap/wrk/:rw</code></td><td>See the gotcha box below — this isn't optional</td></tr>
     <tr><td><code>-t http://dashboard:80</code></td><td>The target URL to attack — the dashboard container, by its Compose service name</td></tr>
-    <tr><td><code>-r zap-report.html</code></td><td>Write an HTML report of findings</td></tr>
+    <tr><td><code>-r zap-report.html</code></td><td>Write an HTML report of findings — requires <code>/zap/wrk</code> to be mounted (see below)</td></tr>
+    <tr><td><code>|| true</code></td><td>Baseline findings are reviewed, not hard-gated like Trivy's, for this phase — stops a ZAP finding from failing the whole build</td></tr>
   </table>
   <p>A "baseline" scan is passive/light — it doesn't send genuinely destructive attack payloads, just checks
     for common misconfigurations and obvious issues. A "full" active scan exists too, but is much slower and
     more aggressive — baseline is the right default for a CI gate that needs to run on every build.</p>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — ZAP refuses to write a report unless <code>/zap/wrk</code> is mounted, and the naive fix doesn't work here</div>
+    Without a mount at <code>/zap/wrk</code>, ZAP refuses to even start when a file-based option
+    (<code>-r zap-report.html</code>) is given — it prints its own usage/help text and exits instead of
+    scanning anything. Combined with <code>|| true</code>, that "quit immediately" looked like a passing
+    build. The obvious fix, <code>-v $(pwd):/zap/wrk:rw</code>, doesn't work here specifically because Jenkins
+    reaches Docker through the <strong>host's</strong> socket — full explanation of why on
+    <a href="docker.html#docker-outside-docker">Docker &amp; Compose → Docker-outside-of-Docker</a>. The
+    actual fix: mount the same named volume Jenkins itself uses
+    (<code>movetrack_ops_jenkins_home</code>) into the ZAP container too, then copy the resulting report from
+    Jenkins's own view of that volume (<code>/var/jenkins_home/zap-report.html</code>) into the build
+    workspace so <code>archiveArtifacts</code> can find it:
+    <pre><code>sh 'cp /var/jenkins_home/zap-report.html "$WORKSPACE"/zap-report.html || true'</code></pre>
+  </div>
 
   <h2 id="archiving">Archiving scan reports</h2>
   <pre><code>stage('Archive Reports') {
@@ -164,6 +229,15 @@
     GitHub Actions run lets you download build artifacts.</p>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-jenkins-zap-volume-mount">
+    <div class="q">Why did the ZAP scan stage show green even though it never actually scanned anything?</div>
+    <div class="a">ZAP refuses to run when a file-output option is given but its expected working directory
+      (<code>/zap/wrk</code>) isn't mounted — it prints usage/help and exits instead of scanning. Combined
+      with a trailing <code>|| true</code> (added so ZAP findings wouldn't hard-fail the build), that
+      immediate exit looked like a pass. A green stage proves the shell command exited <code>0</code> — it
+      doesn't prove the tool actually did the thing you intended. Worth checking the actual console output
+      content, not just the pass/fail color, especially around any command with <code>|| true</code>.</div>
+  </div>
   <div class="qa" id="qa-jenkins-trivy-vs-zap">
     <div class="q">What's the difference between what Trivy and OWASP ZAP each check for?</div>
     <div class="a">Trivy is SCA (Software Composition Analysis) — it inspects what's installed in an image

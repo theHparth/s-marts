@@ -330,6 +330,17 @@
   <p class="pill">↳ <a href="tech/docker.html#qa-cmd-array-is-one-command">Docker &amp; Compose</a></p>
 
   <div class="qa">
+    <div class="q">Why can't you just use $(pwd) as a bind-mount path from a container that reached Docker via a mounted socket?</div>
+    <div class="a">The command runs inside that container but is executed by the host's Docker daemon — so
+      any path in a bind-mount has to make sense to the host, not to the calling container's own filesystem.
+      <code>$(pwd)</code> resolves to a path inside the calling container, which the host daemon has no
+      knowledge of. The fix is a named Docker volume instead of a bind-mount path — named volumes are
+      daemon-managed, so the same one can be mounted into both containers and they'll genuinely share the
+      same storage.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/docker.html#qa-docker-dood-volume">Docker &amp; Compose</a></p>
+
+  <div class="qa">
     <div class="q">How do you confirm an edit to docker-compose.yml actually took effect?</div>
     <div class="a"><code>docker compose config</code> — it prints the fully resolved compose file, with any
       environment variables and defaults already interpolated, showing exactly what Compose is going to use.
@@ -493,7 +504,17 @@
   </div>
   <p class="pill">↳ <a href="tech/go.html#qa-go-blank-import">Go</a></p>
 
-  <h2 id="from-jenkins">From Jenkins, Trivy &amp; OWASP ZAP <span class="tag" style="margin-left:0;">Planned — Phase 5 in progress</span></h2>
+  <h2 id="from-jenkins">From Jenkins, Trivy &amp; OWASP ZAP</h2>
+
+  <div class="qa">
+    <div class="q">Why did the ZAP scan stage show green even though it never actually scanned anything?</div>
+    <div class="a">ZAP refuses to run when a file-output option is given but its expected working directory
+      (<code>/zap/wrk</code>) isn't mounted — it prints usage/help and exits instead of scanning. Combined
+      with a trailing <code>|| true</code> (added so ZAP findings wouldn't hard-fail the build), that
+      immediate exit looked like a pass. A green stage proves the shell command exited <code>0</code> — it
+      doesn't prove the tool actually did the thing you intended.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/jenkins.html#qa-jenkins-zap-volume-mount">Jenkins, Trivy &amp; OWASP ZAP</a></p>
 
   <div class="qa">
     <div class="q">What's the difference between what Trivy and OWASP ZAP each check for?</div>

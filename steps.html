@@ -1894,16 +1894,18 @@ movetrack_ops-shipment-ingestion-1   shipment-ingestion         0.0.0.0:8090-&gt
 
   <h2 id="phase5">Phase 5 — Trivy/ZAP/Jenkins compliance gate</h2>
   <p class="pill">10 steps (53–62), 1 branch. First CI/CD tool in this project. Feeds Phase 4 (Compliance
-    Service ingests its scan output). Written as <strong>pre-study material</strong>, ahead of the actual
-    build — status flips to Done and content gets corrected once each step is really built and tested. Uses
-    the simplified git workflow from here on — one branch for the whole phase, short commits, one PR/merge
-    at the very end, no issue tracking.</p>
+    Service ingests its scan output). <strong>Complete</strong> — Jenkins runs as an 8th container, full
+    pipeline verified: checkout → build → Trivy scan (gated) → ZAP baseline scan → archive reports. First
+    phase using the simplified git workflow — one branch for the whole phase, short commits, one PR/merge at
+    the very end, no issue tracking. Also the most gotcha-prone phase so far — see the boxes below and
+      <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a> / <a href="tech/docker.html">Docker &amp; Compose</a>
+      for the reference-page versions.</p>
 
   <div class="step" id="step53">
     <div class="step-header">
       <span class="step-num">STEP 53</span>
       <span class="step-title">Jenkins running in Docker, initial setup</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> Jenkins itself up and reachable, with a real admin account. Full explanation on
       <a href="tech/jenkins.html#jenkins-basics">Jenkins, Trivy &amp; OWASP ZAP → Jenkins basics</a>.</p>
@@ -1919,22 +1921,40 @@ git checkout -b feature/jenkins-compliance-gate
 #     volumes:
 #       - jenkins_home:/var/jenkins_home
 #
-# add jenkins_home: to the volumes: section at the bottom
+# add jenkins_home: to the volumes: section at the bottom too
 
 docker compose up -d jenkins
-docker compose logs jenkins | grep -A 3 "initialAdminPassword"
-# copy the password shown</code></pre>
+docker compose exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword</code></pre>
     <p>Open <code>http://localhost:8080</code> in a browser, paste the password to unlock, choose "Install
       suggested plugins," then create a real admin user when prompted.</p>
     <p><strong>How to check:</strong> after creating the admin user, Jenkins redirects to its dashboard
       ("Welcome to Jenkins!"). <strong>Expected:</strong> the dashboard loads with no setup wizard remaining.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — a native Jenkins install from 2022 was still holding port 8080</div>
+      <code>docker compose up -d jenkins</code> failed to bind port 8080 because an old, native Windows
+      Jenkins install (years out of date — a real problem given this whole phase is a security gate) was
+      still running as a Windows service. Diagnosed with <code>Get-Service | Where-Object { $_.Name -like
+      "*jenkins*" }</code>, stopped with <code>Stop-Service -Name "Jenkins"</code> — which itself needed an
+      <strong>elevated (Run as Administrator) PowerShell window</strong>, since controlling a Windows service
+      requires admin rights. Fully removed afterward via Windows Settings → Apps → Uninstall, so only the
+      Dockerized version remains.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>jenkins_home</code> volume used but never declared</div>
+      <code>docker compose up -d jenkins</code> failed with
+      <code>service "jenkins" refers to undefined volume jenkins_home: invalid compose project</code> —
+      referencing a named volume under a service's <code>volumes:</code> list isn't enough; it also has to be
+      declared as a top-level key under the file's own <code>volumes:</code> section, or Compose rejects the
+      whole file. Fixed by adding <code>jenkins_home:</code> alongside <code>postgres_data:</code> at the
+      bottom of <code>docker-compose.yml</code>.
+    </div>
   </div>
 
   <div class="step" id="step54">
     <div class="step-header">
       <span class="step-num">STEP 54</span>
       <span class="step-title">Give the Jenkins container access to Docker</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> pipeline stages need to run real <code>docker build</code>/<code>docker run</code>
       commands. Full explanation on
@@ -1963,7 +1983,7 @@ docker compose up -d --build jenkins</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 55</span>
       <span class="step-title">First Jenkinsfile — checkout + a trivial stage</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> prove Jenkins can pull this repo and run a pipeline from it at all, before
       adding anything real. Full explanation on
@@ -1993,13 +2013,22 @@ git push -u origin feature/jenkins-compliance-gate</code></pre>
     <p><strong>How to check:</strong> click the build number → Console Output. <strong>Expected:</strong>
       both stages show green, and the log includes the literal text
       <code>Jenkins can run a pipeline from this repo</code>.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — typed "Pipeline script from SCM" as literal text instead of selecting it</div>
+      The job's Pipeline configuration has a <strong>dropdown</strong> (default: "Pipeline script," with a
+      raw script textarea below it) — the intended choice, "Pipeline script from SCM," has to be selected
+      <em>from that dropdown</em>, not typed as literal text into the script box. Once actually selected, the
+      whole form changes to show SCM fields (Repository URL, Branches to build) instead of a text area.
+      Also worth knowing: the "Branches to build" field sits below the fold on that form — easy to think
+      it's missing entirely when it's really just further down the page.
+    </div>
   </div>
 
   <div class="step" id="step56">
     <div class="step-header">
       <span class="step-num">STEP 56</span>
       <span class="step-title">Build stage — docker build inside the pipeline</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> the pipeline builds a real image from this repo's own code.</p>
     <pre><code># replace the 'Hello' stage in Jenkinsfile with:
@@ -2017,13 +2046,18 @@ git push</code></pre>
       <code>docker images shipment-ingestion</code> (on your host machine)
       — <strong>expected:</strong> a fresh row with a very recent "Created" timestamp, proving the image was
       just rebuilt by the pipeline, not left over from Phase 6.</p>
+    <p class="pill">Newer Docker CLI versions show a redesigned <code>docker images</code> table
+      (<code>IMAGE / ID / DISK USAGE / CONTENT SIZE / EXTRA</code>) with no <code>CREATED</code> column at
+      all — not an error, just a different Docker Desktop version's layout. Confirm the actual creation time
+      with <code>docker inspect shipment-ingestion:latest --format="{{.Created}}"</code> if needed, or trust
+      the Jenkins Console Output itself, which is even stronger proof the build ran.</p>
   </div>
 
   <div class="step" id="step57">
     <div class="step-header">
       <span class="step-num">STEP 57</span>
       <span class="step-title">Trivy stage — scan the built image</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> see real vulnerability findings, before turning them into a gate. Full
       explanation on <a href="tech/jenkins.html#trivy">Jenkins, Trivy &amp; OWASP ZAP → Trivy</a>.</p>
@@ -2041,13 +2075,24 @@ git push</code></pre>
     <p><strong>How to check:</strong> Console Output for the "Trivy Scan" stage. <strong>Expected:</strong> a
       table of findings (or "No vulnerabilities found," depending on the base image) — either way, the stage
       itself still shows green, since no gate exists yet at this step.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real finding — Alpine 3.20 (from Phase 6) had aged out of security support</div>
+      Trivy's report came back with <code>WARN This OS version is no longer supported by the distribution</code>
+      — meaning the "0 vulnerabilities" result wasn't trustworthy; Trivy simply has no current advisory data
+      for an EOL OS version. Fixed by checking the real current Alpine version
+      (<code>docker run --rm alpine:latest cat /etc/os-release</code>) and bumping
+      <code>services/shipment-ingestion/Dockerfile</code>'s final stage from <code>alpine:3.20</code> to
+      <code>alpine:3.24.1</code> — after which the scan showed a different, harmless message
+      (<code>not on the EOL list</code>, meaning the version is too <em>new</em> to have a catalogued EOL date
+      yet) instead of the real problem.
+    </div>
   </div>
 
   <div class="step" id="step58">
     <div class="step-header">
       <span class="step-num">STEP 58</span>
       <span class="step-title">Compliance gate — fail the build on HIGH/CRITICAL findings</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> turn the scan from a report into an actual gate. Full explanation on
       <a href="tech/jenkins.html#trivy">Jenkins, Trivy &amp; OWASP ZAP → Trivy</a>.</p>
@@ -2059,16 +2104,16 @@ git commit -m "add severity gate to trivy stage"
 git push</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> the "Trivy Scan" stage's color in the UI.
-      <strong>Expected:</strong> still green if `shipment-ingestion`'s current base image
-      (<code>alpine:3.20</code>) has no HIGH/CRITICAL findings today — genuinely possible and fine. Step 61
-      later proves the gate really works by deliberately triggering a failure.</p>
+      <strong>Expected:</strong> green — with 0 HIGH/CRITICAL findings on the now-current
+      <code>alpine:3.24.1</code> base image, <code>--exit-code 1</code> has nothing to trigger on yet. Step
+      61 proves the gate really works by deliberately triggering a failure.</p>
   </div>
 
   <div class="step" id="step59">
     <div class="step-header">
       <span class="step-num">STEP 59</span>
       <span class="step-title">OWASP ZAP baseline scan against a running service</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a dynamic scan against something actually running, not just a static image.
       Full explanation on <a href="tech/jenkins.html#zap">Jenkins, Trivy &amp; OWASP ZAP → OWASP ZAP</a>.</p>
@@ -2077,11 +2122,10 @@ git push</code></pre>
 # add a new stage after the Trivy stage:
 #         stage('ZAP Baseline Scan') {
 #             steps {
-#                 sh 'docker run --rm --network movetrack_ops_default -t zaproxy/zap-stable zap-baseline.py -t http://dashboard:80 -r zap-report.html || true'
+#                 sh 'docker run --rm --network movetrack_ops_default -v movetrack_ops_jenkins_home:/zap/wrk/:rw -t zaproxy/zap-stable zap-baseline.py -t http://dashboard:80 -r zap-report.html || true'
+#                 sh 'cp /var/jenkins_home/zap-report.html "$WORKSPACE"/zap-report.html || true'
 #             }
 #         }
-# (the "|| true" keeps this stage from failing the whole build yet — ZAP baseline findings
-#  are review-worthy but not wired into the hard gate the way Trivy is, for this phase)
 
 git add Jenkinsfile
 git commit -m "add zap baseline scan stage"
@@ -2090,13 +2134,31 @@ git push</code></pre>
     <p><strong>How to check:</strong> Console Output for the "ZAP Baseline Scan" stage.
       <strong>Expected:</strong> ZAP's own summary lines (e.g. "FAIL-NEW: 0  FAIL-INPROG: 0  WARN-NEW: N"),
       confirming it actually reached and scanned <code>http://dashboard:80</code>.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the biggest one this phase: ZAP silently never ran at all</div>
+      The first version of this stage (no volume mount) looked green, but Console Output showed ZAP printing
+      its own <code>Usage: zap-baseline.py...</code> help text instead of scan results — it refuses to start
+      when a file-output option (<code>-r zap-report.html</code>) is given without <code>/zap/wrk</code>
+      actually mounted, and the trailing <code>|| true</code> (added so ZAP findings wouldn't hard-fail the
+      build) masked that instant exit as a pass.
+      <br><br>
+      The naive fix (<code>-v $(pwd):/zap/wrk:rw</code>) doesn't work here: Jenkins reaches Docker through
+      the <strong>host's</strong> socket, so <code>$(pwd)</code> resolves to a path inside the Jenkins
+      container's own filesystem — meaningless to the host daemon actually creating the ZAP container. Full
+      explanation of why on
+      <a href="tech/docker.html#docker-outside-docker">Docker &amp; Compose → Docker-outside-of-Docker</a>.
+      The real fix: mount the same <em>named volume</em> Jenkins itself already uses
+      (found via <code>docker volume ls</code> → <code>movetrack_ops_jenkins_home</code>) into the ZAP
+      container too, then copy the report from Jenkins's own view of that volume into the build workspace —
+      the two extra lines shown above.
+    </div>
   </div>
 
   <div class="step" id="step60">
     <div class="step-header">
       <span class="step-num">STEP 60</span>
       <span class="step-title">Archive Trivy + ZAP reports as build artifacts</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> scan results should be reviewable after the fact, not just visible in a
       scrolling console log. Full explanation on
@@ -2121,7 +2183,7 @@ git push</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 61</span>
       <span class="step-title">Prove the gate actually fails on a real finding</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a gate that has never actually failed is unproven — deliberately trigger a
       failure to confirm it's real, then revert.</p>
@@ -2148,7 +2210,7 @@ git push</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 62</span>
       <span class="step-title">Final end-to-end run, merge</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> one last full green run, then close out the phase — single branch, single PR,
       per the simplified git workflow.</p>
@@ -2165,7 +2227,19 @@ git pull origin main</code></pre>
       <code>docker compose ps</code> — <strong>expected:</strong> 8 containers now (the 7 from Phase 6, plus
       <code>jenkins</code>), all <code>Up</code>. Then one final "Build Now" in the Jenkins UI against
       <code>main</code> — <strong>expected:</strong> every stage green, artifacts present.</p>
-    <p><strong>This completes Phase 5</strong> — 10 steps, 53–62.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — ran <code>gh pr create</code> while already on <code>main</code></div>
+      <code>git checkout main; git pull origin main</code> at the start of this step are just a sync — they
+      correctly leave <code>main</code> without any Phase 5 changes yet, since nothing's merged. Running
+      <code>gh pr create</code> from <em>that</em> branch instead of switching back to
+      <code>feature/jenkins-compliance-gate</code> first failed with
+      <code>head branch "main" is the same as base branch "main", cannot create a pull request</code> — a PR
+      needs two different branches. Nothing was lost (the feature branch and its commits were untouched);
+      fixed by <code>git checkout feature/jenkins-compliance-gate</code> before re-running
+      <code>gh pr create</code>.
+    </div>
+    <p><strong>This completes Phase 5</strong> — 10 steps, 53–62. The most gotcha-prone phase of the project
+      so far.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

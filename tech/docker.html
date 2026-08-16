@@ -264,6 +264,35 @@ volumes:
     ps</code>/<code>docker compose ps</code> first to see if it's one of ours, and if nothing shows up
     there, it's a host-level process outside Docker's visibility entirely.</p>
 
+  <h2 id="docker-outside-docker">Docker-outside-of-Docker (DooD) — the socket-mount pattern's real gotcha</h2>
+  <p>Mounting the host's Docker socket into a container (<code>-v /var/run/docker.sock:/var/run/docker.sock</code>,
+    used for Jenkins in Phase 5) lets that container run <code>docker</code> commands — but it's a genuinely
+    common source of confusion about <em>whose filesystem</em> those commands actually operate on.</p>
+  <div class="diagram">Jenkins container                        Host's Docker daemon
+┌─────────────────────┐                  ┌─────────────────────────┐
+│ sh 'docker run       │ ── via socket ──►│ actually creates and     │
+│  -v X:Y ...'         │                  │ runs the new container   │
+└─────────────────────┘                  └─────────────────────────┘
+
+The command is TYPED inside the Jenkins container, but EXECUTED by the host daemon.
+"X" in -v X:Y has to mean something to the HOST, not to Jenkins's own filesystem.</div>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — <code>$(pwd)</code> inside a DooD container isn't a real host path</div>
+    A command like <code>docker run -v $(pwd):/target ...</code>, run from <em>inside</em> a container that
+    reached Docker via a mounted socket, resolves <code>$(pwd)</code> to a path inside <em>that</em>
+    container's own filesystem (e.g. <code>/var/jenkins_home/workspace/...</code>) — which means nothing to
+    the host daemon actually creating the new container. The mount silently doesn't do what you'd expect, or
+    the tool being run refuses to start because "nothing is actually mounted there."
+  </div>
+  <p><strong>Fix used in this project:</strong> mount a <strong>named Docker volume</strong> instead of a
+    bind-mount path. Named volumes are managed by the daemon itself, not tied to any one container's
+    filesystem view — so the same named volume can be mounted into both the Jenkins container (at
+    <code>/var/jenkins_home</code>) and a separately-launched tool container (at whatever path that tool
+    needs), and both genuinely share the same storage. See
+    <a href="jenkins.html#zap">Jenkins, Trivy &amp; OWASP ZAP → OWASP ZAP</a> for the real example (a ZAP
+    scan writing its report into the same volume Jenkins already has, so Jenkins can find and archive it
+    afterward).</p>
+
   <h2 id="env-files">Keeping secrets out of git</h2>
   <ul>
     <li><strong>What:</strong> real values live in <code>.env</code> (gitignored — covered by the root
@@ -365,6 +394,15 @@ CMD uvicorn app.main:app --host 0.0.0.0 --port 8000</code></pre>
   </div>
 
   <h2>Interview Q&amp;A</h2>
+  <div class="qa" id="qa-docker-dood-volume">
+    <div class="q">Why can't you just use <code>$(pwd)</code> as a bind-mount path from a container that reached Docker via a mounted socket?</div>
+    <div class="a">The command runs <em>inside</em> that container but is executed <em>by the host's Docker
+      daemon</em> — so any path in a bind-mount has to make sense to the host, not to the calling container's
+      own filesystem. <code>$(pwd)</code> resolves to a path inside the calling container (like
+      <code>/var/jenkins_home/workspace/...</code>), which the host daemon has no knowledge of. The fix is a
+      named Docker volume instead of a bind-mount path — named volumes are daemon-managed, so the same one
+      can be mounted into both containers and they'll genuinely share the same storage.</div>
+  </div>
   <div class="qa" id="qa-docker-compose-config-verify">
     <div class="q">How do you confirm an edit to docker-compose.yml actually took effect?</div>
     <div class="a"><code>docker compose config</code> — it prints the fully resolved compose file, with any
