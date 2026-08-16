@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="architecture.html">Architecture &amp; Progress</a>
+  <a href="architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="tech/go.html">Go</a>
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="tech/kafka.html">Kafka</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -733,6 +735,35 @@
       out to multiple independent consumers without the producer knowing or caring who's listening.</div>
   </div>
   <p class="pill">↳ <a href="tech/rabbitmq-mongodb.html#qa-rabbitmq-exchange-vs-queue">RabbitMQ &amp; MongoDB</a></p>
+
+  <h2 id="from-kafka">From Kafka <span class="tag">Phase 10 — planned</span></h2>
+
+  <div class="qa">
+    <div class="q">Why does Kafka split a topic into partitions instead of just one ordered log?</div>
+    <div class="a">A single log can only be written to and read from sequentially — that caps throughput at
+      whatever one disk/one process can handle. Splitting into partitions lets multiple producers write and
+      multiple consumers (in a group) read in parallel, each working on a different partition — trading
+      "one global order" for "strict order per partition, plus much higher throughput."</div>
+  </div>
+  <p class="pill">↳ <a href="tech/kafka.html#qa-kafka-why-partitions">Kafka</a></p>
+
+  <div class="qa">
+    <div class="q">If a topic has 3 partitions and you add a 4th consumer to the group, what happens?</div>
+    <div class="a">It sits idle. Kafka assigns each partition to exactly one consumer within a group at a
+      time — with 3 partitions, at most 3 consumers in that group can be doing work simultaneously. The
+      partition count is the real ceiling on a consumer group's parallelism, decided up front when the topic
+      is created.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/kafka.html#qa-kafka-consumer-group-scaling">Kafka</a></p>
+
+  <div class="qa">
+    <div class="q">How would you replay a topic's history from the very beginning?</div>
+    <div class="a">Start a consumer with a brand-new <code>group_id</code> (one Kafka has never seen before)
+      and <code>auto_offset_reset="earliest"</code> — since that group has no committed offset yet, Kafka
+      starts it at the oldest retained message. This is the core capability RabbitMQ's mailroom model doesn't
+      have at all — a consumed RabbitMQ message is simply gone.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/kafka.html#qa-kafka-replay">Kafka</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

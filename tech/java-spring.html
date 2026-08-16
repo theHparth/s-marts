@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -304,6 +306,59 @@ assertThat(captor.getValue().getOldValue()).isEqualTo("7000");</code></pre>
         <code>MockMvc</code> routes through actual Spring wiring — different from plain <code>@Mock</code>,
         which involves no Spring at all).</li>
     </ul>
+  </div>
+
+  <h2 id="cors-config">CORS configuration — why a browser call needs it and curl doesn't</h2>
+  <p>CORS is enforced by the <strong>browser</strong>, not by the server receiving the request — a browser
+    running JavaScript from <code>http://localhost:3000</code> refuses to hand a response back to that
+    JavaScript unless the server explicitly says "this origin is allowed," even though the HTTP request
+    itself already succeeded. <code>curl</code>/Postman never hit this, because neither is a browser enforcing
+    same-origin policy — which is exactly why a REST endpoint can work perfectly in manual testing and still
+    fail with <code>Failed to fetch</code> the first time a real frontend calls it.</p>
+  <pre><code>package com.movetrackops.moveentitlement.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("http://localhost:3000")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS");
+    }
+}</code></pre>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — one service had this, the sibling service didn't</div>
+    <code>claims-service</code> already had a <code>WebConfig</code> like this from an earlier phase;
+    <code>move-entitlement-service</code> never did, because nobody had tested its form through an actual
+    browser before Phase 4 — only via curl/Postman during earlier phases, which never exercises this check
+    at all. The fix is identical either way: add the same <code>WebConfig</code> bean.
+  </div>
+
+  <h2 id="dependency-cve-scanning">Reading a dependency vulnerability scan</h2>
+  <p>IDE/CI tooling can flag a dependency version for known CVEs even when the code compiles and runs fine —
+    a scan finding is a <em>security</em> signal, not a build error, and the two need different responses.</p>
+  <table>
+    <tr><th>Situation</th><th>What to actually do</th></tr>
+    <tr><td>A newer patched version exists</td><td>Pin it explicitly in <code>pom.xml</code>, overriding whatever version Spring Boot's parent BOM chose by default</td></tr>
+    <tr><td>No patched version exists yet upstream</td><td>Accept and track it — you can't fix what hasn't been released. Re-check periodically, don't block current work on it</td></tr>
+  </table>
+  <pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;com.fasterxml.jackson.core&lt;/groupId&gt;
+    &lt;artifactId&gt;jackson-databind&lt;/artifactId&gt;
+    &lt;version&gt;2.21.5&lt;/version&gt; &lt;!-- overrides the BOM-managed 2.21.4 --&gt;
+&lt;/dependency&gt;</code></pre>
+  <div class="box why">
+    <div class="box-title">Real example from this project</div>
+    A scan flagged <code>jackson-databind 2.21.4</code> (the version Spring Boot's parent BOM selected) for
+    two medium-severity CVEs. Pinning to <code>2.21.5</code> fixed two of the three total issues found across
+    both checks — the third had no released patch at the time, confirmed by checking the library's own
+    release wiki before treating it as unresolved. Applied identically to both
+    <code>move-entitlement-service</code> and <code>claims-service</code>, since they share the exact same
+    dependency.
   </div>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>

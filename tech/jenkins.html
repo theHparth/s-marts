@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html" class="active">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -41,11 +43,12 @@
   </p>
 
   <div class="box why">
-    <div class="box-title">Confirmed — built and verified through Step 62</div>
-    Phase 5 (Trivy/ZAP/Jenkins compliance gate) is complete. Jenkins runs as an 8th container alongside
-    everything from Phases 1-6, with a working pipeline: checkout → build → Trivy scan (gated) → ZAP baseline
-    scan → archive reports. This phase hit more real gotchas than any other — every one is documented inline
-    below.
+    <div class="box-title">Confirmed — built and verified through Step 62, extended in Phase 4</div>
+    Phase 5 (Trivy/ZAP/Jenkins compliance gate) is complete. Jenkins runs as a container alongside everything
+    from Phases 1-6, with a working pipeline: checkout → build → Trivy scan (gated) → Report Findings → ZAP
+    baseline scan → archive reports. The <strong>Report Findings</strong> stage was added in Phase 4 — real
+    Trivy JSON output now gets POSTed automatically to the Compliance Service instead of just sitting
+    archived. This phase hit more real gotchas than any other — every one is documented inline below.
   </div>
 
   <h2 id="why-this-exists">Why this exists — the plain-language version</h2>
@@ -228,6 +231,41 @@ WITH this phase:
   <p><code>archiveArtifacts</code> saves files from the build workspace as part of that build's permanent
     record in Jenkins — viewable/downloadable from the build's page in the UI afterward, the same way a
     GitHub Actions run lets you download build artifacts.</p>
+
+  <h2 id="python-in-jenkins-image">Report Findings stage — installing Python in the Jenkins image</h2>
+  <p>The Jenkins container was built to run <code>docker</code> and <code>git</code> commands — nothing about
+    the base image assumes Python will ever be needed inside it. The first attempt at a Python-based pipeline
+    stage failed immediately:</p>
+  <pre><code>+ pip install requests --quiet
+/var/jenkins_home/.../script.sh.copy: 1: pip: not found</code></pre>
+  <p><strong>Fix</strong> — <code>infra/jenkins/Dockerfile</code>:</p>
+  <pre><code>FROM jenkins/jenkins:lts-jdk17
+USER root
+RUN apt-get update &amp;&amp; apt-get install -y docker.io python3 python3-pip
+USER jenkins</code></pre>
+  <div class="box gotcha">
+    <div class="box-title"><code>pip</code> vs. <code>pip3</code></div>
+    Debian's <code>python3-pip</code> package installs the binary as <code>pip3</code>, not a plain
+    <code>pip</code> — the Jenkinsfile's <code>sh</code> commands needed updating to match
+    (<code>pip3 install requests --quiet --break-system-packages || pip3 install requests --quiet</code>).
+    Rebuilding the image after a Dockerfile change also needs an explicit
+    <code>docker compose build jenkins &amp;&amp; docker compose up -d jenkins</code> — editing the
+    Dockerfile alone changes nothing until the image is actually rebuilt and the container restarted from it.
+  </div>
+
+  <h2 id="push-before-jenkins-build">Editing the Jenkinsfile locally doesn't change what Jenkins builds</h2>
+  <p>The <strong>Checkout</strong> stage (<code>checkout scm</code>) pulls the <code>Jenkinsfile</code> and
+    code straight from GitHub, using whatever the job's <strong>Branches to build</strong> field points at —
+    it never reads the local working directory at all. A local edit needs a real <code>git push</code> before
+    a fresh <strong>Build Now</strong> will ever see it.</p>
+  <table>
+    <tr><th>Situation</th><th>What to set "Branches to build" to</th></tr>
+    <tr><td>Testing an in-progress feature branch mid-phase</td><td><code>*/feature/your-branch-name</code></td></tr>
+    <tr><td>Normal, permanent setting once a phase is merged</td><td><code>*/main</code> — real CI watches the base branch, not a personal feature branch</td></tr>
+  </table>
+  <p>See <a href="git.html#branch-deleted-after-merge">Git &amp; GitHub → A branch disappearing right after merge</a>
+    for what happens if this field gets left pointed at a feature branch after it's already been squash-merged
+    and deleted.</p>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-jenkins-zap-volume-mount">

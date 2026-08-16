@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -310,6 +312,53 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></p
   <p>The <code>CMD [...]</code> line is one command (Uvicorn) plus its arguments, written as an array — full
     breakdown, including why <code>0.0.0.0</code> and not <code>localhost</code>, on
     <a href="docker.html#cmd-exec-form">Docker &amp; Compose → Dockerfile CMD — one command, not several</a>.</p>
+
+  <h2 id="windows-empty-files">Creating an empty file on Windows — <code>type nul</code> vs. <code>New-Item</code></h2>
+  <p><code>type nul &gt; app\__init__.py</code> is a leftover cmd.exe trick — <code>type</code> tries to read a
+    file literally named <code>nul</code>, which doesn't exist in PowerShell (unlike cmd.exe's special device
+    name), so it errors. It still works by accident: PowerShell's <code>&gt;</code> redirection creates the
+    destination file <em>before</em> running the left-hand command, so the empty file gets created anyway,
+    despite the visible error.</p>
+  <div class="box gotcha">
+    <div class="box-title">The actual PowerShell-native way</div>
+    <code>New-Item -ItemType File -Path app\__init__.py</code> — no error, no reliance on redirection-order
+    side effects. Re-running it on an existing file errors with "already exists," which is itself a useful
+    confirmation the file is already there.
+  </div>
+
+  <h2 id="powershell-curl-alias">PowerShell's <code>curl</code> is not real curl</h2>
+  <p>PowerShell aliases <code>curl</code> to <code>Invoke-WebRequest</code>, a completely different command
+    that doesn't understand curl.exe's flags (<code>-X</code>, <code>-H</code>, <code>-d</code>) at all —
+    passing them produces a parameter-binding error, not a network error.</p>
+  <table>
+    <tr><th>Approach</th><th>Command</th></tr>
+    <tr><td>Real curl, bypass the alias</td><td><code>curl.exe -X POST url -H "Content-Type: application/json" -d '...'</code></td></tr>
+    <tr><td>PowerShell-native</td><td><code>Invoke-RestMethod -Uri url -Method Post -ContentType "application/json" -Body '...'</code></td></tr>
+  </table>
+  <p><code>Invoke-RestMethod</code> also throws on any non-2xx response (visible as a PowerShell error object),
+    while <code>curl.exe</code> just prints the response body regardless of status code — worth knowing when
+    the same failing request looks different depending on which one you used to test it.</p>
+
+  <h2 id="pytest-module-not-found">pytest's "No module named 'app'"</h2>
+  <p>pytest's default import mode walks up from a test file looking for the first parent folder <em>without</em>
+    an <code>__init__.py</code>, and only adds <em>that</em> folder to Python's import path. If
+    <code>tests/</code> has no <code>__init__.py</code>, pytest stops right there — it never sees a sibling
+    <code>app/</code> folder at all, and importing <code>from app.logic import ...</code> fails with
+    <code>ModuleNotFoundError: No module named 'app'</code>.</p>
+  <div class="box gotcha">
+    <div class="box-title">Fix — an empty <code>tests/__init__.py</code></div>
+    Adding an empty <code>__init__.py</code> to <code>tests/</code> makes pytest keep walking up one more
+    level, landing on the project root (which has no <code>__init__.py</code> of its own) — from there, both
+    <code>app</code> and <code>tests</code> are visible as sibling packages, and the import works.
+  </div>
+  <div class="box why">
+    <div class="box-title">A second, unrelated way to get the same error</div>
+    Running <code>pytest</code> from the wrong directory — e.g. the whole monorepo root instead of one
+    service's own folder — makes pytest try to collect tests from <em>every</em> Python service at once,
+    including ones whose dependencies aren't installed in the venv you're currently using. Always
+    <code>cd</code> into the specific service folder first; each Python service in this project has its own
+    isolated <code>venv</code> and test suite.
+  </div>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-python-swagger-ui">

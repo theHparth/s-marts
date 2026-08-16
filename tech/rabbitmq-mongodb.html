@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html" class="active">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -40,11 +42,13 @@
     <a href="../steps.html#phase4">Steps page → Phase 4</a>.
   </p>
 
-  <div class="box warn">
-    <div class="box-title">Status: written ahead of the build</div>
-    Phase 4 (RabbitMQ + Compliance/Findings Service) is in progress. Everything on this page reflects the
-    <em>planned</em> implementation — read it now to get familiar with the tools before writing code, then it
-    gets corrected/confirmed once each step is really built and tested.
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 74</div>
+    Phase 4 (RabbitMQ + Compliance/Findings Service) is complete. Compliance Service runs as a 10th
+    container, real Trivy output flows in automatically from Jenkins, both Java services publish domain
+    events, verified with a full green Jenkins build against <code>main</code> after merge. This phase hit
+    more real gotchas than any other so far — every one is documented inline below and on
+    <a href="java-spring.html">Java, Spring &amp; Maven</a> / <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>.
   </div>
 
   <h2 id="why-this-phase">Why this phase exists — the plain version</h2>
@@ -168,6 +172,93 @@ one = findings.find_one({"cve": "CVE-2024-12345"})</code></pre>
     <tr><td><code>find({"severity": "HIGH"})</code></td><td><code>SELECT * WHERE severity = 'HIGH'</code></td></tr>
     <tr><td><code>find_one({...})</code></td><td><code>SELECT * ... LIMIT 1</code></td></tr>
   </table>
+
+  <h2 id="real-request-flow">How a real request actually flows — Move &amp; Entitlement example</h2>
+  <p>The concepts above are abstract until you trace one real click through the system. This is exactly what
+    happens when a user submits the Move Requests form on the dashboard (Step 69):</p>
+  <div class="diagram">Browser (localhost:3000)
+     │  1. Click Submit → fetch POST http://localhost:8082/api/move-requests
+     ▼
+move-entitlement-service : 8082  (Java/Spring, MoveRequestController)
+     │  2. calls EntitlementCalculationService.submitMoveRequest()
+     ▼
+PostgreSQL : 5432  (move_entitlement_db)
+     │  3. INSERT INTO move_requests — saved permanently
+     ▼
+RabbitMQ : 5672  (AMQP — the real data path)
+     │  4. rabbitTemplate.convertAndSend("compliance", "move.created", saved)
+     │     message dropped into the "compliance" exchange, fire-and-forget
+     ▼
+back in the same Java method
+     │  5. calculateEntitlement(id) — reads weight_allowances table
+     ▼
+MoveRequestController
+     │  6. builds { entitlementLbs: 7000 } as JSON, HTTP 200 response
+     ▼
+Browser — Redux store updates, "Entitlement: 7000 lbs" renders
+
+Port 15672 (the RabbitMQ web UI) is NOT part of this path — it's a separate
+port for humans to look inside the exchange after the fact. The request
+above never touches 15672 at all.</div>
+  <div class="box why">
+    <div class="box-title">What this proves, concretely</div>
+    Steps 1-3 and 5-6 are the same request/response cycle every REST endpoint in this project already does.
+    The only genuinely new thing Phase 4 adds is step 4 — one extra call, made after the database save
+    succeeds, that announces the event without the caller waiting for or caring whether anyone is listening.
+    That's the entire value RabbitMQ adds over a plain REST API: the announcement doesn't block the response,
+    and any number of future listeners can react to it without this controller ever being changed.
+  </div>
+
+  <h2 id="java-jackson-gotchas">Publishing JSON from Java — three stacked Jackson gotchas</h2>
+  <p>Getting <code>RabbitTemplate</code> to publish a plain Java object as JSON (instead of Java's own binary
+    serialization format) took three separate fixes — each one only became visible once the previous one was
+    fixed, since each earlier failure crashed before the code ever reached the next issue.</p>
+  <table>
+    <tr><th>#</th><th>Symptom</th><th>Real cause</th><th>Fix</th></tr>
+    <tr><td>1</td><td><code>IllegalArgumentException: SimpleMessageConverter only supports String, byte[] and Serializable</code></td><td>Default converter can't turn a plain entity into bytes at all</td><td>Use <code>Jackson2JsonMessageConverter</code> instead of the default</td></tr>
+    <tr><td>2</td><td><code>NoClassDefFoundError: JsonMapper</code> — whole app fails to start</td><td>The converter's zero-arg constructor calls a newer Jackson API than what's actually resolved on the classpath</td><td>Construct it with an explicit <code>new ObjectMapper()</code> instead of letting it build its own</td></tr>
+    <tr><td>3</td><td><code>InvalidDefinitionException: Java 8 date/time type LocalDate not supported</code></td><td>Plain Jackson has no built-in support for <code>java.time</code> types — that needs a separate module, registered on this specific mapper</td><td><code>mapper.registerModule(new JavaTimeModule())</code>, plus the <code>jackson-datatype-jsr310</code> dependency</td></tr>
+  </table>
+  <pre><code>@Configuration
+public class RabbitMQConfig {
+    public static final String EXCHANGE = "compliance";
+
+    @Bean
+    public TopicExchange complianceExchange() {
+        return new TopicExchange(EXCHANGE);
+    }
+
+    @Bean
+    public Jackson2JsonMessageConverter jsonMessageConverter() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return new Jackson2JsonMessageConverter(mapper);
+    }
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
+                                          Jackson2JsonMessageConverter jsonMessageConverter) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(jsonMessageConverter);
+        return template;
+    }
+}</code></pre>
+  <div class="box why">
+    <div class="box-title">Why JSON instead of Java's own serialization</div>
+    Java's built-in <code>Serializable</code> format is Java-only and version-fragile — a consumer written in
+    a different language (this project's own Python <code>compliance-service</code>, eventually) couldn't
+    read it at all. JSON is what every language on this project's stack already speaks — the same format
+    <code>pika</code>/<code>requests</code> use on the Python side.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">A separate, unrelated compile error along the way</div>
+    <code>package com.fasterxml.jackson.databind does not exist</code> — despite this exact app already
+    returning JSON successfully elsewhere (via Spring's own auto-configured HTTP JSON handling),
+    <code>jackson-databind</code> was never actually a direct or transitively-reachable <em>compile</em>
+    dependency of this specific module. Fixed by adding it explicitly to <code>pom.xml</code>, version left
+    unpinned so Spring Boot's parent BOM manages it (see <a href="java-spring.html#dependency-cve-scanning">Java, Spring &amp; Maven → Reading a dependency vulnerability scan</a>
+    for what happened right after that).
+  </div>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-rabbitmq-vs-kafka">

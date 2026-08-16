@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -264,6 +266,47 @@ volumes:
     ... Only one usage of each socket address</code>), but the diagnostic path differs — <code>docker
     ps</code>/<code>docker compose ps</code> first to see if it's one of ours, and if nothing shows up
     there, it's a host-level process outside Docker's visibility entirely.</p>
+
+  <h2 id="docker-nginx-jenkins-layers">Docker, nginx, and Jenkins — how they actually relate</h2>
+  <p>These three get mentally lumped together because they all showed up around the same time in this
+    project, but they're not peers — they sit in completely different layers, and two of them (nginx and
+    Jenkins) never talk to each other at all.</p>
+  <div class="diagram">Your machine
+┌────────────────────────────────────────────────────────────┐
+│              Docker Engine (the ONE host daemon)              │
+│         the single program that actually runs every           │
+│                  container in this project                    │
+└───────────────────────────┬────────────────────────────────┘
+                             │ manages, side by side
+      ┌──────────┬───────────┼───────────┬───────────┐
+      ▼          ▼           ▼           ▼           ▼
+  postgres    mongodb    rabbitmq     jenkins    dashboard
+   :5432      :27017      :5672        :8080    ┌────────┐
+                                          │       │ nginx  │ :3000→80
+                                          │       │ serves │
+                                          │       │ React  │
+                                          │       │ files  │
+                                          │       └────────┘
+                                          │
+                                          └── special: reaches back
+                                              OUT to Docker Engine
+                                              via a mounted socket
+                                              ("build this image",
+                                               "run Trivy", "run ZAP")</div>
+  <table>
+    <tr><th></th><th>What it actually is</th><th>Talks to</th></tr>
+    <tr><td><strong>Docker</strong></td><td>The engine every container in this project runs on — Postgres, Mongo, RabbitMQ, Jenkins, the dashboard, all of it</td><td>Everything depends on it; it depends on nothing else here</td></tr>
+    <tr><td><strong>nginx</strong></td><td>A small web server whose only job is handing out the React app's built static files</td><td>Lives entirely inside the <code>dashboard</code> container — never talks to Jenkins or Docker directly</td></tr>
+    <tr><td><strong>Jenkins</strong></td><td>The CI pipeline runner — itself just another container Docker happens to be running</td><td>Reaches back out to Docker Engine (its own host) through a mounted socket, to spin up sibling containers for builds/scans</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">The one-sentence version</div>
+    Docker is the landlord who owns the building and runs every apartment. nginx is one tenant (living inside
+    the <code>dashboard</code> apartment) whose only job is handing out files. Jenkins is a different tenant
+    who happens to have a master key to call the landlord directly and say "build me a new apartment" —
+    completely unrelated to what the nginx tenant does. See below for exactly how that "master key" (the
+    Docker socket mount) works and where it goes wrong.
+  </div>
 
   <h2 id="docker-outside-docker">Docker-outside-of-Docker (DooD) — the socket-mount pattern's real gotcha</h2>
   <p>Mounting the host's Docker socket into a container (<code>-v /var/run/docker.sock:/var/run/docker.sock</code>,

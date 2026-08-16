@@ -5,8 +5,13 @@ Not linked from any page's sidebar, not part of the polished site.
 
 ---
 
-(Empty — last full pass covered Phase 4 KICKOFF (pre-study), Steps 63-74, written ahead of the real build:
-architecture.html compliance/mongodb/rabbitmq nodes flipped to in-progress, tech/rabbitmq-mongodb.html
-created in full, steps.html Phase 4 section written (all 12 steps, Planned), interview.html "From RabbitMQ
-& MongoDB" section added, all 17 sidebars re-verified. Nothing built/tested yet — no real gotchas exist.
-Next entries go here once the user starts building and hits real steps/errors, same as Phases 5/6.)
+(Empty — last full pass covered Phase 10 KICKOFF (pre-study), Steps 75-83, written ahead of the real build:
+architecture.html kafka node flipped to in-progress with full step array; NEW page tech/kafka.html created
+in full, written from zero (broker/topic/partition/offset/producer/consumer/consumer-group/KRaft concepts,
+Kafka-vs-RabbitMQ restated from Kafka's side, Go kafka-go producer example, Python kafka-python consumer
+example, 3 Interview Q&As); steps.html Phase 10 section written (all 9 steps, Planned); interview.html
+"From Kafka" section added (3 Q&As mirrored from tech/kafka.html); architecture-2.html's #growth section
+updated with a PLANNED amber flow diagram for the Kafka producer+consumer path (big SVG chart itself left
+as-is until Phase 10 completion, per updated standing rule — see feedback_movetrack_flow_map_page memory);
+all 19 sidebars re-verified (kafka.html added as a 19th page). Nothing built/tested yet — no real gotchas
+exist. Next entries go here once the user starts building and hits real steps/errors, same as Phase 4.)

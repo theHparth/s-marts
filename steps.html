@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="architecture.html">Architecture &amp; Progress</a>
+  <a href="architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="steps.html" class="active">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="tech/go.html">Go</a>
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="tech/kafka.html">Kafka</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -2244,16 +2246,20 @@ git pull origin main</code></pre>
   </div>
 
   <h2 id="phase4">Phase 4 — RabbitMQ + Compliance/Findings Service</h2>
-  <p class="pill">12 steps (63–74), 1 branch. First MongoDB and first RabbitMQ usage in this project. Closes
-    the loop with Phase 5 — Jenkins's Trivy/ZAP reports actually get ingested now, not just archived. Written
-    as <strong>pre-study material</strong>, ahead of the actual build — status flips to Done and content
-    gets corrected once each step is really built and tested.</p>
+  <p class="pill">12 steps (63–74), 1 branch. First MongoDB and first RabbitMQ usage in this project.
+    <strong>Complete</strong> — Compliance Service runs as a 10th container, real Trivy output flows in
+    automatically from Jenkins, both Java services publish domain events, verified end-to-end with a full
+    green Jenkins build against <code>main</code> after merge. The gotcha-prone phase before this one
+    (Phase 5) got beaten by this one — see every box below and
+    <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="tech/kafka.html">Kafka</a> / <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+    for the full reference depth.</p>
 
   <div class="step" id="step63">
     <div class="step-header">
       <span class="step-num">STEP 63</span>
       <span class="step-title">Compliance Service — Python venv + skeleton FastAPI app</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> a bare FastAPI service, second Python service in this project after Claims
       Triage ML. Full explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>.</p>
@@ -2265,28 +2271,39 @@ mkdir services/compliance-service
 cd services/compliance-service
 python -m venv venv
 venv\Scripts\activate
-pip install fastapi uvicorn pymongo pika
+pip install fastapi uvicorn pymongo pika requests pytest httpx mongomock
 pip freeze &gt; requirements.txt
 
 # write app/main.py — FastAPI app with a GET /health endpoint
 
 git add services/compliance-service
 git commit -m "scaffold compliance service"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>type nul &gt;</code> is a cmd.exe trick, not PowerShell</div>
+      Creating <code>app/__init__.py</code> with <code>type nul &gt; app\__init__.py</code> printed a "Cannot
+      find path ...\nul" error — but the file got created anyway. PowerShell's <code>&gt;</code> redirection
+      creates the destination file <em>before</em> running the command on the left, so the empty file existed
+      even though <code>type nul</code> itself failed. See
+      <a href="tech/python-fastapi.html#windows-empty-files">Python, FastAPI &amp; scikit-learn → Creating an empty file on Windows</a>
+      for the real fix (<code>New-Item -ItemType File</code>).
+    </div>
   </div>
 
   <div class="step" id="step64">
     <div class="step-header">
       <span class="step-num">STEP 64</span>
       <span class="step-title">MongoDB running in Docker, service connects via pymongo</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> first MongoDB usage in this project. Full explanation on
       <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → MongoDB core concepts</a>.</p>
     <pre><code># add to docker-compose.yml: a mongodb service (image: mongo:7) + mongo_data volume
 
 docker compose up -d mongodb
+docker exec -it movetrack-mongodb mongosh --eval "db.runCommand({ping:1})"
+# expect { ok: 1 }
 
-# write app/db.py — connectMongo() using pymongo
+# write app/db.py — get_db(), caches a single MongoClient at module level
 
 git add docker-compose.yml services/compliance-service/app/db.py
 git commit -m "connect compliance service to mongodb"</code></pre>
@@ -2296,22 +2313,31 @@ git commit -m "connect compliance service to mongodb"</code></pre>
     <div class="step-header">
       <span class="step-num">STEP 65</span>
       <span class="step-title">POST /findings — ingest a scan finding, store in MongoDB</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> the real ingestion endpoint. Full explanation on
       <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → Basic pymongo usage</a>.</p>
     <pre><code># write app/schemas.py — Finding Pydantic model
-# add POST /findings to app/main.py, calling db insert
+# add POST /findings to app/main.py, calling db.findings.insert_one()
 
 git add services/compliance-service/app
 git commit -m "add POST /findings endpoint"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — PowerShell's <code>curl</code> is not real curl</div>
+      <code>curl -X POST ... -H "..." -d "..."</code> failed with a <code>Invoke-WebRequest</code> parameter
+      binding error — PowerShell aliases <code>curl</code> to <code>Invoke-WebRequest</code>, which doesn't
+      understand curl.exe's flags at all. Two real fixes: call <code>curl.exe</code> explicitly (the actual
+      curl, bypassing the alias), or use PowerShell-native <code>Invoke-RestMethod -Method Post -ContentType
+      "application/json" -Body '...'</code>. See
+      <a href="tech/python-fastapi.html#powershell-curl-alias">Python, FastAPI &amp; scikit-learn → PowerShell's curl alias</a>.
+    </div>
   </div>
 
   <div class="step" id="step66">
     <div class="step-header">
       <span class="step-num">STEP 66</span>
       <span class="step-title">RabbitMQ running in Docker, publish finding.detected</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> first RabbitMQ usage in this project. Full explanation on
       <a href="tech/rabbitmq-mongodb.html#rabbitmq-concepts">RabbitMQ &amp; MongoDB → RabbitMQ core concepts</a>.</p>
@@ -2319,144 +2345,503 @@ git commit -m "add POST /findings endpoint"</code></pre>
 
 docker compose up -d rabbitmq
 # verify management UI at http://localhost:15672 (default guest/guest)
+# Exchanges tab -&gt; "compliance" -&gt; publish count moves after each POST /findings
 
 # write app/events.py — publish_finding_detected() using pika
 # call it from POST /findings when severity is HIGH/CRITICAL
 
 git add docker-compose.yml services/compliance-service/app
 git commit -m "publish finding.detected to rabbitmq"</code></pre>
+    <p>No queue is bound to the exchange yet at this point — messages publish successfully and are simply
+      discarded with nowhere to go. That's expected here, not a bug; a real consumer is future work beyond
+      this phase. See the full click-by-click trace at
+      <a href="tech/rabbitmq-mongodb.html#real-request-flow">RabbitMQ &amp; MongoDB → How a real request actually flows</a>.</p>
   </div>
 
   <div class="step" id="step67">
     <div class="step-header">
       <span class="step-num">STEP 67</span>
       <span class="step-title">Extend Jenkinsfile — POST Trivy's real report to this service</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> close the loop with Phase 5 — real scan data flows in automatically, not
       manual testing only.</p>
-    <pre><code># add a stage after Trivy Scan in the Jenkinsfile:
+    <pre><code># Trivy stage now outputs JSON to the same named jenkins_home volume used for ZAP in Phase 5:
+#   docker run ... aquasec/trivy:latest image -f json -o /report/trivy-report.json
+#     --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion || echo "SEVERE FINDINGS DETECTED"
+#   docker cp $(docker ps -aq -f name=jenkins):/var/jenkins_home/trivy-report.json "$WORKSPACE"/trivy-report.json
+
+# new scripts/report_findings.py unpacks Trivy's JSON into one POST per vulnerability
+#   (Trivy's raw report doesn't match our Finding schema directly, so this translator
+#    script is the real fix, not a schema hack)
+
+# new stage:
 #         stage('Report Findings') {
 #             steps {
-#                 sh 'curl -X POST http://compliance-service:8010/findings -H "Content-Type: application/json" -d @trivy-report.json || true'
+#                 sh 'pip3 install requests --quiet --break-system-packages || pip3 install requests --quiet'
+#                 sh 'python3 scripts/report_findings.py || true'
 #             }
 #         }
-# (adjust once Step 65's exact Finding schema is confirmed against Trivy's real JSON output shape)
 
-git add Jenkinsfile
+git add Jenkinsfile scripts/report_findings.py infra/jenkins/Dockerfile
 git commit -m "wire jenkins trivy output into compliance service"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — Jenkins image had no Python at all</div>
+      <code>pip: not found</code> — the Jenkins container (built for running <code>docker</code>/<code>git</code>,
+      not Python scripts) never had Python installed. Fixed in <code>infra/jenkins/Dockerfile</code>:
+      <code>RUN apt-get update &amp;&amp; apt-get install -y docker.io python3 python3-pip</code>, then
+      <code>docker compose build jenkins &amp;&amp; docker compose up -d jenkins</code>. Debian's
+      <code>python3-pip</code> package installs the binary as <code>pip3</code>, not <code>pip</code> — the
+      Jenkinsfile commands were updated to match. See
+      <a href="tech/jenkins.html#python-in-jenkins-image">Jenkins, Trivy &amp; OWASP ZAP → Installing Python in the Jenkins image</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — editing files locally doesn't change what Jenkins builds</div>
+      Jenkins's <code>checkout scm</code> stage pulls the <code>Jenkinsfile</code> straight from GitHub, using
+      whatever the job's <strong>Branches to build</strong> field points at — never the local working
+      directory. Local edits need <code>git push</code> first, and the job's branch field needed switching
+      from <code>*/main</code> to <code>*/feature/compliance-service</code> to actually pick up this phase's
+      in-progress branch while it was still unmerged.
+    </div>
   </div>
 
   <div class="step" id="step68">
     <div class="step-header">
       <span class="step-num">STEP 68</span>
       <span class="step-title">GET /findings — list stored findings</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> verify persistence and retrieval both work.</p>
-    <pre><code># add GET /findings to app/main.py, querying MongoDB
+    <pre><code># add GET /findings to app/main.py, querying MongoDB, converting ObjectId to str
 
 git add services/compliance-service/app
 git commit -m "add GET /findings endpoint"</code></pre>
+    <p>Testing <code>GET /findings</code> before this step was written correctly returned
+      <code>405 Method Not Allowed</code>, not <code>404</code> — FastAPI recognized the path (POST already
+      existed there) but had no handler for GET yet. Expected sequencing, not a bug.</p>
   </div>
 
   <div class="step" id="step69">
     <div class="step-header">
       <span class="step-num">STEP 69</span>
       <span class="step-title">Move &amp; Entitlement (Java) publishes move.created</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> retrofit RabbitMQ publishing into an existing Java service. Full explanation on
-      <a href="tech/rabbitmq-mongodb.html#rabbitmq-concepts">RabbitMQ &amp; MongoDB → Publishing from Java</a>.</p>
+    <p><strong>Goal:</strong> retrofit RabbitMQ publishing into an existing Java service, tested through the
+      real dashboard UI. Full explanation on
+      <a href="tech/rabbitmq-mongodb.html#rabbitmq-concepts">RabbitMQ &amp; MongoDB → Publishing from Java</a>
+      and the full click-by-click trace at
+      <a href="tech/rabbitmq-mongodb.html#real-request-flow">How a real request actually flows</a>.</p>
     <pre><code>cd services/move-entitlement-service
-# add spring-boot-starter-amqp to pom.xml
+# add spring-boot-starter-amqp, jackson-databind, jackson-datatype-jsr310 to pom.xml
 # add RabbitMQ connection properties to application.properties
-# publish move.created via RabbitTemplate when a move is created
+# new config/RabbitMQConfig.java — TopicExchange bean + explicit Jackson2JsonMessageConverter
+#   (ObjectMapper + JavaTimeModule registered by hand)
+# EntitlementCalculationService.submitMoveRequest() now publishes move.created after save
+# new config/WebConfig.java — CORS mapping for http://localhost:3000
+# frontend/dashboard/nginx.conf — SPA fallback (try_files ... /index.html)
 
-git add services/move-entitlement-service
+git add services/move-entitlement-service frontend/dashboard
 git commit -m "publish move.created to rabbitmq"</code></pre>
+    <p>This was the most gotcha-dense single step of the whole project so far — five real, distinct bugs,
+      each one only surfacing after the last was fixed:</p>
+    <div class="box gotcha">
+      <div class="box-title">1. Missing CORS — "Failed to fetch" in the browser</div>
+      No <code>@CrossOrigin</code>/CORS bean existed in this service at all — nobody had tested this form
+      through an actual browser before (only curl/Postman, which don't enforce CORS). Fixed with a
+      <code>WebConfig implements WebMvcConfigurer</code> bean allowing <code>http://localhost:3000</code>.
+      Full explanation: <a href="tech/java-spring.html#cors-config">Java, Spring &amp; Maven → CORS configuration</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">2. nginx 404 on direct URL / page refresh</div>
+      The dashboard's <code>Dockerfile</code> used the stock <code>nginx:alpine</code> config, which has no
+      SPA fallback rule — refreshing <code>/moves</code> hit nginx directly (bypassing React Router
+      entirely) and 404'd because no literal file named <code>moves</code> exists. Fixed with a custom
+      <code>nginx.conf</code> (<code>try_files $uri $uri/ /index.html;</code>) copied in during the Docker
+      build. Full explanation: <a href="tech/react-redux.html#spa-nginx-routing">React, Redux &amp; TypeScript → SPA routing behind nginx</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">3. NoClassDefFoundError — Jackson2JsonMessageConverter crashed the whole app</div>
+      The zero-arg <code>Jackson2JsonMessageConverter()</code> internally calls a newer Jackson API
+      (<code>JsonMapper</code>) not present in whatever Jackson version this app actually resolved — the
+      Spring container failed to start at all. Fixed by constructing the converter with an explicit
+      <code>new ObjectMapper()</code> instead of letting it build its own. Full explanation:
+      <a href="tech/rabbitmq-mongodb.html#java-jackson-gotchas">RabbitMQ &amp; MongoDB → Java/Jackson message-converter gotchas</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">4. Compile error — jackson-databind wasn't actually a dependency</div>
+      <code>package com.fasterxml.jackson.databind does not exist</code> — despite this app already
+      returning JSON successfully elsewhere, <code>jackson-databind</code> was never a direct (or reachable
+      transitive) compile dependency of this module. Added explicitly to <code>pom.xml</code>, version
+      managed by <code>spring-boot-starter-parent</code>'s BOM.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">5. InvalidDefinitionException — LocalDate isn't JSON-serializable by default</div>
+      <code>MoveRequest.moveDate</code> is a <code>java.time.LocalDate</code> — plain Jackson can't serialize
+      that without the separate <code>jackson-datatype-jsr310</code> module registered on the specific
+      <code>ObjectMapper</code> in use. Existing REST responses handled this invisibly via Spring's own
+      auto-configured JSON handling; the hand-built RabbitMQ converter didn't inherit that. Fixed by adding
+      the dependency and calling <code>mapper.registerModule(new JavaTimeModule())</code> explicitly.
+    </div>
+    <p>One more thing that looked like a bug but wasn't: submitting a move with a past date correctly
+      returned <code>400</code> from the DTO's <code>@FutureOrPresent</code> validation — working as
+      designed, not a defect.</p>
   </div>
 
   <div class="step" id="step70">
     <div class="step-header">
       <span class="step-num">STEP 70</span>
       <span class="step-title">Claims Service (Java) publishes claim.filed</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Goal:</strong> same pattern as Step 69, second Java service.</p>
+    <p><strong>Goal:</strong> same pattern as Step 69, second Java service — CORS was already handled here
+      from an earlier phase, one fewer gotcha to hit.</p>
     <pre><code>cd services/claims-service
-# same spring-boot-starter-amqp + RabbitTemplate pattern as Step 69
-# publish claim.filed when a claim is filed
+# same spring-boot-starter-amqp + RabbitMQConfig + RabbitTemplate pattern as Step 69
+# ClaimApprovalService.submitForAdjusterReview() now publishes claim.filed after save
 
 git add services/claims-service
 git commit -m "publish claim.filed to rabbitmq"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — changing a constructor signature broke an existing test</div>
+      Adding <code>RabbitTemplate</code> as a constructor parameter to <code>ClaimApprovalService</code> broke
+      compilation of a pre-existing unit test that built the service with the old 2-argument constructor.
+      Fixed by adding a <code>@Mock private RabbitTemplate rabbitTemplate;</code> and passing it into the
+      constructor call — none of the existing tests exercise the method that actually publishes, so no
+      stubbing was needed. A real, expected consequence of changing a constructor, not a new defect.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Dependency security scan — jackson-databind CVEs</div>
+      An IDE vulnerability scan flagged the Spring Boot BOM-managed <code>jackson-databind 2.21.4</code> for
+      two medium-severity CVEs. Pinned explicitly to <code>2.21.5</code> (the latest release at the time),
+      which fixed two of the three; the third has no released patch yet upstream (<code>2.21.6</code> was
+      still in development) — tracked as a known, accepted gap rather than blocked on. Applied to both
+      <code>move-entitlement-service</code> and <code>claims-service</code>, since both share the identical
+      dependency. Full explanation: <a href="tech/java-spring.html#dependency-cve-scanning">Java, Spring &amp; Maven → Reading a dependency vulnerability scan</a>.
+    </div>
   </div>
 
   <div class="step" id="step71">
     <div class="step-header">
       <span class="step-num">STEP 71</span>
       <span class="step-title">Unit tests (pytest)</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <pre><code>cd services/compliance-service
-# write tests/test_findings.py
+# write tests/test_findings.py — pure should_publish(severity) logic, no db/rabbitmq involved
 
 pytest
+# expect 3 passed
 
 git add services/compliance-service/tests
 git commit -m "add unit tests for findings logic"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>ModuleNotFoundError: No module named 'app'</code></div>
+      pytest's default import mode walks up from the test file looking for the first folder <em>without</em>
+      an <code>__init__.py</code>, and only adds that folder to Python's import path. <code>tests/</code> had
+      none, so pytest stopped right there and never saw the sibling <code>app/</code> folder. Fixed with an
+      empty <code>tests/__init__.py</code>, which makes pytest walk one level higher, landing on the project
+      root where both <code>app</code> and <code>tests</code> are visible as siblings. Full explanation:
+      <a href="tech/python-fastapi.html#pytest-module-not-found">Python, FastAPI &amp; scikit-learn → pytest's "No module named 'app'"</a>.
+    </div>
   </div>
 
   <div class="step" id="step72">
     <div class="step-header">
       <span class="step-num">STEP 72</span>
       <span class="step-title">Integration tests (FastAPI TestClient)</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <pre><code># write tests/test_api.py using TestClient
+    <pre><code># write tests/test_api.py — TestClient + mongomock, monkeypatch swaps get_db for the duration
+# of one test only, real MongoDB never touched
 
 pytest
+# expect 4 passed
 
 git add services/compliance-service/tests
 git commit -m "add api integration tests"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — running pytest from the repo root instead of the service folder</div>
+      <code>pytest</code> run from <code>MoveTrack_Ops</code> (the monorepo root) instead of
+      <code>services/compliance-service</code> tried to collect tests from every Python service at once —
+      <code>claims-triage-ml</code>'s tests failed immediately with <code>ModuleNotFoundError: No module
+      named 'joblib'</code>, a dependency that only exists in that service's own separate <code>venv</code>.
+      Each Python service has its own isolated venv and test suite; always <code>cd</code> into the specific
+      service folder first.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the mongomock fake wasn't actually shared between calls</div>
+      <code>fake_get_db()</code> created a brand-new <code>mongomock.MongoClient()</code> on <em>every</em>
+      call — so the test's POST wrote into one throwaway in-memory database, and the very next GET read from
+      a completely different, empty one. The real <code>app/db.py</code> caches its client in a module-level
+      variable; the fake needed the same caching, fixed by creating the fake client once at module level in
+      the test file instead of inside the function.
+    </div>
   </div>
 
   <div class="step" id="step73">
     <div class="step-header">
       <span class="step-num">STEP 73</span>
       <span class="step-title">Dockerize Compliance Service</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> same single-stage pattern as Claims Triage ML. Full explanation on
       <a href="tech/python-fastapi.html#python-dockerfile">Python, FastAPI &amp; scikit-learn → Containerizing a Python service</a>.</p>
     <pre><code># write Dockerfile, .dockerignore matching claims-triage-ml's pattern
 
-docker build -t compliance-service services/compliance-service
+cd services/compliance-service
+docker build -t compliance-service .
 
 git add services/compliance-service/Dockerfile services/compliance-service/.dockerignore
 git commit -m "containerize compliance service"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — relative path resolved from the wrong working directory</div>
+      Running <code>docker build -t compliance-service services/compliance-service</code> while already
+      <code>cd</code>'d <em>inside</em> <code>services/compliance-service</code> resolved that relative path
+      one level too deep, creating a stray nested
+      <code>compliance-service/services/compliance-service/</code> folder (and accidentally placing
+      <code>.dockerignore</code> inside it) instead of building. Fixed by removing the stray folder and
+      building with <code>docker build -t compliance-service .</code> from the correct directory instead.
+    </div>
   </div>
 
   <div class="step" id="step74">
     <div class="step-header">
       <span class="step-num">STEP 74</span>
       <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-status done">Done</span>
     </div>
-    <pre><code># add compliance-service to docker-compose.yml, DATABASE/RABBITMQ env vars pointing at
+    <pre><code># add compliance-service to docker-compose.yml, MONGO_URI/RABBITMQ_URL env vars pointing at
 # service names (mongodb, rabbitmq), depends_on both
 
 docker compose up -d --build
 docker compose ps
-# expect 10 containers now: the 8 from Phase 5 plus mongodb and compliance-service
+# 10 containers total, all Up: the 8 from Phase 5 plus mongodb and compliance-service
 # (rabbitmq already came up in Step 66)
 
+git add docker-compose.yml
+git commit -m "wire compliance service into compose"
 git push -u origin feature/compliance-service
 gh pr create --title "Add RabbitMQ and Compliance Service"
 gh pr merge --squash --delete-branch
 git checkout main
 git pull origin main</code></pre>
-    <p><strong>This completes Phase 4</strong> once verified — 12 steps, 63–74.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real surprise — Jenkins couldn't find the feature branch anymore</div>
+      Re-running the Jenkins job (still configured to build <code>*/feature/compliance-service</code>) failed
+      with <code>fatal: couldn't find remote ref refs/heads/feature/compliance-service</code>. Not a bug —
+      the merge sequence above had already run (<code>git log</code> on <code>main</code> showed
+      <code>"Add RabbitMQ and Compliance Service (#43)"</code> as the latest commit), and
+      <code>gh pr merge --squash --delete-branch</code> deletes the branch from GitHub the moment it merges.
+      Fixed by switching the job's <strong>Branches to build</strong> field back to <code>*/main</code> —
+      the correct, permanent setting now that the phase is merged. See
+      <a href="tech/git.html#branch-deleted-after-merge">Git &amp; GitHub → A branch disappearing right after merge</a>.
+    </div>
+    <p><strong>Final verification — a full green Jenkins build against <code>main</code>:</strong> Trivy
+      found zero HIGH/CRITICAL vulnerabilities on <code>alpine:3.24.1</code>, <code>report_findings.py</code>
+      connected successfully and printed <code>reported 0 findings</code> (a correct empty report, not a
+      failed connection — proven by comparing against the connection-refused tracebacks seen earlier in this
+      same phase), ZAP's baseline scan ran with 8 advisory warnings and 0 fails, and both reports archived.
+      Confirmed via <code>GET /findings</code> that the 2 findings stored earlier in manual testing were
+      still there, untouched.</p>
+    <p><strong>This completes Phase 4</strong> — 12 steps, 63–74. First phase to close a loop opened by a
+      previous phase (Phase 5's scan output finally gets consumed, not just archived), and the first time a
+      Jenkins build was deliberately re-run against <code>main</code> after merge specifically to prove the
+      compliance gate works on the real, permanent branch — not just a feature branch mid-development.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-cors-vs-service-to-service">
+      <div class="q">Why does a message queue need CORS configuration, but a REST API between two backend services doesn't?</div>
+      <div class="a">CORS is enforced by the <em>browser</em>, not by servers talking to each other. RabbitMQ
+        publishing happens entirely server-side (Java calling RabbitMQ directly) — no browser is ever
+        involved, so CORS never applies there. It only became relevant in this phase because the React
+        dashboard (running in a browser) calls the Java REST API directly, and that's a cross-origin request
+        the browser polices.</div>
+    </div>
+    <div class="qa" id="qa-unrouted-message">
+      <div class="q">If a message gets published to an exchange with no queue bound to it, where does it go?</div>
+      <div class="a">Nowhere — it's accepted and immediately discarded. RabbitMQ doesn't hold unrouted
+        messages by default (unless the exchange is configured with an "alternate exchange" fallback). This
+        is exactly what happened in Step 66: <code>finding.detected</code> published successfully, visible
+        in the management UI's publish counter, with zero consumers and zero durability — a real, working
+        publish with nothing downstream yet.</div>
+    </div>
+    <div class="qa" id="qa-three-jackson-fixes">
+      <div class="q">Why did the exact same Jackson dependency problem take three separate fixes to fully resolve?</div>
+      <div class="a">Because they were three genuinely different failures stacked on top of each other, not
+        one problem showing three symptoms: (1) the message converter's zero-arg constructor called a
+        Jackson API version that didn't match what was resolved, (2) the base library wasn't even a declared
+        dependency at all, (3) the date/time extension module wasn't registered on the specific
+        <code>ObjectMapper</code> instance being used. Fixing one exposed the next, since each earlier
+        failure short-circuited the code before it ever reached the next issue.</div>
+    </div>
+  </div>
+
+  <h2 id="phase10">Phase 10 — Kafka</h2>
+  <p class="pill">9 steps (75–83), 1 branch. First Kafka usage in this project — a genuinely different tool
+    from Phase 4's RabbitMQ, not a second copy of the same idea. Written as <strong>pre-study
+    material</strong>, ahead of the actual build — status flips to Done and content gets corrected once each
+    step is really built and tested. Full concept explanation on <a href="tech/kafka.html">Kafka</a>, written
+    from zero for anyone who's never touched it before.</p>
+
+  <div class="step" id="step75">
+    <div class="step-header">
+      <span class="step-num">STEP 75</span>
+      <span class="step-title">Kafka running in Docker — KRaft mode, no ZooKeeper</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a single-broker Kafka instance for local development. Full explanation on
+      <a href="tech/kafka.html#kafka-docker">Kafka → Kafka in Docker</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/kafka-tracking
+
+# add to docker-compose.yml: a kafka service (image: apache/kafka:3.8.0), KRaft env vars, port 9092
+
+docker compose up -d kafka
+docker compose logs kafka
+# expect log lines showing the broker started, no ZooKeeper connection attempts anywhere
+
+git add docker-compose.yml
+git commit -m "add kafka broker"</code></pre>
+  </div>
+
+  <div class="step" id="step76">
+    <div class="step-header">
+      <span class="step-num">STEP 76</span>
+      <span class="step-title">Create the shipment.tracking topic</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> create the topic explicitly (3 partitions, replication factor 1) rather than
+      relying on auto-creation. Full explanation on
+      <a href="tech/kafka.html#kafka-concepts">Kafka → Topics, partitions, and offsets</a>.</p>
+    <pre><code>docker exec -it movetrack-kafka /opt/kafka/bin/kafka-topics.sh --create --topic shipment.tracking \
+  --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+
+docker exec -it movetrack-kafka /opt/kafka/bin/kafka-topics.sh --describe --topic shipment.tracking \
+  --bootstrap-server localhost:9092</code></pre>
+  </div>
+
+  <div class="step" id="step77">
+    <div class="step-header">
+      <span class="step-num">STEP 77</span>
+      <span class="step-title">Go Ingestion Service publishes to Kafka on every successful ping</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> retrofit a Kafka producer into the existing Go service, keyed by
+      <code>shipment_id</code> so one shipment's history always lands on the same partition. Full
+      explanation on <a href="tech/kafka.html#kafka-go-producer">Kafka → Publishing from Go</a>.</p>
+    <pre><code>cd services/shipment-ingestion
+go get github.com/segmentio/kafka-go
+
+# new kafka.go — a *kafka.Writer, Addr pointing at kafka:9092, Balancer: &amp;kafka.Hash{}
+# handleIngest() publishes the ping (JSON, keyed by shipment_id) after the Postgres insert succeeds
+
+git add services/shipment-ingestion
+git commit -m "publish shipment pings to kafka"</code></pre>
+  </div>
+
+  <div class="step" id="step78">
+    <div class="step-header">
+      <span class="step-num">STEP 78</span>
+      <span class="step-title">Verify with a console consumer that messages actually arrive</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> prove the producer really works before writing any consumer code.</p>
+    <pre><code>docker exec -it movetrack-kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --topic shipment.tracking --bootstrap-server localhost:9092 --from-beginning
+
+# in another terminal, POST a ping to the Go service, watch it appear in the consumer output</code></pre>
+  </div>
+
+  <div class="step" id="step79">
+    <div class="step-header">
+      <span class="step-num">STEP 79</span>
+      <span class="step-title">Python demo consumer — subscribes, logs every message</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a small standalone script proving real end-to-end consumption, not a full
+      service — Phase 9's WebSocket gateway is the real future consumer. Full explanation on
+      <a href="tech/kafka.html#kafka-python-consumer">Kafka → Consuming from Python</a>.</p>
+    <pre><code>mkdir services/kafka-demo-consumer
+cd services/kafka-demo-consumer
+python -m venv venv
+venv\Scripts\activate
+pip install kafka-python
+pip freeze &gt; requirements.txt
+
+# write consumer.py — KafkaConsumer, group_id="demo-consumer", auto_offset_reset="earliest"
+
+git add services/kafka-demo-consumer
+git commit -m "add kafka demo consumer"</code></pre>
+  </div>
+
+  <div class="step" id="step80">
+    <div class="step-header">
+      <span class="step-num">STEP 80</span>
+      <span class="step-title">Unit tests — Go producer</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code>cd services/shipment-ingestion
+# table-driven test for the message-building logic (key/value shape), same pattern as
+# Phase 6's existing tests — no real Kafka connection needed for this one
+
+go test ./...
+
+git add services/shipment-ingestion
+git commit -m "add unit tests for kafka producer"</code></pre>
+  </div>
+
+  <div class="step" id="step81">
+    <div class="step-header">
+      <span class="step-num">STEP 81</span>
+      <span class="step-title">Integration test — produce then consume round trip</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># a test that writes a message with the real kafka-go Writer, then reads it back with a
+# kafka-go Reader, asserting the value matches — needs the real kafka container running
+
+go test ./... -tags=integration
+
+git add services/shipment-ingestion
+git commit -m "add kafka integration test"</code></pre>
+  </div>
+
+  <div class="step" id="step82">
+    <div class="step-header">
+      <span class="step-num">STEP 82</span>
+      <span class="step-title">Dockerize the Python consumer</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># write Dockerfile, .dockerignore matching compliance-service's single-stage pattern
+
+docker build -t kafka-demo-consumer services/kafka-demo-consumer
+
+git add services/kafka-demo-consumer/Dockerfile services/kafka-demo-consumer/.dockerignore
+git commit -m "containerize kafka demo consumer"</code></pre>
+  </div>
+
+  <div class="step" id="step83">
+    <div class="step-header">
+      <span class="step-num">STEP 83</span>
+      <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># add kafka-demo-consumer to docker-compose.yml, depends_on kafka
+
+docker compose up -d --build
+docker compose ps
+# expect 12 containers now: the 10 from Phase 4 plus kafka and kafka-demo-consumer
+
+docker compose logs -f kafka-demo-consumer
+# POST a ping to the Go service, watch it appear in this container's logs too
+
+git push -u origin feature/kafka-tracking
+gh pr create --title "Add Kafka shipment tracking"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>This completes Phase 10</strong> once verified — 9 steps, 75–83.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -144,6 +146,42 @@ export default defineConfig({
     real user would see. A component using <code>useSelector</code>/<code>useDispatch</code> needs a real
     <code>&lt;Provider&gt;</code> wrapped around it in the test too — usually a small throwaway store built
     just for that test, separate from the app's real one.</p>
+
+  <h2 id="spa-nginx-routing">SPA routing behind nginx — why a page refresh can 404</h2>
+  <p><code>npm run build</code> produces exactly one real HTML file, <code>index.html</code>. Every other
+    "page" (<code>/moves</code>, <code>/claims</code>) doesn't exist as a file at all — React Router fakes
+    those URLs entirely with JavaScript, <em>after</em> <code>index.html</code> has already loaded.</p>
+  <div class="diagram">Clicking a link inside the app:
+  React's JS is already running -&gt; intercepts the click -&gt; swaps content client-side. Never asks the server for anything new.
+
+Typing a URL directly, or hitting refresh:
+  Brand new request straight to the server, before any JS has run.
+  nginx (by default) asks: "is there a real file called /moves?" -&gt; no -&gt; 404.</div>
+  <p>The stock <code>nginx:alpine</code> image (used with no custom config) has no rule telling it what to do
+    with a path that isn't a real file — it needs to be told explicitly to fall back to
+    <code>index.html</code> for anything it doesn't recognize, letting React Router take over from there.</p>
+  <pre><code>server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}</code></pre>
+  <table>
+    <tr><th><code>try_files</code> arg</th><th>What it tries</th></tr>
+    <tr><td><code>$uri</code></td><td>Is there a real file at this exact path?</td></tr>
+    <tr><td><code>$uri/</code></td><td>Is there a real folder (with an index file) at this path?</td></tr>
+    <tr><td><code>/index.html</code></td><td>Give up being literal — hand back <code>index.html</code> and let React Router figure out what the URL means</td></tr>
+  </table>
+  <div class="box gotcha">
+    <div class="box-title">Where this file has to be copied in</div>
+    Adding <code>nginx.conf</code> to the project does nothing on its own — the Dockerfile's final stage needs
+    an explicit <code>COPY nginx.conf /etc/nginx/conf.d/default.conf</code> after the existing
+    <code>COPY --from=build /app/dist /usr/share/nginx/html</code> line, replacing nginx's own default config
+    with this one.
+  </div>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-redux-why">

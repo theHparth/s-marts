@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Request &amp; Failure Flow Map</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="architecture.html">Architecture &amp; Progress</a>
+  <a href="architecture-2.html" class="active">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="tech/git.html">Git &amp; GitHub</a>
+  <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="tech/docker.html">Docker &amp; Compose</a>
+  <a href="tech/react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="tech/go.html">Go</a>
+  <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="interview.html">All Interview Questions</a>
+  <a href="notes/sql.html">SQL Notes</a>
+  <a href="notes/aws.html">AWS Notes</a>
+  <a href="notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="notes/linux.html">Linux/Unix Notes</a>
+  <a href="notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Request &amp; Failure Flow Map</h1>
+  <p class="subtitle">
+    <a href="architecture.html">Architecture &amp; Progress</a> shows <em>what exists</em> — every service,
+    every data store, every connection between them. This page shows <em>what actually happens</em> when a
+    real request moves through that system: which service handles it, which port, what it does next, and —
+    for every point where something could go either way — what happens if it succeeds, and what happens if it
+    doesn't. Every branch below is a real thing that happened during this project, not a hypothetical.
+  </p>
+
+  <div class="box why">
+    <div class="box-title">How to read these diagrams</div>
+    <ul>
+      <li>A plain <code>▼</code> arrow means "this step happened, moving straight to the next one."</li>
+      <li>A <code>├─</code> branch means a real decision point — something that can go more than one way.
+        Each branch is labeled with the condition and where it leads.</li>
+      <li><strong>FAILURE</strong> branches aren't hypothetical edge cases — every one shown here is a real
+        error this project actually hit, with a link to the full explanation and fix.</li>
+      <li>Diagrams in the normal box style below are <strong>confirmed built and verified</strong>. A diagram
+        in an amber, dashed box is <strong>planned</strong> — written before the code exists, the same
+        pre-study convention used on the tech reference pages, and gets replaced with the real, confirmed
+        version once that phase is actually built.</li>
+    </ul>
+  </div>
+
+  <h2 id="one-chart">The whole system, one chart</h2>
+  <p>Three ways to read the exact same picture:</p>
+  <table>
+    <tr><th>If you're...</th><th>Look at...</th></tr>
+    <tr><td><strong>a user</strong></td><td>the top two rows — you only ever touch the browser and the dashboard. Everything below that happens without you seeing it.</td></tr>
+    <tr><td><strong>a developer</strong></td><td>every box and every port label — this is the real map of what calls what, on which port, storing data where.</td></tr>
+    <tr><td><strong>a stakeholder</strong></td><td>the shape of it — 5 backend services, 4 data stores, 1 CI/CD pipeline, all wired together. The detailed flows further down this page are the evidence each connection actually works, not just a design intent.</td></tr>
+  </table>
+  <div class="diagram-svg-wrap" style="overflow-x:auto;">
+  <svg viewBox="0 0 1300 700" role="img" aria-label="MoveTrack Ops full system request and data flow chart" style="width:100%; height:auto; min-width:900px; font-family:'Segoe UI',Arial,sans-serif; display:block;">
+    <defs>
+      <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5b6663"/>
+      </marker>
+    </defs>
+
+    <!-- edges: request/data flow (solid) -->
+    <line x1="650" y1="75" x2="650" y2="108" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
+    <line x1="600" y1="163" x2="200" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="380" y="188" font-size="9.5" fill="#5b6663">fetch :8082</text>
+    <line x1="640" y1="163" x2="440" y2="208" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="560" y="192" font-size="9.5" fill="#5b6663">fetch :8081</text>
+
+    <line x1="130" y1="298" x2="130" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="138" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
+    <line x1="380" y1="298" x2="220" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="280" y="332" font-size="9" fill="#5b6663">JPA/Hibernate</text>
+    <line x1="1150" y1="298" x2="300" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="900" y="345" font-size="9" fill="#5b6663">database/sql</text>
+    <line x1="630" y1="298" x2="465" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="500" y="332" font-size="9" fill="#5b6663">cache get/set</text>
+    <line x1="880" y1="298" x2="690" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="720" y="332" font-size="9" fill="#5b6663">pymongo insert</text>
+    <line x1="200" y1="298" x2="880" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="650" y="315" font-size="9" fill="#5b6663">publish: move.created</text>
+    <line x1="440" y1="298" x2="920" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="600" y="352" font-size="9" fill="#5b6663">publish: claim.filed</text>
+    <line x1="900" y1="298" x2="1000" y2="358" stroke="#5b6663" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    <text x="960" y="345" font-size="8.3" fill="#5b6663">publish: finding.detected (HIGH/CRITICAL only)</text>
+
+    <!-- edges: CI/CD build-time flow (dashed) -->
+    <line x1="245" y1="560" x2="270" y2="560" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <line x1="500" y1="560" x2="525" y2="560" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <line x1="500" y1="580" x2="780" y2="580" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="275" y="553" font-size="8.3" fill="#b7791f">docker.sock</text>
+    <line x1="640" y1="518" x2="1130" y2="300" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="850" y="460" font-size="8.3" fill="#b7791f">builds + scans this image</text>
+    <line x1="700" y1="518" x2="880" y2="302" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="720" y="440" font-size="8.3" fill="#b7791f">Report Findings stage POSTs results</text>
+    <line x1="900" y1="518" x2="650" y2="168" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="760" y="270" font-size="8.3" fill="#b7791f">baseline scan http://dashboard:80</text>
+
+    <!-- browser -->
+    <rect x="520" y="20" width="260" height="55" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5"/>
+    <text x="650" y="42" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Browser — the user</text>
+    <text x="650" y="58" text-anchor="middle" font-size="10" fill="#1f2523">localhost:3000</text>
+
+    <!-- dashboard -->
+    <rect x="520" y="110" width="260" height="55" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="650" y="132" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">React Dashboard</text>
+    <text x="650" y="148" text-anchor="middle" font-size="10" fill="#1f2523">nginx :3000 → static build</text>
+
+    <!-- backend row -->
+    <rect x="15" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="132" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Move &amp; Entitlement</text>
+    <text x="132" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Java / Spring — :8082</text>
+    <text x="132" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /api/move-requests</text>
+    <text x="132" y="272" text-anchor="middle" font-size="9" fill="#1f2523">CORS: localhost:3000 only</text>
+    <text x="132" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes move.created</text>
+
+    <rect x="265" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="382" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Claims Service</text>
+    <text x="382" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Java / Spring — :8081</text>
+    <text x="382" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /api/claims</text>
+    <text x="382" y="272" text-anchor="middle" font-size="9" fill="#1f2523">adjuster/supervisor decision</text>
+    <text x="382" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes claim.filed</text>
+
+    <rect x="515" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="632" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Claims Triage ML</text>
+    <text x="632" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Python / FastAPI — :8000</text>
+    <text x="632" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST /predict</text>
+    <text x="632" y="272" text-anchor="middle" font-size="9" fill="#1f2523">scikit-learn pipeline</text>
+    <text x="632" y="286" text-anchor="middle" font-size="9" fill="#1f2523">not called by dashboard directly</text>
+
+    <rect x="765" y="208" width="235" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="882" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Compliance / Findings</text>
+    <text x="882" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Python / FastAPI — :8010</text>
+    <text x="882" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST/GET /findings</text>
+    <text x="882" y="272" text-anchor="middle" font-size="9" fill="#1f2523">called by Jenkins, not dashboard</text>
+    <text x="882" y="286" text-anchor="middle" font-size="9" fill="#1f2523">publishes finding.detected</text>
+
+    <rect x="1015" y="208" width="270" height="90" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="1150" y="230" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
+    <text x="1150" y="245" text-anchor="middle" font-size="9.5" fill="#1f2523">Go — :8090</text>
+    <text x="1150" y="259" text-anchor="middle" font-size="9" fill="#1f2523">POST/GET /ingest</text>
+    <text x="1150" y="272" text-anchor="middle" font-size="9" fill="#1f2523">called by carrier devices</text>
+    <text x="1150" y="286" text-anchor="middle" font-size="9" fill="#1f2523">the image Trivy scans</text>
+
+    <!-- data row -->
+    <rect x="15" y="358" width="330" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="180" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">PostgreSQL (shared) — :5432</text>
+    <text x="180" y="396" text-anchor="middle" font-size="9.5" fill="#1f2523">move_entitlement_db · claims_db · shipment_ingestion</text>
+    <text x="180" y="411" text-anchor="middle" font-size="9" fill="#1f2523">one container, database-per-service</text>
+    <text x="180" y="425" text-anchor="middle" font-size="9" fill="#1f2523">source of truth, relational</text>
+
+    <rect x="360" y="358" width="210" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="465" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">Redis — :6379</text>
+    <text x="465" y="396" text-anchor="middle" font-size="9" fill="#1f2523">prediction cache, 5-min TTL</text>
+    <text x="465" y="411" text-anchor="middle" font-size="9" fill="#1f2523">not a system of record</text>
+
+    <rect x="585" y="358" width="210" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="690" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">MongoDB — :27017</text>
+    <text x="690" y="396" text-anchor="middle" font-size="9" fill="#1f2523">variable-shape scan findings</text>
+    <text x="690" y="411" text-anchor="middle" font-size="9" fill="#1f2523">document store</text>
+
+    <rect x="810" y="358" width="280" height="80" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="950" y="380" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2523">RabbitMQ — :5672 (AMQP) + :15672 (UI)</text>
+    <text x="950" y="396" text-anchor="middle" font-size="9" fill="#1f2523">"compliance" topic exchange</text>
+    <text x="950" y="411" text-anchor="middle" font-size="9" fill="#1f2523">no queue bound yet — publishes, then discards</text>
+
+    <!-- CI/CD lane -->
+    <text x="15" y="502" font-size="11" font-weight="700" fill="#5b6663">CI/CD — build-time, not part of any user's request</text>
+    <rect x="15" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="130" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Jenkins — :8080</text>
+    <text x="130" y="557" text-anchor="middle" font-size="9" fill="#1f2523">Checkout → Build → Trivy →</text>
+    <text x="130" y="570" text-anchor="middle" font-size="9" fill="#1f2523">Report Findings → ZAP → Archive</text>
+
+    <rect x="270" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="385" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Docker Engine (host)</text>
+    <text x="385" y="557" text-anchor="middle" font-size="9" fill="#1f2523">reached via mounted socket</text>
+    <text x="385" y="570" text-anchor="middle" font-size="9" fill="#1f2523">(DooD — see docker.html)</text>
+
+    <rect x="525" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="640" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">Trivy (ephemeral)</text>
+    <text x="640" y="557" text-anchor="middle" font-size="9" fill="#1f2523">image vulnerability scan</text>
+    <text x="640" y="570" text-anchor="middle" font-size="9" fill="#1f2523">gate: exit 1 on HIGH/CRITICAL</text>
+
+    <rect x="780" y="520" width="230" height="65" rx="8" fill="#eaf5ee" stroke="#0f8a6b" stroke-width="2"/>
+    <text x="895" y="542" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2523">OWASP ZAP (ephemeral)</text>
+    <text x="895" y="557" text-anchor="middle" font-size="9" fill="#1f2523">passive baseline scan</text>
+    <text x="895" y="570" text-anchor="middle" font-size="9" fill="#1f2523">advisory only, never blocks</text>
+
+    <!-- legend -->
+    <line x1="15" y1="650" x2="60" y2="650" stroke="#5b6663" stroke-width="1.4" marker-end="url(#arrow2)"/>
+    <text x="70" y="654" font-size="10" fill="#1f2523">real-time request / data flow</text>
+    <line x1="15" y1="672" x2="60" y2="672" stroke="#b7791f" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow2)"/>
+    <text x="70" y="676" font-size="10" fill="#1f2523">CI/CD build-time flow (Jenkins-triggered, not user-triggered)</text>
+  </svg>
+  </div>
+  <p>Ports, arrows, and boxes here are all real — pulled directly from <code>docker-compose.yml</code> and the
+    actual code, not a design sketch. Every arrow above is expanded into a full step-by-step diagram — with
+    every real failure branch — further down this page.</p>
+
+  <h2 id="toc">On this page</h2>
+  <ul>
+    <li><a href="#one-chart">The whole system, one chart</a> — every service, port, and connection at a glance</li>
+    <li><a href="#flow-move-request">Move Request submission</a> — React → Java → Postgres → RabbitMQ</li>
+    <li><a href="#flow-claim-filing">Claim filing + approval state machine</a> — React → Java → Postgres → RabbitMQ</li>
+    <li><a href="#flow-shipment-ingestion">Shipment ingestion</a> — Go service, Postgres</li>
+    <li><a href="#flow-ml-predict">Claims triage prediction</a> — Python/FastAPI, Redis cache</li>
+    <li><a href="#flow-cicd">CI/CD pipeline</a> — Jenkins, Trivy gate, ZAP, Report Findings</li>
+    <li><a href="#flow-findings-ingestion">Findings ingestion + severity branch</a> — Compliance Service, MongoDB, RabbitMQ</li>
+    <li><a href="#failure-signatures">Common failure signatures, cross-cutting reference</a></li>
+    <li><a href="#growth">How this page grows with each new phase</a></li>
+  </ul>
+
+  <h2 id="flow-move-request">Move Request submission</h2>
+  <p>Confirmed built — <a href="steps.html#step69">Steps page → Step 69</a>. Full concept explanation on
+    <a href="tech/rabbitmq-mongodb.html#real-request-flow">RabbitMQ &amp; MongoDB → How a real request actually flows</a>;
+    this version adds every failure branch actually hit while building it.</p>
+  <div class="diagram">Browser (localhost:3000/moves) — click Submit
+  │
+  │ fetch POST http://localhost:8082/api/move-requests
+  ▼
+Does move-entitlement-service allow this browser origin (CORS)?
+  │
+  ├─ NO, no CORS config ──────► FAILURE: browser blocks the response before React ever sees it.
+  │                              Screen shows "Failed to fetch." The server actually received and
+  │                              processed the request (visible in container logs) — the browser
+  │                              refused to hand the response back to the calling JavaScript.
+  │                              Fix: java-spring.html#cors-config
+  │
+  ▼ YES, origin allowed
+MoveRequestController.submitMoveRequest() — @Valid checks the DTO
+  │
+  ├─ moveDate is in the past ─► FAILURE: HTTP 400, MethodArgumentNotValidException.
+  │                              Request never reaches the service layer — working as designed,
+  │                              not a bug.
+  │
+  ▼ validation passes
+EntitlementCalculationService.submitMoveRequest()
+  │
+  │ moveRequestRepository.save(request)
+  ▼
+PostgreSQL :5432 — move_entitlement_db, INSERT INTO move_requests
+  │
+  ▼ save succeeds, row now has an ID
+rabbitTemplate.convertAndSend("compliance", "move.created", saved)
+  │
+  ├─ Jackson message converter misconfigured ─► FAILURE: HTTP 500, MessageConversionException
+  │                              (three real, stacked causes hit here — full breakdown at
+  │                              rabbitmq-mongodb.html#java-jackson-gotchas). Note: the Postgres
+  │                              INSERT already committed by this point — the move exists in the
+  │                              database even though the request as a whole failed. Nothing rolls
+  │                              that back; the RabbitMQ publish isn't in the same transaction.
+  │
+  ▼ publish succeeds
+calculateEntitlement(id) — reads weight_allowances table for the submitted rank
+  │
+  ▼
+MoveRequestController builds { entitlementLbs: 7000 }, HTTP 200
+  │
+  ▼
+Browser — Redux store updates, "Entitlement: 7000 lbs" renders on screen</div>
+
+  <h2 id="flow-claim-filing">Claim filing + approval state machine</h2>
+  <p>Confirmed built — <a href="steps.html#step70">Steps page → Step 70</a>. CORS was already configured here
+    from an earlier phase, so this flow has one fewer failure branch than the Move Request one above.</p>
+  <div class="diagram">Browser (localhost:3000/claims) — click "File claim"
+  │
+  │ fetch POST http://localhost:8081/api/claims
+  ▼
+ClaimController.fileClaim() — @Valid checks ClaimRequest
+  │
+  ├─ required field missing ──► FAILURE: HTTP 400
+  │
+  ▼ validation passes
+ClaimApprovalService.submitForAdjusterReview()
+  │
+  │ claim.setStatus(ADJUSTER_REVIEW), claimRepository.save(claim)
+  ▼
+PostgreSQL :5432 — claims_db, INSERT INTO claims
+  │
+  ▼ save succeeds
+rabbitTemplate.convertAndSend("compliance", "claim.filed", saved)
+  │  (same exchange as move.created — the routing key is what tells the two apart downstream)
+  ▼
+HTTP 200 { id, status: "ADJUSTER_REVIEW" }
+  │
+  ▼
+Browser — "Claim #1 — ADJUSTER_REVIEW" renders</div>
+  <p>What happens next to that claim is its own branch, already built in earlier phases:</p>
+  <div class="diagram">ADJUSTER_REVIEW
+  │
+  │ POST /api/claims/{id}/adjuster-decision  { approved }
+  │
+  ├─ approved = false ─────────────────────────► REJECTED
+  │
+  ├─ approved = true, amount ≤ threshold ──────► APPROVED
+  │
+  └─ approved = true, amount &gt; threshold ──────► PENDING_SUPERVISOR_APPROVAL
+                                                     │
+                                                     │ POST /api/claims/{id}/supervisor-decision
+                                                     │
+                                              ┌──────┴──────┐
+                                       approved=false  approved=true
+                                              │              │
+                                          REJECTED        APPROVED</div>
+
+  <h2 id="flow-shipment-ingestion">Shipment ingestion (Go)</h2>
+  <p>Confirmed built — <a href="steps.html#phase6">Steps page → Phase 6</a>. No CORS branch here — this
+    service is only ever called machine-to-machine (carrier devices, or Jenkins/tests), never from the
+    browser dashboard directly.</p>
+  <div class="diagram">Carrier device / simulated client — POST :8090/ingest  { shipment_id, lat, lon, recorded_at }
+  │
+  ▼
+main.go handleIngest() — json.Decode into a ShipmentPing struct
+  │
+  ├─ malformed JSON body ──────► FAILURE: HTTP 400, decode error
+  │
+  ▼ decodes fine
+validatePing(ping) — checked BEFORE touching the database
+  │
+  ├─ required field missing ───► FAILURE: HTTP 400. Deliberately checked before any db call —
+  │                               an earlier version of this handler let a nil/invalid ping reach
+  │                               insertPing() first and panicked instead of returning a clean 400.
+  │
+  ▼ valid
+insertPing(db, ping) — parameterized SQL INSERT into shipment_ingestion.pings
+  │
+  ├─ Postgres unreachable ─────► FAILURE: HTTP 500, connection refused
+  │
+  ▼ insert succeeds
+HTTP 201 { id, shipment_id, lat, lon, recorded_at }
+
+Separately — GET :8090/ingest
+  │
+  ▼
+listPings(db) — SELECT ... ORDER BY recorded_at DESC
+  │  (recorded_at cast to ::text in the query itself — Go's database/sql can't Scan a
+  │   TIMESTAMPTZ column straight into a Go string otherwise)
+  ▼
+HTTP 200, JSON array of every stored ping</div>
+
+  <h2 id="flow-ml-predict">Claims triage prediction (Python/FastAPI)</h2>
+  <p>Confirmed built — <a href="steps.html#phase8">Steps page → Phase 8</a>. The one flow so far with a
+    genuine performance-driven branch: a cache hit skips the ML model entirely.</p>
+  <div class="diagram">Caller — POST :8000/predict  { claim features }
+  │
+  ▼
+Pydantic model validates the request shape
+  │
+  ├─ shape invalid ────────────► FAILURE: HTTP 422 (FastAPI's own automatic validation error)
+  │
+  ▼ valid
+build a cache key from the request → check Redis :6379
+  │
+  ├─ Cache HIT ─────────────────► return the cached prediction immediately.
+  │                                scikit-learn pipeline never runs at all for this request.
+  │
+  ▼ Cache MISS
+pandas builds a one-row DataFrame → the loaded scikit-learn pipeline predicts a priority
+  │
+  ▼
+cache the result in Redis (5-minute TTL) → HTTP 200 { priority, confidence }</div>
+
+  <h2 id="flow-cicd">CI/CD pipeline (Jenkins)</h2>
+  <p>Confirmed built — <a href="steps.html#phase5">Phase 5</a> + <a href="steps.html#step67">Step 67</a>. This
+    is the flow with the real "push code, then watch the pipeline react" loop the project is built around.</p>
+  <div class="diagram">You — git push origin your-branch
+  │
+  ▼
+Jenkins UI — click "Build Now" (this project triggers manually, not via webhook)
+  │
+  ▼
+Checkout stage — checkout scm pulls the Jenkinsfile + code from whatever the job's
+"Branches to build" field currently points at
+  │
+  ├─ branch renamed/deleted ───► FAILURE: "fatal: couldn't find remote ref ..."
+  │                               Real incident: a branch got squash-merged + auto-deleted by
+  │                               gh pr merge --delete-branch while Jenkins was still configured
+  │                               to build it. Fix: point the field at *staffed*/main instead.
+  │                               Full story: git.html#branch-deleted-after-merge
+  │
+  ▼ checkout succeeds
+Build stage — docker build the target service's image
+  │
+  ▼
+Trivy Scan stage — trivy image -f json -o trivy-report.json --exit-code 1 --severity HIGH,CRITICAL
+  │
+  ├─ HIGH/CRITICAL vulnerability found ─► exits 1, caught by "|| echo SEVERE FINDINGS DETECTED" —
+  │                                        the stage keeps running (doesn't hard-abort the whole
+  │                                        pipeline) but is now VISIBLY flagged in Console Output.
+  │                                        This flag-not-abort behavior IS the compliance gate.
+  │
+  ▼ clean scan, exits 0
+Report Findings stage — python3 scripts/report_findings.py unpacks the JSON, POSTs one
+request per vulnerability to compliance-service
+  │
+  ├─ compliance-service not reachable ─► connection error printed, caught by "|| true",
+  │                                       stage still shows green. (Real early-phase state,
+  │                                       before Step 74 wired the service into the same
+  │                                       Docker network as Jenkins.)
+  │
+  ▼ reaches compliance-service — see the findings-ingestion flow below for what happens next
+ZAP Baseline Scan stage — passive scan against http://dashboard:80
+  │
+  ▼ advisory only — WARN-NEW findings never fail the build ("|| true" always continues)
+Archive Reports stage — archiveArtifacts *-report.html
+  │
+  ▼
+Build marked SUCCESS
+(the only stage that hard-fails the whole pipeline on a real problem is the Docker
+ build itself — everything after it is designed to flag, not block)</div>
+
+  <h2 id="flow-findings-ingestion">Findings ingestion — the severity branch</h2>
+  <p>Confirmed built — <a href="steps.html#step65">Step 65</a> / <a href="steps.html#step66">Step 66</a>. This
+    is the exact decision that determines whether RabbitMQ ever hears about a finding at all.</p>
+  <div class="diagram">Jenkins's report_findings.py — POST :8010/findings  { source, severity, title, target }
+  │
+  ▼
+Pydantic Finding model validates
+  │
+  ├─ shape invalid ────────────► FAILURE: HTTP 422
+  │
+  ▼ valid
+db.findings.insert_one(doc) — MongoDB :27017
+  │
+  ▼ always succeeds — Mongo has no schema to violate, unlike a SQL insert
+should_publish(severity)?
+  │
+  ├─ severity in (LOW, MEDIUM) ─► NO — nothing published. Finding is stored, permanently
+  │                                queryable via GET /findings, but silent otherwise.
+  │
+  └─ severity in (HIGH, CRITICAL) ─► YES — publish_finding_detected() sends to RabbitMQ :5672,
+                                       "compliance" exchange, routing key finding.detected.
+                                       No queue is bound to that exchange yet — the message
+                                       publishes successfully and is currently discarded with
+                                       nowhere to go. That's expected at this point (future work),
+                                       not a bug — see rabbitmq-mongodb.html#rabbitmq-concepts.
+  │
+  ▼
+HTTP 200 { id }  (returned either way — publishing is fire-and-forget, never blocks the response)</div>
+
+  <h2 id="failure-signatures">Common failure signatures — cross-cutting reference</h2>
+  <p>The same handful of failure shapes keep recurring across totally different technologies. This table is
+    the fast way to recognize which one you're looking at.</p>
+  <table>
+    <tr><th>What you see</th><th>Where it happens</th><th>Real cause</th><th>Full explanation</th></tr>
+    <tr><td><code>Failed to fetch</code> in the browser console</td><td>React calling any Java/Python service directly</td><td>Missing CORS configuration on the server</td><td><a href="tech/java-spring.html#cors-config">java-spring.html#cors-config</a></td></tr>
+    <tr><td>nginx 404 page on a direct URL or refresh</td><td>The dashboard container</td><td>No SPA fallback rule in nginx's config</td><td><a href="tech/react-redux.html#spa-nginx-routing">react-redux.html#spa-nginx-routing</a></td></tr>
+    <tr><td>HTTP 405 Method Not Allowed</td><td>Any REST framework</td><td>Testing a method (GET) before that route existed yet — the path is real, the method isn't</td><td>expected mid-build sequencing, not a bug</td></tr>
+    <tr><td>HTTP 400 / 422</td><td>Validation layer (Pydantic / <code>@Valid</code>)</td><td>Input genuinely fails a real rule (e.g. a past date on a <code>@FutureOrPresent</code> field)</td><td>working as designed</td></tr>
+    <tr><td>Python traceback / connection refused calling another service</td><td>Any container reaching another by service name</td><td>Target service not yet on the same Docker network, or not running/built yet</td><td><a href="tech/docker.html#docker-outside-docker">docker.html#docker-outside-docker</a></td></tr>
+    <tr><td><code>pip: not found</code></td><td>Jenkins container</td><td>Base Jenkins image has no Python installed</td><td><a href="tech/jenkins.html#python-in-jenkins-image">jenkins.html#python-in-jenkins-image</a></td></tr>
+    <tr><td><code>fatal: couldn't find remote ref</code></td><td>Jenkins Checkout stage</td><td>Branch was renamed or deleted — often because it was already squash-merged</td><td><a href="tech/git.html#branch-deleted-after-merge">git.html#branch-deleted-after-merge</a></td></tr>
+    <tr><td><code>NoClassDefFoundError</code> on app startup</td><td>Java service using a hand-built message converter</td><td>A newer library API called than what's actually resolved on the classpath</td><td><a href="tech/rabbitmq-mongodb.html#java-jackson-gotchas">rabbitmq-mongodb.html#java-jackson-gotchas</a></td></tr>
+    <tr><td><code>ModuleNotFoundError: No module named 'app'</code></td><td>pytest, any Python service</td><td>Missing <code>tests/__init__.py</code>, or pytest run from the wrong directory</td><td><a href="tech/python-fastapi.html#pytest-module-not-found">python-fastapi.html#pytest-module-not-found</a></td></tr>
+  </table>
+
+  <h2 id="growth">How this page grows with each new phase</h2>
+  <p>This page follows the same rule as <a href="architecture.html">Architecture &amp; Progress</a>: at the
+    start of every new phase, a new flow diagram gets added here in the amber/planned style below —
+    describing what the new service is expected to do, before any of it is built. Once that phase is
+    confirmed working, the diagram gets replaced with the normal style, corrected to match what was actually
+    built (including whatever real failure branches got hit along the way, the same as every flow above).</p>
+  <div class="box warn">
+    <div class="box-title">PLANNED — Phase 10 (Kafka), not yet built</div>
+    <p>Written ahead of the build. Full concept explanation on <a href="tech/kafka.html">Kafka</a>.</p>
+    <div class="diagram">Carrier device — POST :8090/ingest  { shipment_id, lat, lon, recorded_at }
+  │
+  ▼  (same validate → insert flow as the confirmed diagram above)
+insertPing(db, ping) — PostgreSQL :5432
+  │
+  ▼ insert succeeds
+writer.WriteMessages() — kafka-go, key=shipment_id, topic=shipment.tracking
+  │
+  ├─ Kafka broker unreachable ─► PLANNED FAILURE: publish call errors/times out.
+  │                                Unlike the Postgres insert above, nothing has
+  │                                rolled back — the ping is safely stored either way.
+  │
+  ▼ publish succeeds — Kafka picks the partition by hashing shipment_id,
+  │  so this shipment's pings always land on the same partition, in order
+  ▼
+HTTP 201 (response to the carrier device doesn't wait on Kafka at all —
+publish happens after the response-worthy work, same fire-and-forget
+shape as RabbitMQ in Phase 4)
+
+Separately, continuously running —
+kafka-demo-consumer (Python) — subscribed to shipment.tracking, group_id="demo-consumer"
+  │
+  ▼
+for message in consumer: print(partition, offset, value)
+  │
+  ├─ consumer container restarts ─► PLANNED: resumes from its last committed
+  │                                  offset per partition — no messages lost
+  │                                  or reprocessed, the core guarantee this
+  │                                  phase exists to prove works</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — companion to Architecture &amp; Progress. That page shows what
+    exists; this one shows what happens when a request actually moves through it. Grows by one confirmed flow
+    (and, briefly, one planned flow) every phase.</footer>
+</main>
+</div>
+<script src="assets/page-nav.js"></script>
+</body>
+</html>

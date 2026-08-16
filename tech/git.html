@@ -12,6 +12,7 @@
   <div class="brand">MoveTrack <span>Ops</span></div>
   <div class="group-label">Big Picture</div>
   <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
   <div class="group-label">Build Log</div>
   <a href="../steps.html">Steps</a>
   <div class="group-label">Technology Reference</div>
@@ -23,6 +24,7 @@
   <a href="go.html">Go</a>
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -388,6 +390,35 @@ git branch -D &lt;wrong-branch-name&gt;  # delete the old branch once its real c
     Step 31 containerize commit, and Phase 6's Step 50 Docker/compose commit — all landed on an already-open
     branch instead of a fresh one, all recovered the same way with zero lost work.
   </div>
+
+  <h2 id="branch-deleted-after-merge">A branch disappearing right after merge — not a bug</h2>
+  <p><code>gh pr merge --squash --delete-branch</code> does exactly what its name says: squashes every commit
+    on the feature branch into one new commit on the base branch, then deletes the feature branch from
+    GitHub entirely — immediately, not on a delay.</p>
+  <div class="diagram">Before merge:
+  origin/feature/compliance-service  -&gt;  exists, Jenkins can fetch it
+  origin/main                         -&gt;  doesn't have this work yet
+
+gh pr merge --squash --delete-branch:
+  origin/main                         -&gt;  gets ONE new squashed commit
+  origin/feature/compliance-service  -&gt;  deleted, gone immediately
+
+Any tool still configured to fetch the old branch name (e.g. a CI
+job's "Branches to build" setting) will fail with:
+  fatal: couldn't find remote ref refs/heads/feature/compliance-service</div>
+  <div class="box gotcha">
+    <div class="box-title">Real incident — Jenkins job still pointed at the deleted branch</div>
+    A Jenkins job had its <strong>Branches to build</strong> field temporarily switched to
+    <code>*/feature/compliance-service</code> mid-phase, to test in-progress work before it was merged.
+    After the merge/delete ran, re-triggering that same job failed with the exact error above — not a real
+    problem, just a stale setting pointing at a branch that no longer exists. Fixed by switching the field
+    back to <code>*/main</code>, which is also the correct permanent setting once a phase is done (real CI
+    watches the base branch, not a developer's personal feature branch).
+  </div>
+  <p>A quick way to confirm a "missing ref" error is this exact situation rather than something actually
+    wrong: <code>git log --oneline -1</code> on <code>main</code> — if the latest commit message matches the
+    PR title you just merged, the branch is gone because the merge already succeeded, not because of a real
+    failure.</p>
 
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-cherry-pick-wrong-branch">
