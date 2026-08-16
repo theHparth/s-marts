@@ -22,6 +22,7 @@
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -698,6 +699,40 @@
       instead of fetching everything and sorting client-side.</div>
   </div>
   <p class="pill">↳ <a href="notes/redis.html#qa-redis-when-sorted-set">Redis Notes</a></p>
+
+  <h2 id="from-rabbitmq-mongodb">From RabbitMQ &amp; MongoDB</h2>
+
+  <div class="qa">
+    <div class="q">RabbitMQ vs. Kafka — why would you pick one over the other?</div>
+    <div class="a">RabbitMQ is a message <em>broker</em> — it pushes each message to a consumer, then forgets
+      it (or holds it briefly if nobody's listening); it shines at routing individual work items to the right
+      place (exact-once task distribution, priority queues, request/reply). Kafka is a <em>distributed log</em>
+      — it keeps every message for a retention window, and any number of independent consumers can replay
+      from any offset; it shines at high-throughput event streaming where multiple systems need the same
+      history. MoveTrack Ops uses RabbitMQ because Phase 4's job is routing discrete events (a finding
+      detected, a move created) to one interested consumer each — not replaying a long history.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/rabbitmq-mongodb.html#qa-rabbitmq-vs-kafka">RabbitMQ &amp; MongoDB</a></p>
+
+  <div class="qa">
+    <div class="q">Why store Trivy/ZAP findings in MongoDB instead of a Postgres table?</div>
+    <div class="a">Every scanner shapes its findings differently — a Trivy CVE has package/version/severity
+      fields, a ZAP alert has URL/risk/evidence fields, and a future scanner will have yet another shape.
+      Forcing all of that into one fixed relational schema means either a wide table of mostly-null columns
+      or constant migrations as new scanners get added. MongoDB stores each finding as a document that can
+      carry whatever fields that finding type needs, with no schema migration required to add a new shape.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/rabbitmq-mongodb.html#qa-mongo-why-document-store">RabbitMQ &amp; MongoDB</a></p>
+
+  <div class="qa">
+    <div class="q">What's the actual difference between an exchange and a queue in RabbitMQ?</div>
+    <div class="a">A producer never sends directly to a queue — it always sends to an <strong>exchange</strong>,
+      which is just a routing rule. The exchange decides which queue(s) the message actually lands in, based
+      on the exchange type (direct/topic/fanout) and the message's routing key. A <strong>queue</strong> is
+      the actual buffer a consumer reads from. Splitting the two apart is what lets one published event fan
+      out to multiple independent consumers without the producer knowing or caring who's listening.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/rabbitmq-mongodb.html#qa-rabbitmq-exchange-vs-queue">RabbitMQ &amp; MongoDB</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

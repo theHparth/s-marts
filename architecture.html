@@ -45,6 +45,7 @@
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -156,11 +157,11 @@
         </g>
 
         <g class="node" data-node="compliance">
-          <rect x="485" y="216" width="190" height="80" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <rect x="485" y="216" width="190" height="80" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
           <text x="580" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Compliance / Findings</text>
           <text x="580" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Python / FastAPI</text>
           <text x="580" y="268" text-anchor="middle" font-size="10" fill="#1f2523">ingests Trivy + ZAP scans</text>
-          <text x="580" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <text x="580" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Steps 63-74</text>
         </g>
 
         <g class="node" data-node="soap">
@@ -188,19 +189,19 @@
         </g>
 
         <g class="node" data-node="mongodb">
-          <rect x="380" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <text x="475" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">MongoDB</text>
-          <text x="475" y="419" text-anchor="middle" font-size="10" fill="#1f2523">written by: Compliance</text>
-          <text x="475" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <rect x="380" y="380" width="190" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="475" y="401" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">MongoDB</text>
+          <text x="475" y="415" text-anchor="middle" font-size="10" fill="#1f2523">written by: Compliance</text>
+          <text x="475" y="428" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">in progress — Step 64</text>
         </g>
 
 
         <g class="node" data-node="rabbitmq">
-          <rect x="690" y="380" width="190" height="68" rx="8" fill="#f7f9f8" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <text x="785" y="399" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">RabbitMQ</text>
-          <text x="785" y="413" text-anchor="middle" font-size="10" fill="#1f2523">from: Move&amp;Ent, Claims,</text>
-          <text x="785" y="425" text-anchor="middle" font-size="10" fill="#1f2523">Compliance (business events)</text>
-          <text x="785" y="440" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6663">not started</text>
+          <rect x="690" y="380" width="190" height="68" rx="8" fill="#fdf3e0" stroke="#b7791f" stroke-width="2"/>
+          <text x="785" y="397" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2523">RabbitMQ</text>
+          <text x="785" y="410" text-anchor="middle" font-size="10" fill="#1f2523">from: Move&amp;Ent, Claims,</text>
+          <text x="785" y="422" text-anchor="middle" font-size="10" fill="#1f2523">Compliance (business events)</text>
+          <text x="785" y="435" text-anchor="middle" font-size="9.5" font-style="italic" fill="#b7791f">in progress — Steps 66,69,70</text>
         </g>
 
         <g class="node" data-node="kafka">
@@ -265,7 +266,7 @@
     <tr><td>2</td><td><a href="steps.html#phase2">Claims Service</a></td><td>3–12</td><td>10</td><td class="mark">Done</td><td>Feeds: Phase 8 (ML trains on claims data), Phase 9 (WebSocket)</td></tr>
     <tr><td>3</td><td>React/Redux dashboard skeleton</td><td>22–31</td><td>10</td><td class="mark">Done</td><td>Needs: Phases 1 &amp; 2's REST APIs to have something to call</td></tr>
     <tr><td>8</td><td><a href="steps.html#phase8">Claims triage ML + Redis</a></td><td>32–40</td><td>9</td><td class="mark">Done</td><td>Needs: Phase 2's claim data to train on. Pulled forward ahead of Phases 4–7. Feeds: Phase 10 (Kafka) once that phase exists, for real-time consumption instead of synchronous /predict calls; Phase 14 (ML research track compares against this production model).</td></tr>
-    <tr><td>4</td><td>RabbitMQ + Compliance/Findings Service</td><td>TBD</td><td>~18</td><td>Not started</td><td>Needs: Phase 5's Jenkins pipeline to actually produce scan results to ingest</td></tr>
+    <tr><td>4</td><td><a href="steps.html#phase4">RabbitMQ + Compliance/Findings Service</a></td><td>63–74</td><td>12</td><td class="prog">In progress</td><td>Needed Phase 5's Jenkins pipeline to actually produce scan results to ingest — now satisfied</td></tr>
     <tr><td>5</td><td><a href="steps.html#phase5">Trivy/ZAP/Jenkins compliance gate</a></td><td>53–62</td><td>10</td><td class="mark">Done</td><td>Feeds: Phase 4 (Compliance Service ingests its scan output)</td></tr>
     <tr><td>6</td><td><a href="steps.html#phase6">Go Ingestion Service (REST)</a></td><td>41–52</td><td>12</td><td class="mark">Done</td><td>Feeds: Phase 10 (Kafka), Phase 13 (raw sockets extend this same service)</td></tr>
     <tr><td>7</td><td>SOAP Legacy Adapter</td><td>TBD</td><td>~8</td><td>Not started</td><td>Needs: Phase 1's REST API to translate to/from</td></tr>
@@ -368,11 +369,20 @@
       ]
     },
     compliance: {
-      name: "Compliance / Findings Service", tech: "Python / FastAPI", status: "not-started",
-      port: "TBD", input: "Trivy + OWASP ZAP scan output from the Jenkins pipeline (Phase 5)",
+      name: "Compliance / Findings Service", tech: "Python / FastAPI", status: "in-progress",
+      port: "8010 (planned)", input: "Trivy + OWASP ZAP scan output, POSTed directly from the Jenkins pipeline (Phase 5)",
       output: "Stored findings in MongoDB, publishes finding.detected events to RabbitMQ",
       why: "Blocks the build on an unresolved critical security finding — the platform's own DevSecOps gate.",
-      steps: []
+      steps: [
+        {n:"Step 63", t:"Python venv + requirements.txt, skeleton FastAPI app", href:null, done:false},
+        {n:"Step 65", t:"POST /findings — ingest a scan finding, store in MongoDB", href:null, done:false},
+        {n:"Step 67", t:"Extend Jenkinsfile — POST Trivy's real report to this service", href:null, done:false},
+        {n:"Step 68", t:"GET /findings — list stored findings", href:null, done:false},
+        {n:"Step 71", t:"Unit tests (pytest)", href:null, done:false},
+        {n:"Step 72", t:"Integration tests (FastAPI TestClient)", href:null, done:false},
+        {n:"Step 73", t:"Dockerize", href:null, done:false},
+        {n:"Step 74", t:"Wire into docker-compose.yml, verify end-to-end, merge", href:null, done:false}
+      ]
     },
     soap: {
       name: "SOAP Legacy Adapter", tech: "Java / Spring-WS", status: "not-started",
@@ -414,10 +424,12 @@
       ]
     },
     mongodb: {
-      name: "MongoDB", tech: "Document store", status: "not-started",
-      port: "TBD", input: "Raw Trivy/ZAP scan findings from the Compliance Service",
+      name: "MongoDB", tech: "Document store", status: "in-progress",
+      port: "27017 (planned), published to host", input: "Raw Trivy/ZAP scan findings from the Compliance Service",
       output: "Queryable finding documents", why: "Scan results are semi-structured/variable-shape — a document store fits better than forcing them into relational columns.",
-      steps: []
+      steps: [
+        {n:"Step 64", t:"MongoDB running in Docker, Compliance Service connects via pymongo", href:null, done:false}
+      ]
     },
     redis: {
       name: "Redis", tech: "In-memory cache", status: "in-progress",
@@ -431,10 +443,14 @@
       ]
     },
     rabbitmq: {
-      name: "RabbitMQ", tech: "Message broker", status: "not-started",
-      port: "TBD (default 5672)", input: "move.created, claim.filed, finding.detected events from Move & Entitlement, Claims, and Compliance",
+      name: "RabbitMQ", tech: "Message broker", status: "in-progress",
+      port: "5672 (AMQP) + 15672 (management UI), published to host", input: "move.created, claim.filed, finding.detected events from Move & Entitlement, Claims, and Compliance",
       output: "Routed events to whichever service subscribes", why: "Business/domain events that need routing and occasional replay — a traditional queue fits better here than Kafka's durable-log model.",
-      steps: []
+      steps: [
+        {n:"Step 66", t:"RabbitMQ running in Docker, Compliance publishes finding.detected", href:null, done:false},
+        {n:"Step 69", t:"Move & Entitlement (Java) publishes move.created", href:null, done:false},
+        {n:"Step 70", t:"Claims Service (Java) publishes claim.filed", href:null, done:false}
+      ]
     },
     kafka: {
       name: "Kafka", tech: "Distributed log, topic: shipment.tracking", status: "not-started",

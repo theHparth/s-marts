@@ -22,6 +22,7 @@
   <a href="tech/python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
   <a href="tech/go.html">Go</a>
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -2240,6 +2241,222 @@ git pull origin main</code></pre>
     </div>
     <p><strong>This completes Phase 5</strong> — 10 steps, 53–62. The most gotcha-prone phase of the project
       so far.</p>
+  </div>
+
+  <h2 id="phase4">Phase 4 — RabbitMQ + Compliance/Findings Service</h2>
+  <p class="pill">12 steps (63–74), 1 branch. First MongoDB and first RabbitMQ usage in this project. Closes
+    the loop with Phase 5 — Jenkins's Trivy/ZAP reports actually get ingested now, not just archived. Written
+    as <strong>pre-study material</strong>, ahead of the actual build — status flips to Done and content
+    gets corrected once each step is really built and tested.</p>
+
+  <div class="step" id="step63">
+    <div class="step-header">
+      <span class="step-num">STEP 63</span>
+      <span class="step-title">Compliance Service — Python venv + skeleton FastAPI app</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> a bare FastAPI service, second Python service in this project after Claims
+      Triage ML. Full explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/compliance-service
+
+mkdir services/compliance-service
+cd services/compliance-service
+python -m venv venv
+venv\Scripts\activate
+pip install fastapi uvicorn pymongo pika
+pip freeze &gt; requirements.txt
+
+# write app/main.py — FastAPI app with a GET /health endpoint
+
+git add services/compliance-service
+git commit -m "scaffold compliance service"</code></pre>
+  </div>
+
+  <div class="step" id="step64">
+    <div class="step-header">
+      <span class="step-num">STEP 64</span>
+      <span class="step-title">MongoDB running in Docker, service connects via pymongo</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> first MongoDB usage in this project. Full explanation on
+      <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → MongoDB core concepts</a>.</p>
+    <pre><code># add to docker-compose.yml: a mongodb service (image: mongo:7) + mongo_data volume
+
+docker compose up -d mongodb
+
+# write app/db.py — connectMongo() using pymongo
+
+git add docker-compose.yml services/compliance-service/app/db.py
+git commit -m "connect compliance service to mongodb"</code></pre>
+  </div>
+
+  <div class="step" id="step65">
+    <div class="step-header">
+      <span class="step-num">STEP 65</span>
+      <span class="step-title">POST /findings — ingest a scan finding, store in MongoDB</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> the real ingestion endpoint. Full explanation on
+      <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → Basic pymongo usage</a>.</p>
+    <pre><code># write app/schemas.py — Finding Pydantic model
+# add POST /findings to app/main.py, calling db insert
+
+git add services/compliance-service/app
+git commit -m "add POST /findings endpoint"</code></pre>
+  </div>
+
+  <div class="step" id="step66">
+    <div class="step-header">
+      <span class="step-num">STEP 66</span>
+      <span class="step-title">RabbitMQ running in Docker, publish finding.detected</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> first RabbitMQ usage in this project. Full explanation on
+      <a href="tech/rabbitmq-mongodb.html#rabbitmq-concepts">RabbitMQ &amp; MongoDB → RabbitMQ core concepts</a>.</p>
+    <pre><code># add to docker-compose.yml: a rabbitmq service (image: rabbitmq:3-management), ports 5672 + 15672
+
+docker compose up -d rabbitmq
+# verify management UI at http://localhost:15672 (default guest/guest)
+
+# write app/events.py — publish_finding_detected() using pika
+# call it from POST /findings when severity is HIGH/CRITICAL
+
+git add docker-compose.yml services/compliance-service/app
+git commit -m "publish finding.detected to rabbitmq"</code></pre>
+  </div>
+
+  <div class="step" id="step67">
+    <div class="step-header">
+      <span class="step-num">STEP 67</span>
+      <span class="step-title">Extend Jenkinsfile — POST Trivy's real report to this service</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> close the loop with Phase 5 — real scan data flows in automatically, not
+      manual testing only.</p>
+    <pre><code># add a stage after Trivy Scan in the Jenkinsfile:
+#         stage('Report Findings') {
+#             steps {
+#                 sh 'curl -X POST http://compliance-service:8010/findings -H "Content-Type: application/json" -d @trivy-report.json || true'
+#             }
+#         }
+# (adjust once Step 65's exact Finding schema is confirmed against Trivy's real JSON output shape)
+
+git add Jenkinsfile
+git commit -m "wire jenkins trivy output into compliance service"</code></pre>
+  </div>
+
+  <div class="step" id="step68">
+    <div class="step-header">
+      <span class="step-num">STEP 68</span>
+      <span class="step-title">GET /findings — list stored findings</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> verify persistence and retrieval both work.</p>
+    <pre><code># add GET /findings to app/main.py, querying MongoDB
+
+git add services/compliance-service/app
+git commit -m "add GET /findings endpoint"</code></pre>
+  </div>
+
+  <div class="step" id="step69">
+    <div class="step-header">
+      <span class="step-num">STEP 69</span>
+      <span class="step-title">Move &amp; Entitlement (Java) publishes move.created</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> retrofit RabbitMQ publishing into an existing Java service. Full explanation on
+      <a href="tech/rabbitmq-mongodb.html#rabbitmq-concepts">RabbitMQ &amp; MongoDB → Publishing from Java</a>.</p>
+    <pre><code>cd services/move-entitlement-service
+# add spring-boot-starter-amqp to pom.xml
+# add RabbitMQ connection properties to application.properties
+# publish move.created via RabbitTemplate when a move is created
+
+git add services/move-entitlement-service
+git commit -m "publish move.created to rabbitmq"</code></pre>
+  </div>
+
+  <div class="step" id="step70">
+    <div class="step-header">
+      <span class="step-num">STEP 70</span>
+      <span class="step-title">Claims Service (Java) publishes claim.filed</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> same pattern as Step 69, second Java service.</p>
+    <pre><code>cd services/claims-service
+# same spring-boot-starter-amqp + RabbitTemplate pattern as Step 69
+# publish claim.filed when a claim is filed
+
+git add services/claims-service
+git commit -m "publish claim.filed to rabbitmq"</code></pre>
+  </div>
+
+  <div class="step" id="step71">
+    <div class="step-header">
+      <span class="step-num">STEP 71</span>
+      <span class="step-title">Unit tests (pytest)</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code>cd services/compliance-service
+# write tests/test_findings.py
+
+pytest
+
+git add services/compliance-service/tests
+git commit -m "add unit tests for findings logic"</code></pre>
+  </div>
+
+  <div class="step" id="step72">
+    <div class="step-header">
+      <span class="step-num">STEP 72</span>
+      <span class="step-title">Integration tests (FastAPI TestClient)</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># write tests/test_api.py using TestClient
+
+pytest
+
+git add services/compliance-service/tests
+git commit -m "add api integration tests"</code></pre>
+  </div>
+
+  <div class="step" id="step73">
+    <div class="step-header">
+      <span class="step-num">STEP 73</span>
+      <span class="step-title">Dockerize Compliance Service</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Goal:</strong> same single-stage pattern as Claims Triage ML. Full explanation on
+      <a href="tech/python-fastapi.html#python-dockerfile">Python, FastAPI &amp; scikit-learn → Containerizing a Python service</a>.</p>
+    <pre><code># write Dockerfile, .dockerignore matching claims-triage-ml's pattern
+
+docker build -t compliance-service services/compliance-service
+
+git add services/compliance-service/Dockerfile services/compliance-service/.dockerignore
+git commit -m "containerize compliance service"</code></pre>
+  </div>
+
+  <div class="step" id="step74">
+    <div class="step-header">
+      <span class="step-num">STEP 74</span>
+      <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># add compliance-service to docker-compose.yml, DATABASE/RABBITMQ env vars pointing at
+# service names (mongodb, rabbitmq), depends_on both
+
+docker compose up -d --build
+docker compose ps
+# expect 10 containers now: the 8 from Phase 5 plus mongodb and compliance-service
+# (rabbitmq already came up in Step 66)
+
+git push -u origin feature/compliance-service
+gh pr create --title "Add RabbitMQ and Compliance Service"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>This completes Phase 4</strong> once verified — 12 steps, 63–74.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

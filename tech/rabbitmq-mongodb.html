@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — RabbitMQ &amp; MongoDB</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html" class="active">RabbitMQ &amp; MongoDB</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>RabbitMQ &amp; MongoDB <span class="tag">Phase 4</span></h1>
+  <p class="subtitle">
+    Fundamentals + how this project actually uses it. For when each piece was introduced, see the
+    <a href="../steps.html#phase4">Steps page → Phase 4</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 4 (RabbitMQ + Compliance/Findings Service) is in progress. Everything on this page reflects the
+    <em>planned</em> implementation — read it now to get familiar with the tools before writing code, then it
+    gets corrected/confirmed once each step is really built and tested.
+  </div>
+
+  <h2 id="why-this-phase">Why this phase exists — the plain version</h2>
+  <div class="diagram">Phase 5 (done):  Jenkins runs Trivy/ZAP → findings archived as a build artifact
+                                          (a report sitting in a file, nobody reading it automatically)
+
+Phase 4 (this):  Jenkins POSTs that same report → Compliance Service → stored + queryable
+                                                                       → an alert event fires if it's bad</div>
+  <p>Two new pieces of infrastructure make that possible: <strong>MongoDB</strong> (where findings actually
+    live) and <strong>RabbitMQ</strong> (how "a bad finding just got stored" gets announced to the rest of
+    the system, without the Compliance Service needing to know who's listening).</p>
+
+  <h2 id="overview">What each piece is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>What it is</th></tr>
+    <tr><td><strong>RabbitMQ</strong></td><td>A message broker — services send messages to it, other services receive them, without talking to each other directly</td></tr>
+    <tr><td><strong>MongoDB</strong></td><td>A NoSQL document database — stores flexible, JSON-like documents instead of fixed-schema rows/columns</td></tr>
+    <tr><td><strong>pika</strong></td><td>The Python client library for talking to RabbitMQ</td></tr>
+    <tr><td><strong>pymongo</strong></td><td>The Python client library for talking to MongoDB</td></tr>
+    <tr><td><strong>Spring AMQP</strong></td><td>Spring's abstraction over RabbitMQ, used to add publishing to the existing Java services</td></tr>
+  </table>
+
+  <h2 id="rabbitmq-concepts">RabbitMQ core concepts</h2>
+  <div class="diagram">Producer                    Exchange                    Queue              Consumer
+   │                          │                          │                    │
+   │── publish(routing_key) ─►│── routes by key/rules ──►│── holds messages ─►│── consume()
+                                                            until read
+
+A producer never sends directly to a queue — it sends to an EXCHANGE,
+which decides (by routing key) which queue(s) actually get the message.</div>
+  <table>
+    <tr><th>Concept</th><th>What it is</th></tr>
+    <tr><td>Producer</td><td>Anything that sends a message — Move &amp; Entitlement, Claims, and Compliance are all producers in this phase</td></tr>
+    <tr><td>Exchange</td><td>Receives messages from producers and routes them to queue(s) based on rules — never stores anything itself</td></tr>
+    <tr><td>Queue</td><td>Where messages actually sit until a consumer reads them</td></tr>
+    <tr><td>Binding</td><td>The rule connecting an exchange to a queue — "route messages matching X to this queue"</td></tr>
+    <tr><td>Consumer</td><td>Anything that reads messages off a queue</td></tr>
+  </table>
+  <table>
+    <tr><th>Exchange type</th><th>Routing behavior</th></tr>
+    <tr><td>Direct</td><td>Exact routing-key match — e.g. only <code>finding.detected</code> messages go to a specific queue</td></tr>
+    <tr><td>Topic</td><td>Pattern match on the routing key (<code>finding.*</code>) — this project's likely choice, since <code>move.created</code>/<code>claim.filed</code>/<code>finding.detected</code> all share a dot-separated naming pattern</td></tr>
+    <tr><td>Fanout</td><td>Broadcasts to every bound queue, ignoring the routing key entirely</td></tr>
+  </table>
+
+  <h3>Publishing from Python (pika)</h3>
+  <pre><code>import pika
+import json
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+channel = connection.channel()
+channel.exchange_declare(exchange="movetrack_events", exchange_type="topic")
+
+channel.basic_publish(
+    exchange="movetrack_events",
+    routing_key="finding.detected",
+    body=json.dumps({"finding_id": "abc123", "severity": "HIGH"}),
+)
+connection.close()</code></pre>
+
+  <h3>Publishing from Java (Spring AMQP)</h3>
+  <pre><code>@Autowired
+private RabbitTemplate rabbitTemplate;
+
+public void publishMoveCreated(Move move) {
+    rabbitTemplate.convertAndSend("movetrack_events", "move.created", move);
+}</code></pre>
+  <p>Same underlying concept as the Python version — an exchange name, a routing key, a message body — just
+    Spring's higher-level <code>RabbitTemplate</code> wrapping the same AMQP protocol calls.</p>
+
+  <div class="box why">
+    <div class="box-title">RabbitMQ vs. Kafka — a real comparison, since Kafka is coming in Phase 10</div>
+    <table>
+      <tr><th></th><th>RabbitMQ (this phase)</th><th>Kafka (Phase 10, not built yet)</th></tr>
+      <tr><td>Model</td><td>Traditional message queue — a message is typically removed once consumed</td><td>Durable, replayable log — messages persist and can be re-read</td></tr>
+      <tr><td>Best fit</td><td>Business/domain events needing routing logic (this phase's <code>move.created</code>, <code>claim.filed</code>, <code>finding.detected</code>)</td><td>High-volume, ordered streams (Phase 10's shipment tracking telemetry)</td></tr>
+      <tr><td>Throughput</td><td>Lower, but simpler routing model</td><td>Much higher — built for firehose-scale data</td></tr>
+    </table>
+    Worth stating this contrast directly in an interview: this project deliberately uses <em>both</em>, for
+    genuinely different traffic shapes — not "RabbitMQ because it's older" or "Kafka because it's trendier."
+  </div>
+
+  <h2 id="mongodb-concepts">MongoDB core concepts</h2>
+  <table>
+    <tr><th>SQL (Postgres, this project)</th><th>MongoDB equivalent</th></tr>
+    <tr><td>Database</td><td>Database</td></tr>
+    <tr><td>Table</td><td>Collection</td></tr>
+    <tr><td>Row</td><td>Document</td></tr>
+    <tr><td>Column</td><td>Field</td></tr>
+    <tr><td>Fixed schema, enforced by the database</td><td>No enforced schema — each document in a collection can have different fields</td></tr>
+  </table>
+  <div class="box why">
+    <div class="box-title">Why MongoDB for scan findings specifically, not another Postgres table</div>
+    A Trivy finding and a ZAP finding look nothing alike — different fields, different nesting, different
+    shapes entirely. Forcing both into fixed relational columns means either a huge sparse table (mostly
+    NULL columns) or constant schema migrations as new scanner types get added later. A document store
+    accepts whatever shape a finding actually has, no migration required.
+  </div>
+
+  <h3>Basic pymongo usage</h3>
+  <pre><code>from pymongo import MongoClient
+
+client = MongoClient("mongodb://mongodb:27017")
+db = client["compliance"]
+findings = db["findings"]
+
+# insert
+findings.insert_one({
+    "source": "trivy",
+    "severity": "HIGH",
+    "package": "openssl",
+    "cve": "CVE-2024-12345",
+})
+
+# query
+high_severity = findings.find({"severity": "HIGH"})
+one = findings.find_one({"cve": "CVE-2024-12345"})</code></pre>
+  <table>
+    <tr><th>pymongo</th><th>SQL equivalent</th></tr>
+    <tr><td><code>insert_one(doc)</code></td><td><code>INSERT INTO ...</code></td></tr>
+    <tr><td><code>find({"severity": "HIGH"})</code></td><td><code>SELECT * WHERE severity = 'HIGH'</code></td></tr>
+    <tr><td><code>find_one({...})</code></td><td><code>SELECT * ... LIMIT 1</code></td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-rabbitmq-vs-kafka">
+    <div class="q">Why use both RabbitMQ and Kafka in the same project instead of picking one?</div>
+    <div class="a">They fit genuinely different traffic shapes. RabbitMQ suits routed business/domain events
+      (a move was created, a claim was filed, a finding was detected) where a traditional queue's routing
+      logic is the point. Kafka suits high-volume, ordered, replayable streams (shipment tracking telemetry)
+      where durability and throughput matter more than per-message routing rules. Using both isn't
+      indecision — it's matching each tool to the traffic it's actually good at.</div>
+  </div>
+  <div class="qa" id="qa-mongo-why-document-store">
+    <div class="q">Why store scan findings in MongoDB instead of a Postgres table?</div>
+    <div class="a">Trivy and ZAP findings have genuinely different shapes from each other, and that shape can
+      change as new scanners get added. A relational table would need either a wide, mostly-empty schema or
+      constant migrations. A document store accepts whatever shape a finding actually has, with no schema
+      migration required — the right tool for semi-structured, variable-shape data specifically.</div>
+  </div>
+  <div class="qa" id="qa-rabbitmq-exchange-vs-queue">
+    <div class="q">What's the difference between an exchange and a queue in RabbitMQ?</div>
+    <div class="a">A producer never sends directly to a queue — it publishes to an exchange, which routes the
+      message to whichever queue(s) match its routing rules (a "binding"). The queue is just where messages
+      wait until a consumer reads them; the exchange is what decides where a message goes at all. This
+      indirection is what lets a producer stay ignorant of who's actually listening.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>
