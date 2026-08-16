@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Node.js &amp; WebSockets</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
+  <a href="websocket.html" class="active">Node.js &amp; WebSockets</a>
+  <a href="soap.html">SOAP &amp; Spring-WS</a>
+  <a href="raw-sockets.html">Raw Sockets &amp; WireGuard</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Node.js &amp; WebSockets <span class="tag">Phase 9</span></h1>
+  <p class="subtitle">
+    Written from zero — assumes no prior Node.js or WebSocket experience. For when each piece was
+    introduced, see the <a href="../steps.html#phase9">Steps page → Phase 9</a>.
+  </p>
+
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 90</div>
+    Phase 9 (WebSocket live feed) is complete. A live shipment feed renders on the dashboard with zero page
+    refresh, fully inside Docker — the full chain (Go → Postgres + Kafka → Node consumer → WebSocket →
+    React) verified working end to end. This phase's real gotchas were almost all one shape, in three
+    different disguises — every one documented inline below.
+  </div>
+
+  <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project need this at all?</td><td>Right now the dashboard only shows data at the moment the page loads — a new shipment ping published to Kafka is invisible until you manually refresh. This phase closes that gap: the browser gets told the instant something new happens.</td></tr>
+    <tr><td>What does it actually do?</td><td>A small Node.js service subscribes to Kafka's <code>shipment.tracking</code> topic and, for every message, immediately pushes it out to every browser tab currently connected.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Between Kafka and the dashboard — a real consumer of the topic Phase 10 built, replacing the throwaway demo consumer with something the actual UI depends on.</td></tr>
+    <tr><td>When would you reach for a WebSocket instead of polling?</td><td>When updates are frequent and unpredictable in timing — polling ("ask every 5 seconds, is there anything new?") wastes requests when nothing changed and feels laggy when something did. A WebSocket flips that: the server pushes the instant there's something to say.</td></tr>
+  </table>
+
+  <h2 id="story">The story, in plain terms</h2>
+  <p>Every request you've built so far in this project follows the same shape: the browser asks a question,
+    the server answers, the connection closes. That's HTTP — a REST call, a form submit, all of it. It works
+    great when the browser is the one deciding when to ask.</p>
+  <p>A live feed is the opposite problem: the <em>server</em> knows something happened (a shipment moved)
+    before the browser has any reason to ask. A WebSocket is a connection that, once opened, <strong>stays
+    open</strong> — either side can send a message at any time, without a new request/response round trip
+    for every single update.</p>
+  <div class="diagram">HTTP (everything built so far in this project):
+  Browser: "any updates?" -&gt; Server: "here's the answer" -&gt; connection closes
+  Repeat that on every page load / manual refresh. Server can never speak first.
+
+WebSocket (this phase):
+  Browser: "let's open a channel" -&gt; Server: "OK, channel open"
+  ... connection stays open ...
+  Server: "new ping!" -&gt; Browser (no request needed, arrives instantly)
+  Server: "new ping!" -&gt; Browser
+  Either side can send, any time, without re-asking first.</div>
+
+  <h2 id="overview">What each piece is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>Node.js</strong></td><td>A JavaScript runtime for running JS outside a browser — on a server. Same language your React frontend already uses, now on the backend too.</td></tr>
+    <tr><td><strong>Event loop</strong></td><td>Node's core model — one thread, but it never sits idle waiting on I/O (a network read, a file read); it registers a callback and moves on, running that callback only once the result is ready. This is why Node handles many simultaneous slow connections (like open WebSockets) cheaply — the same class of reasoning as Go's goroutines, different mechanism.</td></tr>
+    <tr><td><strong>WebSocket</strong></td><td>A protocol for a long-lived, two-way connection between browser and server, upgraded from an initial HTTP request.</td></tr>
+    <tr><td><strong><code>ws</code></strong></td><td>The most common, minimal Node.js library implementing the WebSocket protocol — this project's choice, no framework overhead beyond what's needed.</td></tr>
+    <tr><td><strong>KafkaJS</strong></td><td>The Node.js client library for talking to Kafka — this service's version of what <code>kafka-go</code> is for Go and <code>kafka-python</code> is for Python.</td></tr>
+  </table>
+
+  <h2 id="why-node">Why Node.js specifically, for this one service</h2>
+  <div class="box why">
+    <div class="box-title">Same reasoning shape as Go's Phase 6 justification, different mechanism</div>
+    This service's whole job is holding open many simultaneous, mostly-idle connections (one per browser
+    tab watching the dashboard) and occasionally pushing a message down each one. Node's single-threaded
+    event loop handles that cheaply for the same underlying reason Go's goroutines did in Phase 6 — neither
+    wastes a full OS thread per idle connection, unlike a traditional thread-per-request server (the Java
+    services' model). Node is the more natural choice here specifically because this is also where the
+    <em>frontend</em> team's skillset already lives — same language, both ends of this one feature.
+  </div>
+
+  <h2 id="node-ws-server">A minimal WebSocket server</h2>
+  <pre><code>const { WebSocketServer } = require("ws");
+
+const wss = new WebSocketServer({ port: 8095 });
+const clients = new Set();
+
+wss.on("connection", (socket) => {
+  clients.add(socket);
+  socket.on("close", () => clients.delete(socket));
+});
+
+function broadcast(message) {
+  const payload = JSON.stringify(message);
+  for (const client of clients) {
+    if (client.readyState === client.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
+module.exports = { broadcast };</code></pre>
+  <table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><code>clients</code> (a <code>Set</code>)</td><td>Tracks every currently-open connection — a live feed with nobody to push to isn't useful, so this is how the service knows who's listening</td></tr>
+    <tr><td><code>socket.on("close", ...)</code></td><td>Removes a disconnected tab from the set — without this, the set would grow forever with dead connections</td></tr>
+    <tr><td><code>readyState === client.OPEN</code></td><td>Guards against sending to a connection that's in the middle of closing — sending to a closed socket throws</td></tr>
+  </table>
+
+  <h2 id="kafkajs-consumer">Consuming Kafka from Node (KafkaJS)</h2>
+  <pre><code>const { Kafka } = require("kafkajs");
+const { broadcast } = require("./wsServer");
+
+const kafka = new Kafka({ clientId: "ws-live-feed", brokers: ["kafka:29092"] });
+const consumer = kafka.consumer({ groupId: "ws-live-feed" });
+
+async function start() {
+  await consumer.connect();
+  await consumer.subscribe({ topic: "shipment.tracking", fromBeginning: false });
+
+  await consumer.run({
+    eachMessage: async ({ message }) => {
+      const ping = JSON.parse(message.value.toString());
+      broadcast(ping);
+    },
+  });
+}
+
+start();</code></pre>
+  <p><code>fromBeginning: false</code> is a deliberate, different choice from Phase 10's demo consumer — a
+    live feed only cares about what's happening <em>now</em>, not replaying every historical ping from the
+    start of the topic every time this service restarts.</p>
+
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — running the wrong file (twice, in two different disguises)</div>
+    <code>server.js</code> only starts the WebSocket server — it never <code>require</code>s
+    <code>kafkaConsumer.js</code>, so running <code>node server.js</code> means the Kafka consumer never
+    starts at all. Since <code>kafkaConsumer.js</code> already pulls in <code>server.js</code> via
+    <code>require("./server")</code> and then begins consuming, it's the correct single entry point —
+    <code>node kafkaConsumer.js</code> locally, and (this is the part that repeated the mistake a second
+    time) <code>CMD ["node", "kafkaConsumer.js"]</code> in the Dockerfile too, not
+    <code>CMD ["node", "server.js"]</code>. Neither wrong version throws an error — the WebSocket server
+    runs fine either way, it just has nothing to ever broadcast, which makes this a genuinely quiet failure
+    mode: "nothing happened" with zero error output, rather than a crash pointing at the real cause.
+  </div>
+
+  <h2 id="react-ws-client">Connecting from React</h2>
+  <pre><code>import { useEffect, useState } from "react";
+
+function useLiveFeed(url: string) {
+  const [pings, setPings] = useState<any[]>([]);
+
+  useEffect(() =&gt; {
+    const socket = new WebSocket(url);
+
+    socket.onmessage = (event) =&gt; {
+      const ping = JSON.parse(event.data);
+      setPings((prev) =&gt; [ping, ...prev].slice(0, 50));
+    };
+
+    return () =&gt; socket.close();
+  }, [url]);
+
+  return pings;
+}</code></pre>
+  <p>The browser's own built-in <code>WebSocket</code> class — no library needed on the frontend side, this
+    is a native web API. <code>.slice(0, 50)</code> caps how much history the UI keeps in memory, since a
+    live feed that never trims would grow unbounded over a long session.</p>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — a hook with nothing calling it produces zero errors</div>
+    <code>useLiveFeed.ts</code> got built and committed, but no page component ever imported or called it,
+    and no route/nav link existed to reach one — so the app ran perfectly, with nothing visibly broken,
+    while genuinely doing nothing on screen. This wasn't caught until testing several steps later. A hook
+    (or any function) nobody calls is indistinguishable from "working but idle" — worth checking directly
+    whether something actually invokes new code, not just whether it compiles cleanly.
+  </div>
+
+  <h2 id="docker-address">The same local-vs-Docker address problem, a third time</h2>
+  <p>Same root cause as Kafka's own dual-listener gotcha (<a href="kafka.html#kafka-listeners">Kafka → Host
+    vs. Docker-network listeners</a>) — this service's <code>kafkaConsumer.js</code> still had
+    <code>localhost:9092</code> hardcoded from local testing. Once containerized, that produced
+    <code>ECONNREFUSED 127.0.0.1:9092</code> and crashed the whole Node process (an unhandled Kafka
+    connection error is fatal by default). Fixed by switching to <code>kafka:29092</code>, the same
+    Docker-network listener every other containerized client in this project uses.</p>
+  <div class="box why">
+    <div class="box-title">The pattern worth internalizing</div>
+    Any time a service gets built and tested locally first, then containerized later, expect at least one
+    address that needs to flip from <code>localhost</code> to a Docker Compose service name. This is now the
+    third time this exact category of bug has shown up in this project (the Go producer in Phase 10, the
+    Python demo consumer in Phase 10, and this service) — worth checking for on sight whenever "it worked
+    locally, then broke the moment it got containerized" shows up again.
+  </div>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-websocket-vs-polling">
+    <div class="q">Why not just have the dashboard poll a REST endpoint every few seconds instead of using a WebSocket?</div>
+    <div class="a">Polling means picking a tradeoff you can't win: poll too slowly and updates feel laggy;
+      poll too fast and you're making mostly-wasted requests (nothing changed most of the time) that scale
+      badly with more open dashboard tabs. A WebSocket sidesteps the tradeoff entirely — the server only
+      sends when there's actually something to say, and the connection itself is cheap to hold open.</div>
+  </div>
+  <div class="qa" id="qa-node-event-loop">
+    <div class="q">Node.js is single-threaded — how does it handle many WebSocket connections at once without blocking?</div>
+    <div class="a">The event loop never blocks waiting on I/O — a slow operation (a network read, in this
+      case waiting on a WebSocket to have data) registers a callback and the loop moves on to other work
+      immediately, running the callback only when the result is actually ready. Many idle connections cost
+      almost nothing while they're idle; the model breaks down for CPU-heavy work, not I/O-heavy work like
+      this.</div>
+  </div>
+  <div class="qa" id="qa-kafka-groupid-live-feed">
+    <div class="q">Why does this service use its own Kafka consumer group instead of reusing Phase 10's demo-consumer group?</div>
+    <div class="a">Two independent consumer groups reading the same topic don't interfere with each other at
+      all — each group tracks its own separate offset. Reusing the demo group would tie this real,
+      production-facing feature to a throwaway debugging tool; a dedicated group id keeps them fully
+      independent, and either one can be stopped/restarted without affecting the other.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

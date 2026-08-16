@@ -34,6 +34,8 @@
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -89,6 +91,10 @@
     <tr><td>9092</td><td>kafka</td><td>Kafka (host listener)</td><td>For anything running directly on your machine — <code>go test</code>, local scripts</td></tr>
     <tr><td>29092</td><td>kafka</td><td>Kafka (Docker-network listener)</td><td>For anything running inside a container — the Go producer, <code>kafka-ui</code>, the Python consumer</td></tr>
     <tr><td>8089</td><td>kafka-ui</td><td>Kafka UI</td><td>Browser-based topic/message/consumer-group inspection</td></tr>
+    <tr><td>8095</td><td>ws-live-feed</td><td>Node.js + <code>ws</code> + KafkaJS</td><td>WebSocket endpoint the dashboard connects to for live shipment updates</td></tr>
+    <tr><td>8083</td><td>soap-legacy-adapter</td><td>Java / Spring-WS</td><td>SOAP/XML endpoint, translates to/from Move &amp; Entitlement's REST API</td></tr>
+    <tr><td>8091 <em>(planned)</em></td><td>shipment-ingestion</td><td>Go — raw UDP</td><td>Primary transport for frequent, lightweight location pings, over the WireGuard tunnel</td></tr>
+    <tr><td>8092 <em>(planned)</em></td><td>shipment-ingestion</td><td>Go — raw TCP</td><td>Failover transport when UDP delivery can't be confirmed, over the WireGuard tunnel</td></tr>
   </table>
 
   <h2 id="one-chart">The whole system, one chart</h2>
@@ -320,6 +326,9 @@
     <li><a href="#flow-cicd">CI/CD pipeline</a> — Jenkins, Trivy gate, ZAP, Report Findings</li>
     <li><a href="#flow-findings-ingestion">Findings ingestion + severity branch</a> — Compliance Service, MongoDB, RabbitMQ</li>
     <li><a href="#flow-kafka-tracking">Kafka shipment tracking</a> — Go producer, Python consumer, dual listeners</li>
+    <li><a href="#flow-websocket-live-feed">WebSocket live feed</a> — Kafka to browser, no refresh</li>
+    <li><a href="#flow-soap-legacy-adapter">SOAP legacy adapter</a> — SOAP/XML in, REST out, standalone (nothing else calls it)</li>
+    <li><a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> — planned, UDP primary, TCP fallback</li>
     <li><a href="#failure-signatures">Common failure signatures, cross-cutting reference</a></li>
     <li><a href="#growth">How this page grows with each new phase</a></li>
   </ul>
@@ -354,24 +363,45 @@ EntitlementCalculationService.submitMoveRequest()
   ▼
 PostgreSQL :5432 — move_entitlement_db, INSERT INTO move_requests
   │
-  ▼ save succeeds, row now has an ID
-rabbitTemplate.convertAndSend("compliance", "move.created", saved)
-  │
-  ├─ Jackson message converter misconfigured ─► FAILURE: HTTP 500, MessageConversionException
-  │                              (three real, stacked causes hit here — full breakdown at
-  │                              rabbitmq-mongodb.html#java-jackson-gotchas). Note: the Postgres
-  │                              INSERT already committed by this point — the move exists in the
-  │                              database even though the request as a whole failed. Nothing rolls
-  │                              that back; the RabbitMQ publish isn't in the same transaction.
-  │
-  ▼ publish succeeds
-calculateEntitlement(id) — reads weight_allowances table for the submitted rank
-  │
-  ▼
-MoveRequestController builds { entitlementLbs: 7000 }, HTTP 200
-  │
-  ▼
-Browser — Redux store updates, "Entitlement: 7000 lbs" renders on screen</div>
+  ▼ save succeeds — "saved" now exists, with a real DB-generated ID
+
+Once "saved" exists, the code does two independent things with it —
+neither one waits on or feeds into the other:
+
+                    ┌─────────────────┐
+                    │  "saved" object   │
+                    │ (has a real ID)   │
+                    └─────────┬─────────┘
+                              │
+              ┌────────────────┴────────────────┐
+              │                                    │
+              ▼                                    ▼
+  rabbitTemplate.convertAndSend           calculateEntitlement(saved.getId())
+  ("compliance","move.created",                    │
+   saved)                                           ▼
+              │                            reads weight_allowances table
+              ▼                                     │
+           RabbitMQ                                 ▼
+   (fire-and-forget — doesn't          MoveRequestController builds
+    block or delay the HTTP            { entitlementLbs: 7000 }
+    response at all)                            │
+              │                                 ▼
+    ├─ Jackson message converter          HTTP 200 response
+    │  misconfigured ─► FAILURE:
+    │  HTTP 500, MessageConversionException
+    │  (three real, stacked causes — full
+    │  breakdown at rabbitmq-mongodb.html
+    │  #java-jackson-gotchas). Note: the
+    │  Postgres INSERT above already
+    │  committed by this point regardless
+    │  — the move exists in the database
+    │  even if this one branch fails.
+    │  Nothing rolls that back; this isn't
+    │  in the same transaction as the save.
+
+                              ▼
+              Browser — Redux store updates,
+              "Entitlement: 7000 lbs" renders on screen</div>
 
   <h2 id="flow-claim-filing">Claim filing + approval state machine</h2>
   <p>Confirmed built — <a href="steps.html#step70">Steps page → Step 70</a>. CORS was already configured here
@@ -391,14 +421,28 @@ ClaimApprovalService.submitForAdjusterReview()
   ▼
 PostgreSQL :5432 — claims_db, INSERT INTO claims
   │
-  ▼ save succeeds
-rabbitTemplate.convertAndSend("compliance", "claim.filed", saved)
-  │  (same exchange as move.created — the routing key is what tells the two apart downstream)
-  ▼
-HTTP 200 { id, status: "ADJUSTER_REVIEW" }
-  │
-  ▼
-Browser — "Claim #1 — ADJUSTER_REVIEW" renders</div>
+  ▼ save succeeds — "saved" now exists, with a real DB-generated ID
+
+Once "saved" exists, two independent things happen with it:
+
+                    ┌─────────────────┐
+                    │  "saved" object   │
+                    └─────────┬─────────┘
+                              │
+              ┌────────────────┴────────────────┐
+              │                                    │
+              ▼                                    ▼
+  rabbitTemplate.convertAndSend            toResponse(saved) builds
+  ("compliance","claim.filed",             { id, status: "ADJUSTER_REVIEW" }
+   saved)                                            │
+              │                                      ▼
+              ▼                              HTTP 200 response
+           RabbitMQ                                  │
+  (same exchange as move.created —                    ▼
+   the routing key is what tells         Browser — "Claim #1 — ADJUSTER_REVIEW" renders
+   the two apart downstream; fire-
+   and-forget, doesn't block the
+   response above)</div>
   <p>What happens next to that claim is its own branch, already built in earlier phases:</p>
   <div class="diagram">ADJUSTER_REVIEW
   │
@@ -555,28 +599,54 @@ HTTP 200 { id }  (returned either way — publishing is fire-and-forget, never b
 
   <h2 id="flow-kafka-tracking">Kafka shipment tracking — producer + consumer</h2>
   <p>Confirmed built — <a href="steps.html#phase10">Steps page → Phase 10</a>. Full concept explanation on
-    <a href="tech/kafka.html">Kafka</a>. This phase hit the densest run of real gotchas so far — nearly every
+    <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a>. This phase hit the densest run of real gotchas so far — nearly every
     branch below is a real bug hit while building it, not a hypothetical.</p>
   <div class="diagram">Carrier device — POST :8090/ingest  { device_id, latitude, longitude, timestamp }
   │
-  ▼  (same validate → insert flow as the Shipment Ingestion diagram above)
-insertPing(db, ping) — PostgreSQL :5432
-  │
-  ▼ insert succeeds
-writer.WriteMessages() — kafka-go, Addr: kafka:29092, key=device_id, topic=shipment.tracking
-  │
-  ├─ Kafka's advertised listener pointed at the wrong address ─► FAILURE (hit twice, from
-  │      opposite directions): first `dial tcp [::1]:9092: connect: connection refused` when
-  │      the listener advertised `localhost` to a container; later `lookup kafka: no such
-  │      host` when it advertised `kafka` to a host-machine process. Fixed with two separate
-  │      listeners — one per audience. Full story: tech/kafka.html#kafka-listeners
-  │
-  ▼ publish succeeds — Kafka picks the partition by hashing device_id,
-  │  so this device's pings always land on the same partition, in order
-  ▼
+  ▼  (same JSON-decode → validatePing flow as the Shipment Ingestion diagram above)
+handleIngest(w, r) — has the decoded ping "p" in hand
+
+Go writes "p" to TWO places directly — neither one reads from the
+other, both are fed straight from the same original request:
+
+                    ┌──────────────┐
+                    │  handleIngest │
+                    │  (has ping p) │
+                    └───────┬───────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                             │
+              ▼                             ▼
+    insertPing(db, p)             publishPing(pingJSON, p.DeviceID)
+              │                             │
+              ▼                             ▼
+        PostgreSQL :5432               kafka-go Writer
+   (permanent record —          Addr: kafka:29092, key=device_id,
+    shipment_ingestion.pings)    topic=shipment.tracking
+              │                             │
+              ▼                             ├─ Kafka's advertised listener pointed at
+       (used for GET /ingest,               │  the wrong address ─► FAILURE (hit twice,
+        the history view)                   │  from opposite directions): first
+                                             │  `dial tcp [::1]:9092: connect: connection
+                                             │  refused` when the listener advertised
+                                             │  `localhost` to a container; later
+                                             │  `lookup kafka: no such host` when it
+                                             │  advertised `kafka` to a host-machine
+                                             │  process. Fixed with two separate
+                                             │  listeners — one per audience. Full story:
+                                             │  tech/kafka.html#kafka-listeners
+                                             │
+                                             ▼ publish succeeds — Kafka picks the
+                                               partition by hashing device_id, so this
+                                               device's pings always land on the same
+                                               partition, in order
+
+                              ▼
 HTTP 201 (response to the carrier device doesn't wait on Kafka at all —
-publish happens after the response-worthy work, same fire-and-forget
-shape as RabbitMQ in Phase 4)
+neither branch above blocks the other or the response itself; this is
+the exact same fire-and-forget shape as RabbitMQ in Phase 4)
 
 Separately, continuously running —
 kafka-demo-consumer (Python) — subscribed to shipment.tracking, group_id="demo-consumer"
@@ -600,6 +670,135 @@ for message in consumer: print(partition, offset, value)
 Confirmed via Kafka UI (http://localhost:8089 → Consumers → demo-consumer):
 State: STABLE, 3/3 partitions assigned, Total lag: 0</div>
 
+  <h2 id="flow-websocket-live-feed">WebSocket live feed — Kafka to browser, no refresh</h2>
+  <p>Confirmed built — <a href="steps.html#phase9">Steps page → Phase 9</a>. Full concept explanation on
+    <a href="tech/websocket.html">Node.js &amp; WebSockets</a>. Closes the loop Phase 10 opened — a real
+    consumer of the <code>shipment.tracking</code> topic, not the throwaway demo one.</p>
+  <div class="diagram">Browser (localhost:3000/live-feed) — page loads
+  │
+  │ new WebSocket("ws://localhost:8095")
+  ▼
+ws-live-feed (Node.js, entry point: kafkaConsumer.js — NOT server.js, see below)
+  │ accepts the connection, adds it to a Set of open clients
+  │
+  │ (meanwhile, independently, continuously running since the process started)
+  ▼
+KafkaJS consumer — subscribed to shipment.tracking, group: ws-live-feed, fromBeginning: false
+  │
+  ├─ wrong entry point (node server.js instead of kafkaConsumer.js) ─► FAILURE:
+  │      no error thrown anywhere — the WebSocket server runs fine, it just never
+  │      starts consuming Kafka at all, since server.js never requires
+  │      kafkaConsumer.js. Hit twice: once running locally, once baked into the
+  │      Dockerfile's CMD. Full story: tech/websocket.html#kafkajs-consumer
+  │
+  ├─ kafkaConsumer.js pointed at localhost:9092 instead of kafka:29092 ─► FAILURE
+  │      (once containerized): ECONNREFUSED, crashes the whole Node process. Same
+  │      local-vs-Docker address category as Kafka's own dual-listener gotcha —
+  │      third time this exact shape hit the project. Full story:
+  │      tech/websocket.html#docker-address
+  │
+  ▼ a new shipment.tracking message arrives
+broadcast(ping) — sent to every client in the Set whose readyState is OPEN
+  │
+  ▼ message sent
+Browser — socket.onmessage fires, useLiveFeed hook updates React state
+  │
+  ├─ hook built, but no page/route ever called it ─► FAILURE: zero errors, zero
+  │      visible change — the app just had nowhere to render the feed. Not caught
+  │      until end-to-end testing, several steps later. Fixed with a dedicated
+  │      LiveFeedPage.tsx plus a Link/Route in App.tsx.
+  │
+  ▼ page + route exist
+New ping appears at the top of the live feed list, no page refresh —
+confirmed with a real ping: "DEVICE-1 — 38.9, -77 @ 2026-08-16T15:10:00Z"</div>
+
+  <h2 id="flow-soap-legacy-adapter">SOAP legacy adapter — hand-sent request, no automated client</h2>
+  <p>Confirmed built — <a href="steps.html#phase7">Steps page → Phase 7</a>. Full concept explanation on
+    <a href="tech/soap.html">SOAP &amp; Spring-WS</a>
+  <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>. This flow reads as linear on purpose — unlike Kafka's
+    dual-write or WebSocket's independently-running consumer, every step here genuinely depends on the one
+    before it finishing (parse the XML, translate it, call REST, wait for the response, translate that back)
+    — there's no point where one value gets consumed twice by independent downstream actions, so no
+    box-and-branch notation applies here. Also unlike every other flow on this page, nothing else in
+    MoveTrack Ops actually triggers this one automatically — see
+    <a href="tech/soap.html#standalone-by-design">SOAP &amp; Spring-WS → Why this phase is standalone</a>.</p>
+  <div class="diagram">PowerShell (hand-sent, no automated legacy client exists in this project)
+  │
+  │ POST http://localhost:8083/ws
+  │ Content-Type: text/xml — &lt;soap:Envelope&gt;...&lt;submitMoveRequest&gt;...&lt;/soap:Envelope&gt;
+  ▼
+soap-legacy-adapter : 8083  (Java/Spring-WS, MoveRequestEndpoint)
+  │ @PayloadRoot routes by XML element name, not URL path
+  │ parses into a generated SubmitMoveRequest object (package com.movetrack.soap.moverequest,
+  │ auto-derived from the XSD's targetNamespace — confirmed by reading target/generated-sources/xjc)
+  │
+  ├─ moveDate generates as XMLGregorianCalendar, not LocalDate/String ─► FAILURE (if unhandled):
+  │      wrong assumption about the generated type. Fixed with .toXMLFormat(), not .toString().
+  │      Full story: tech/soap.html#qa-soap-xmlgregoriancalendar
+  │
+  ▼
+toRestDto(request) — maps SOAP fields into a plain Map (no shared DTO class with Move & Entitlement,
+  deliberately — keeps the adapter from needing a compile-time dependency on that service's internals)
+  ▼
+RestTemplate.postForObject(...)
+  │
+  ▼
+move-entitlement-service : 8082  (unchanged — has no idea a SOAP client exists)
+  │ same REST path the React dashboard already calls
+  ▼
+PostgreSQL : 5432 — INSERT INTO move_requests, entitlement calculated
+  ▼
+toSoapResponse(restResponse) — maps the REST JSON response back into SubmitMoveRequestResponse
+  ▼
+PowerShell — receives a well-formed SOAP response envelope:
+&lt;id&gt;19&lt;/id&gt; &lt;entitlementLbs&gt;7000&lt;/entitlementLbs&gt;
+  │
+  ├─ printing the response object directly shows only "Envelope" ─► not a failure, PowerShell's
+  │      Invoke-RestMethod auto-parses XML and hides nested content on direct print.
+  │      $response.OuterXml reveals the real values. Full story: tech/soap.html#verifying-the-round-trip
+  │
+  ▼ cross-checked independently
+docker compose exec postgres psql ... SELECT id, service_member_name, rank FROM move_requests
+  ORDER BY id DESC LIMIT 1  →  same id=19, same Jane Doe / E5 — proves the SOAP response reflects
+  a real database write, not just an echoed/faked value</div>
+
+  <h2 id="flow-raw-sockets-wireguard">Raw sockets + WireGuard failover — planned</h2>
+  <p>Planned — <a href="steps.html#phase13">Steps page → Phase 13</a>, in progress. Full concept explanation
+    on <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>. This diagram uses a
+    <code>├─</code> decision branch, not box-and-branch notation — UDP failing over to TCP is a genuine
+    sequential retry (try UDP, then conditionally try TCP), not two independent actions consuming the same
+    value simultaneously the way Kafka's dual-write or WebSocket's independent consumer are.</p>
+  <div class="box warn">
+    <div class="box-title">Planned, not yet built — corrected once Phase 13 is confirmed</div>
+    <div class="diagram">Device (simulated) — inside the WireGuard tunnel
+  │
+  │ sends ping via raw UDP → shipment-ingestion : 8091
+  ▼
+shipment-ingestion (Go) — UDP listener
+  │ handlePing(raw) — same shared validate/persist/publish function REST and Kafka already use
+  ▼
+PostgreSQL : 5432 — INSERT INTO shipment pings
+  ▼
+UDP ack datagram sent back to device
+  │
+  ├─ ack received within timeout ─► done, delivered via UDP (the normal case —
+  │      most pings never touch TCP at all)
+  │
+  ├─ no ack after N attempts ─► device falls back to TCP :8092 for this ping
+  │      (device-driven decision — the server never orchestrates the fallback,
+  │      it just exposes both listeners)
+  │      ▼
+  │      shipment-ingestion (Go) — TCP listener
+  │      │ same handlePing(raw) — identical downstream behavior regardless of transport
+  │      ▼
+  │      PostgreSQL : 5432 — INSERT INTO shipment pings
+  │      TCP's own handshake success/failure IS the delivery confirmation —
+  │      no separate ack scheme needed on top of it
+  ▼
+Either path: a real ping lands in Postgres, encrypted end-to-end by the
+WireGuard tunnel the entire way — raw UDP/TCP never touch the open network</div>
+  </div>
+
   <h2 id="failure-signatures">Common failure signatures — cross-cutting reference</h2>
   <p>The same handful of failure shapes keep recurring across totally different technologies. This table is
     the fast way to recognize which one you're looking at.</p>
@@ -616,20 +815,20 @@ State: STABLE, 3/3 partitions assigned, Total lag: 0</div>
     <tr><td><code>ModuleNotFoundError: No module named 'app'</code></td><td>pytest, any Python service</td><td>Missing <code>tests/__init__.py</code>, or pytest run from the wrong directory</td><td><a href="tech/python-fastapi.html#pytest-module-not-found">python-fastapi.html#pytest-module-not-found</a></td></tr>
     <tr><td><code>dial tcp [::1]:9092</code> / <code>lookup kafka: no such host</code></td><td>Any Kafka client, container or host</td><td>A single advertised listener can never be correct for both audiences at once</td><td><a href="tech/kafka.html#kafka-listeners">kafka.html#kafka-listeners</a></td></tr>
     <tr><td>Consumer connects with no crash, but never receives anything</td><td>Kafka consumer groups, single-broker dev cluster</td><td><code>__consumer_offsets</code> stuck trying to create 3 replicas with only 1 broker available</td><td><a href="tech/kafka.html#single-broker-offsets">kafka.html#single-broker-offsets</a></td></tr>
+    <tr><td>Service runs with zero errors, but does nothing observable</td><td>Any multi-file service (Node, Go, Python)</td><td>Ran/deployed the wrong entry point — the file that actually wires everything together was never invoked</td><td><a href="tech/websocket.html#kafkajs-consumer">websocket.html#kafkajs-consumer</a></td></tr>
+    <tr><td><code>git status</code> shows clean, but a fix seems to be missing</td><td>Any git workflow, especially right after a merge</td><td>A clean tree only proves nothing is uncommitted — a fix can be sitting on a separate, unmerged branch</td><td><a href="tech/git.html#wrong-branch-recovery">git.html#wrong-branch-recovery</a></td></tr>
+    <tr><td><code>Non-parseable POM</code> / <code>end tag name ... must match start tag name</code></td><td>Any Maven build, right after editing <code>pom.xml</code></td><td>A POM is strict, well-formed XML — one incomplete or orphan tag fails the entire build before any dependency resolves</td><td><a href="tech/soap.html#contract-first">soap.html#contract-first</a></td></tr>
+    <tr><td>Editor shows "declared package does not match expected package"</td><td>Any newly-added Java file, right after creating a new Maven module</td><td>The editor's Java language server hasn't recognized the new module's source root yet — not a real compile error, a project reload fixes it</td><td><a href="tech/soap.html#contract-first">soap.html#contract-first</a></td></tr>
+    <tr><td>PowerShell prints only a root element name (e.g. <code>Envelope</code>) for an XML response</td><td><code>Invoke-RestMethod</code> against any XML/SOAP endpoint</td><td>Auto-parsed into an object; direct printing hides nested content — read <code>$response.OuterXml</code> instead</td><td><a href="tech/soap.html#verifying-the-round-trip">soap.html#verifying-the-round-trip</a></td></tr>
   </table>
 
   <h2 id="growth">How this page grows with each new phase</h2>
   <p>This page follows the same rule as <a href="architecture.html">Architecture &amp; Progress</a>: at the
-    start of every new phase, a new flow diagram gets added here in the amber/planned style below —
-    describing what the new service is expected to do, before any of it is built. Once that phase is
-    confirmed working, the diagram gets replaced with the normal style, corrected to match what was actually
-    built (including whatever real failure branches got hit along the way, the same as every flow above).</p>
-  <div class="box warn">
-    <div class="box-title">No phase currently planned/in-progress</div>
-    Phase 10 (Kafka) is the most recently completed phase as of this page's last update — see
-    <a href="#flow-kafka-tracking">Kafka shipment tracking</a> above for its confirmed flow. The next phase's
-    planned flow diagram will appear here the moment a new phase is picked.
-  </div>
+    start of every new phase, a new flow diagram gets added in the amber/planned style — describing what the
+    new service is expected to do, before any of it is built. Once that phase is confirmed working, the
+    diagram gets replaced with the normal style, corrected to match what was actually built (including
+    whatever real failure branches got hit along the way, the same as every flow above).</p>
+  <p>Currently planned: <a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a>, above.</p>
 
   <footer class="page-footer">MoveTrack Ops — companion to Architecture &amp; Progress. That page shows what
     exists; this one shows what happens when a request actually moves through it. Grows by one confirmed flow

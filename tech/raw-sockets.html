@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Raw Sockets &amp; WireGuard</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
+  <a href="websocket.html">Node.js &amp; WebSockets</a>
+  <a href="soap.html">SOAP &amp; Spring-WS</a>
+  <a href="raw-sockets.html" class="active">Raw Sockets &amp; WireGuard</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Raw Sockets &amp; WireGuard <span class="tag">Phase 13</span></h1>
+  <p class="subtitle">
+    Written from zero — assumes no prior raw-socket or VPN-tunneling experience. For when each piece was
+    introduced, see the <a href="../steps.html#phase13">Steps page → Phase 13</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 13 (raw sockets + WireGuard) is starting now, extending Phase 6's Go service rather than creating a
+    new one. Everything on this page reflects the <em>planned</em> implementation — read it now to get
+    familiar with the tools before writing code, then it gets corrected/confirmed once each step is really
+    built and tested.
+  </div>
+
+  <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project need this at all?</td><td>Phase 6's REST endpoint assumes every device can make a normal HTTP request — real field-deployed tracking hardware often can't afford that overhead, or needs a transport suited to how often/reliably it can actually reach the network. This phase adds the lower-level transports real tracking devices actually use.</td></tr>
+    <tr><td>What does it actually do?</td><td>Adds two new raw socket listeners to the existing <code>shipment-ingestion</code> Go service — UDP for frequent, lightweight, fire-and-forget pings, and TCP as a higher-reliability fallback when a device needs guaranteed delivery. Both travel through a WireGuard-encrypted tunnel instead of the open network.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Inside the same Go service Phase 6 already built — new listeners, same validation/persistence/Kafka-publish logic. Not a new box in the architecture diagram.</td></tr>
+    <tr><td>When would you reach for this pattern in a real job?</td><td>Any IoT/telemetry system with real devices in the field — cheap, unreliable connectivity, battery/bandwidth constraints, and a real security requirement (raw UDP/TCP have zero built-in encryption on their own).</td></tr>
+  </table>
+
+  <h2 id="story">The story, in plain terms</h2>
+  <p>Phase 6 built one door into this service: a REST endpoint, which assumes a full HTTP request/response
+    and a device with enough network stack to speak it comfortably. Real tracking hardware in the field is
+    often cheaper and more constrained than that — it wants to send a tiny burst of bytes as fast and as
+    cheaply as possible, without the overhead of an HTTP request every time.</p>
+  <div class="diagram">REST (Phase 6, done):
+  Device → full HTTP request (headers, method, path, JSON body) → :8090/ingest
+  Reliable, but relatively heavy per message.
+
+Raw UDP (Phase 13 — the normal case):
+  Device → a few dozen raw bytes, no handshake, no guarantee of arrival → :8091
+  Cheap and fast. Fine for frequent pings where losing one occasionally is fine.
+
+Raw TCP (Phase 13 — the fallback):
+  Device → same data, but TCP's built-in handshake + retransmission guarantees delivery → :8092
+  Used when a device needs to be sure a specific ping actually arrived — e.g. catching up
+  after being offline, or repeated missed UDP acks.
+
+WireGuard (Phase 13 — wraps both):
+  Neither raw UDP nor raw TCP has any encryption of its own. WireGuard creates an encrypted
+  tunnel between device and service first; the raw UDP/TCP traffic travels inside that tunnel,
+  invisible and unreadable to anything sitting on the network between them.</div>
+
+  <h2 id="overview">What each piece is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>Socket</strong></td><td>An operating-system handle representing one end of a network connection — everything (HTTP, UDP, TCP) is ultimately built on sockets; "raw sockets" here just means talking UDP/TCP directly, with no HTTP layer on top.</td></tr>
+    <tr><td><strong>UDP</strong></td><td>User Datagram Protocol — connectionless, no handshake, no delivery guarantee, no ordering guarantee. Send a packet and move on; the OS doesn't tell you if it arrived.</td></tr>
+    <tr><td><strong>TCP</strong></td><td>Transmission Control Protocol — connection-oriented, guarantees delivery and ordering via handshakes and retransmission. More overhead than UDP, but reliable.</td></tr>
+    <tr><td><strong>WireGuard</strong></td><td>A modern VPN protocol — creates an encrypted point-to-point tunnel between two endpoints using public-key cryptography. Simpler and faster than older VPN protocols (IPsec, OpenVPN), widely used for exactly this kind of device-to-server tunnel.</td></tr>
+    <tr><td><strong>Failover</strong></td><td>Automatically switching to a backup transport when the primary one isn't working — here, a device falling back from UDP to TCP after enough pings go unacknowledged.</td></tr>
+  </table>
+
+  <h2 id="udp-vs-tcp">UDP vs. TCP — the real comparison</h2>
+  <table>
+    <tr><th></th><th>UDP (primary transport, this phase)</th><th>TCP (fallback transport, this phase)</th></tr>
+    <tr><td>Connection</td><td>None — just send a datagram</td><td>Handshake required before any data flows (3-way handshake)</td></tr>
+    <tr><td>Delivery guarantee</td><td>None — a packet can be silently dropped</td><td>Guaranteed — the OS retransmits until it's acknowledged</td></tr>
+    <tr><td>Ordering</td><td>Not guaranteed — packets can arrive out of order</td><td>Guaranteed — arrives in the order it was sent</td></tr>
+    <tr><td>Overhead per message</td><td>Minimal — a small header, no handshake</td><td>Higher — handshake, acknowledgments, retransmission bookkeeping</td></tr>
+    <tr><td>Why it's the primary transport here</td><td colspan="2">Frequent location pings can tolerate occasionally losing one — the next ping a few seconds later makes up for it. Paying TCP's overhead on every single ping isn't worth it for that traffic shape.</td></tr>
+  </table>
+
+  <h2 id="go-listeners">Raw listeners in Go — planned code</h2>
+  <pre><code>// UDP — connectionless, read one datagram at a time
+conn, err := net.ListenUDP("udp", &amp;net.UDPAddr{Port: 8091})
+buf := make([]byte, 1024)
+for {
+    n, addr, err := conn.ReadFromUDP(buf)
+    go handlePing(buf[:n])           // same shared handler REST/TCP use
+    conn.WriteToUDP([]byte("ACK"), addr)  // UDP has no built-in delivery confirmation —
+                                           // this ack is what lets a client detect a drop
+}</code></pre>
+  <pre><code>// TCP — connection-oriented, one goroutine per accepted connection
+listener, err := net.Listen("tcp", ":8092")
+for {
+    conn, err := listener.Accept()
+    go func(c net.Conn) {
+        defer c.Close()
+        data, err := io.ReadAll(c)
+        handlePing(data)              // same shared handler
+    }(conn)
+}</code></pre>
+  <p><code>handlePing(...)</code> is the same validate → persist to Postgres → publish to Kafka logic Phase 6
+    and Phase 10 already built for the REST handler — refactored into one shared function so all three
+    transports (REST, UDP, TCP) feed the identical pipeline instead of three separate, drifting copies of it.</p>
+
+  <h2 id="failover">The failover pattern — client-driven, not server-driven</h2>
+  <div class="diagram">Device sends ping via UDP :8091
+  │
+  ├─ ACK received within timeout ─► done, ping delivered
+  │
+  ▼ no ACK after N attempts (UDP is silently unreliable — could be a dropped
+    packet, a dropped ack, or the link genuinely being down; the device
+    can't tell which, and doesn't need to)
+Device falls back to TCP :8092 for this ping
+  │
+  ▼ TCP's own handshake either succeeds or fails outright
+Delivery confirmed by TCP itself — no separate ack scheme needed on top of it</div>
+  <p>The decision to fail over lives entirely on the <strong>client</strong> side — the Go service doesn't
+    orchestrate anything, it just exposes both listeners and lets whichever one gets used, get used. This
+    mirrors how failover actually works in real IoT firmware: the constrained device is the one that has to
+    reason about link quality, not the server.</p>
+
+  <h2 id="wireguard-basics">WireGuard — what actually happens at the network layer</h2>
+  <table>
+    <tr><th>Concept</th><th>What it is</th></tr>
+    <tr><td>Key pair</td><td>Each peer (device, service) has a private/public key pair — WireGuard uses these for both authentication and encryption, no separate certificate infrastructure needed</td></tr>
+    <tr><td>Peer config</td><td>Each side lists the other's public key and allowed IP range — WireGuard only accepts traffic from a peer whose key it already trusts</td></tr>
+    <tr><td>Tunnel interface (<code>wg0</code>)</td><td>A virtual network interface WireGuard creates — traffic sent to it gets encrypted and wrapped before leaving the real network interface</td></tr>
+    <tr><td>Why raw UDP/TCP need this</td><td>Neither protocol has any encryption of its own — anything sniffing the network between device and service could read a raw ping in plain text without a tunnel wrapping it first</td></tr>
+  </table>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-rawsockets-udp-vs-tcp-choice">
+    <div class="q">Why is UDP the primary transport here instead of TCP, if TCP is more reliable?</div>
+    <div class="a">Reliability isn't free — TCP's handshake and retransmission bookkeeping cost overhead on
+      every single message. For frequent, low-stakes location pings, occasionally losing one is a non-issue
+      (the next ping a few seconds later supersedes it), so paying TCP's overhead on every message isn't
+      worth it. TCP is kept as a fallback specifically for the cases where losing a message actually matters —
+      the right tool matched to the traffic's actual reliability requirement, not "TCP is always safer."</div>
+  </div>
+  <div class="qa" id="qa-rawsockets-why-wireguard">
+    <div class="q">Why does this need WireGuard specifically, instead of just trusting the network?</div>
+    <div class="a">Raw UDP and TCP sockets have zero encryption built in — anyone positioned on the network
+      path between a device and this service could read a ping in plain text, or worse, forge one. WireGuard
+      wraps that raw traffic in an encrypted, authenticated tunnel first, so what travels the actual network
+      is opaque and provably from a trusted peer, regardless of what the inner UDP/TCP payload looks like.</div>
+  </div>
+  <div class="qa" id="qa-rawsockets-shared-handler">
+    <div class="q">Why refactor the ping-processing logic into a shared handler instead of writing it three times?</div>
+    <div class="a">REST, UDP, and TCP are just three different ways bytes arrive at the service — once parsed,
+      the actual work (validate, persist to Postgres, publish to Kafka) is identical regardless of transport.
+      Writing it three times means three places that can silently drift out of sync as the logic evolves; one
+      shared function called from three thin transport-specific handlers guarantees all three transports
+      behave identically.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

@@ -25,6 +25,9 @@
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a>
+  <a href="tech/raw-sockets.html">Raw Sockets & WireGuard</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -786,6 +789,149 @@
       working the entire time — which is exactly what made this bug so confusing to isolate.</div>
   </div>
   <p class="pill">↳ <a href="steps.html#qa-kafka-offsets-vs-produce">Steps — Phase 10</a></p>
+
+  <h2 id="from-websocket">From Node.js &amp; WebSockets <span class="tag">Phase 9</span></h2>
+
+  <div class="qa">
+    <div class="q">Why not just have the dashboard poll a REST endpoint every few seconds instead of using a WebSocket?</div>
+    <div class="a">Polling means picking a tradeoff you can't win: poll too slowly and updates feel laggy;
+      poll too fast and you're making mostly-wasted requests that scale badly with more open dashboard
+      tabs. A WebSocket sidesteps the tradeoff entirely — the server only sends when there's actually
+      something to say, and the connection itself is cheap to hold open.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/websocket.html#qa-websocket-vs-polling">Node.js &amp; WebSockets</a></p>
+
+  <div class="qa">
+    <div class="q">Node.js is single-threaded — how does it handle many WebSocket connections at once without blocking?</div>
+    <div class="a">The event loop never blocks waiting on I/O — a slow operation registers a callback and
+      the loop moves on immediately, running the callback only when the result is actually ready. Many idle
+      connections cost almost nothing while they're idle; the model breaks down for CPU-heavy work, not
+      I/O-heavy work like this.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/websocket.html#qa-node-event-loop">Node.js &amp; WebSockets</a></p>
+
+  <div class="qa">
+    <div class="q">Why does this service use its own Kafka consumer group instead of reusing Phase 10's demo-consumer group?</div>
+    <div class="a">Two independent consumer groups reading the same topic don't interfere with each other at
+      all — each group tracks its own separate offset. Reusing the demo group would tie this real,
+      production-facing feature to a throwaway debugging tool; a dedicated group id keeps them fully
+      independent.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/websocket.html#qa-kafka-groupid-live-feed">Node.js &amp; WebSockets</a></p>
+
+  <div class="qa">
+    <div class="q">A React hook was built and committed with no errors, but nothing changed on screen — how do you debug that?</div>
+    <div class="a">Check whether anything actually calls the hook at all, before assuming the hook's logic
+      is broken. A hook (or any function) that's never invoked produces zero errors and zero visible
+      behavior — it's indistinguishable from "working but doing nothing" unless you specifically verify
+      something is using it. In this case, the hook existed, but no page component called it and no route
+      existed to reach one.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-hook-with-no-consumer">Steps — Phase 9</a></p>
+
+  <div class="qa">
+    <div class="q">Why isn't <code>git status</code> showing "clean" enough proof that a fix actually made it into the codebase?</div>
+    <div class="a">A clean working tree only proves there's nothing <em>uncommitted</em> sitting around
+      locally — it says nothing about whether a commit actually reached the branch you think it did, or
+      whether it was ever merged. A fix can sit safely on a separate, still-open, unmerged branch while
+      <code>main</code> looks completely clean after a reset. The real proof is checking the file's live
+      content on the branch that matters, not just the absence of local changes.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-clean-status-vs-merged">Steps — Phase 9</a></p>
+
+  <h2 id="from-soap">From SOAP &amp; Spring-WS <span class="tag">Phase 7</span></h2>
+
+  <div class="qa">
+    <div class="q">What does "contract-first" mean, and why does Spring-WS use that order instead of code-first?</div>
+    <div class="a">Contract-first means the formal shape of a service (its XSD/WSDL) is written before any
+      Java code exists, and the code gets generated from that contract — not the other way around. This
+      matters for SOAP specifically because SOAP clients are often generated automatically from a WSDL by
+      completely separate teams/systems; if the contract could silently drift from whatever the code happens
+      to do, every client generated against an older WSDL version would break. Code-first (like this
+      project's REST APIs) is fine when the API and its one client evolve together — SOAP's traditional use
+      case (loosely coupled legacy systems) specifically assumes they don't.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/soap.html#qa-soap-contract-first">SOAP &amp; Spring-WS</a></p>
+
+  <div class="qa">
+    <div class="q">Is SOAP actually still relevant, or is this just historical trivia?</div>
+    <div class="a">Still genuinely relevant at real system boundaries — government, banking, insurance, and
+      healthcare systems built 15-20+ years ago standardized on SOAP and are often too risky or expensive to
+      replace outright. A real job in an enterprise environment can absolutely involve building an adapter
+      like this one, translating between an old SOAP-only system and a modern REST-based one, exactly the
+      scenario this phase demonstrates.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/soap.html#qa-soap-still-relevant">SOAP &amp; Spring-WS</a></p>
+
+  <div class="qa">
+    <div class="q">Why build a translation adapter instead of just adding SOAP support directly to Move &amp; Entitlement?</div>
+    <div class="a">Keeps the two concerns fully separate — Move &amp; Entitlement stays a clean REST service
+      with no idea SOAP clients exist at all, and the adapter is the only place that has to know about XML
+      envelopes and WSDLs. If the legacy system is ever retired, the adapter is deleted with zero risk to the
+      real service; if Move &amp; Entitlement's REST API changes, only the adapter's translation logic needs
+      updating, not two different endpoint implementations living in the same service.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/soap.html#qa-soap-adapter-vs-rewrite">SOAP &amp; Spring-WS</a></p>
+
+  <div class="qa">
+    <div class="q">Why does a JAXB-generated <code>xs:date</code> field come back as <code>XMLGregorianCalendar</code> instead of <code>LocalDate</code>?</div>
+    <div class="a">JAXB predates <code>java.time</code> (introduced in Java 8) and has never been updated to
+      generate against it by default — <code>XMLGregorianCalendar</code> is the original, XML-Schema-aligned
+      date/time type it's always used. Converting it cleanly needs <code>.toXMLFormat()</code>, not
+      <code>.toString()</code>. Worth checking the actually-generated code before writing translation logic
+      against it, rather than assuming a modern type.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/soap.html#qa-soap-xmlgregoriancalendar">SOAP &amp; Spring-WS</a></p>
+
+  <div class="qa">
+    <div class="q">A SOAP endpoint returns HTTP 200 with a response body — is that enough to call the feature done?</div>
+    <div class="a">No — a 200 with a response only proves the adapter itself didn't crash, not that the
+      underlying REST call reached the real service or that anything was actually persisted. Real proof here
+      was cross-checking the SOAP response's <code>id</code> value directly against Postgres and confirming
+      it matched exactly — the same "verify against the actual data store, not just the HTTP status" instinct
+      used throughout this project.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-soap-verify-not-just-200-steps">Steps — Phase 7</a></p>
+
+  <div class="qa">
+    <div class="q">If a code fix is described correctly but the bug persists, what's the first thing to check?</div>
+    <div class="a">Whether the fix actually landed in the file at all, before re-diagnosing the logic. A
+      described fix and an applied fix aren't the same thing until the file is actually re-read and confirmed
+      changed — re-reading the real file content directly, rather than trusting an instruction was followed,
+      is what catches this.</div>
+  </div>
+  <p class="pill">↳ <a href="steps.html#qa-soap-described-vs-applied-fix">Steps — Phase 7</a></p>
+
+  <h2 id="from-raw-sockets">From Raw Sockets &amp; WireGuard <span class="tag">Phase 13</span></h2>
+
+  <div class="qa">
+    <div class="q">Why is UDP the primary transport here instead of TCP, if TCP is more reliable?</div>
+    <div class="a">Reliability isn't free — TCP's handshake and retransmission bookkeeping cost overhead on
+      every single message. For frequent, low-stakes location pings, occasionally losing one is a non-issue
+      (the next ping a few seconds later supersedes it), so paying TCP's overhead on every message isn't
+      worth it. TCP is kept as a fallback specifically for the cases where losing a message actually matters —
+      the right tool matched to the traffic's actual reliability requirement, not "TCP is always safer."</div>
+  </div>
+  <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-udp-vs-tcp-choice">Raw Sockets &amp; WireGuard</a></p>
+
+  <div class="qa">
+    <div class="q">Why does this need WireGuard specifically, instead of just trusting the network?</div>
+    <div class="a">Raw UDP and TCP sockets have zero encryption built in — anyone positioned on the network
+      path between a device and this service could read a ping in plain text, or worse, forge one. WireGuard
+      wraps that raw traffic in an encrypted, authenticated tunnel first, so what travels the actual network
+      is opaque and provably from a trusted peer, regardless of what the inner UDP/TCP payload looks like.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-why-wireguard">Raw Sockets &amp; WireGuard</a></p>
+
+  <div class="qa">
+    <div class="q">Why refactor the ping-processing logic into a shared handler instead of writing it three times?</div>
+    <div class="a">REST, UDP, and TCP are just three different ways bytes arrive at the service — once parsed,
+      the actual work (validate, persist to Postgres, publish to Kafka) is identical regardless of transport.
+      Writing it three times means three places that can silently drift out of sync as the logic evolves; one
+      shared function called from three thin transport-specific handlers guarantees all three transports
+      behave identically.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-shared-handler">Raw Sockets &amp; WireGuard</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

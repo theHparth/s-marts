@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — SOAP &amp; Spring-WS</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
+  <a href="websocket.html">Node.js &amp; WebSockets</a>
+  <a href="soap.html" class="active">SOAP &amp; Spring-WS</a>
+  <a href="raw-sockets.html">Raw Sockets &amp; WireGuard</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>SOAP &amp; Spring-WS <span class="tag">Phase 7</span></h1>
+  <p class="subtitle">
+    Written from zero — assumes no prior SOAP/XML web services experience. For when each piece was
+    introduced, see the <a href="../steps.html#phase7">Steps page → Phase 7</a>.
+  </p>
+
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 98</div>
+    Phase 7 (SOAP Legacy Adapter) is complete. Containerized, running on port 8083, verified with a real SOAP
+    request that round-tripped through Move &amp; Entitlement's REST API into a real Postgres row and back
+    out as a real SOAP response (<code>id=19</code>, <code>entitlementLbs=7000</code>, cross-checked directly
+    against the database). Unlike every other phase so far, nothing else in the system calls this adapter
+    automatically — see <a href="#standalone-by-design">Why this phase is standalone</a> below. Every real
+    gotcha hit along the way is documented inline.
+  </div>
+
+  <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project need this at all?</td><td>Real government/military IT environments are full of decades-old systems that only speak SOAP/XML, not REST/JSON — a legacy scheduling system needing to submit a move request is exactly this scenario. This phase demonstrates translating between the two at a system boundary, a real, common integration pattern.</td></tr>
+    <tr><td>What does it actually do?</td><td>Exposes a SOAP endpoint that accepts XML requests shaped like a legacy system would send, translates each one into a real REST call against Move &amp; Entitlement's existing API, and translates the JSON response back into SOAP/XML.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>In front of Move &amp; Entitlement — nothing about that service changes at all. The adapter is a pure translation layer, calling the exact same REST API the React dashboard already calls.</td></tr>
+    <tr><td>When would you reach for this pattern in a real job?</td><td>Whenever a legacy system can't be changed (too risky, too old, someone else owns it) but still needs to talk to a modern system — build a thin adapter instead of touching either side.</td></tr>
+  </table>
+
+  <h2 id="story">The story, in plain terms</h2>
+  <p>Every API this project has built so far speaks the same language: JSON over HTTP, a REST-shaped URL for
+    each action. SOAP is an older, different way of doing the same basic job — call a remote operation, get
+    a result back — but everything is wrapped in XML, and the exact shape of every request and response is
+    defined upfront in a formal contract, not discovered by reading code.</p>
+  <div class="diagram">REST (everything built so far in this project):
+  POST /api/move-requests
+  Body: { "serviceMemberName": "...", "rank": "E5", ... }   (JSON)
+  No upfront contract file required — the DTO classes ARE the contract.
+
+SOAP (this phase):
+  POST /ws  (one single URL for everything)
+  Body: &lt;soap:Envelope&gt;&lt;soap:Body&gt;&lt;SubmitMoveRequest&gt;...&lt;/SubmitMoveRequest&gt;&lt;/soap:Body&gt;&lt;/soap:Envelope&gt;
+  A WSDL file, generated from an XSD schema, formally defines every
+  operation and every field's shape BEFORE any client can call it.</div>
+
+  <h2 id="overview">What each piece is, in one line</h2>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>SOAP</strong></td><td>Simple Object Access Protocol — an XML-based messaging format for calling remote operations, wrapped in a standard envelope structure.</td></tr>
+    <tr><td><strong>XSD</strong></td><td>XML Schema Definition — a formal, machine-readable contract describing exactly what fields a request/response can contain and what type each one is. Written by hand, first, before any code.</td></tr>
+    <tr><td><strong>WSDL</strong></td><td>Web Services Description Language — describes an entire SOAP service: what operations exist, what each one's request/response looks like (built from the XSD), and where to send requests. Auto-generated from the XSD in this project, not hand-written.</td></tr>
+    <tr><td><strong>Spring-WS</strong></td><td>Spring's library for building SOAP web services — contract-first by design, meaning you write the XSD first and Spring generates the Java classes from it (the opposite order from a typical REST controller, where you write Java first).</td></tr>
+    <tr><td><strong>@Endpoint / @PayloadRoot</strong></td><td>Spring-WS's equivalent of <code>@RestController</code>/<code>@PostMapping</code> — marks a class as handling SOAP requests, and routes a specific XML element name to a specific method.</td></tr>
+  </table>
+
+  <h2 id="soap-vs-rest">SOAP vs. REST — the real comparison</h2>
+  <table>
+    <tr><th></th><th>REST (this project's other Java services)</th><th>SOAP (this phase)</th></tr>
+    <tr><td>Data format</td><td>JSON</td><td>XML, wrapped in a standard "envelope"</td></tr>
+    <tr><td>Contract</td><td>Informal — DTOs and documentation, no single required contract file</td><td>Formal — a WSDL/XSD must exist before a client can be built against it, generated first, code second</td></tr>
+    <tr><td>URLs</td><td>One URL per resource/action (<code>/api/move-requests</code>, <code>/api/move-requests/{id}</code>)</td><td>Usually a single URL for everything — the XML body itself says which operation is being called</td></tr>
+    <tr><td>Why it still exists in 2026</td><td colspan="2">Enterprise, government, and older financial/healthcare systems standardized on SOAP decades ago and haven't migrated — a real, common integration boundary, not a dead technology.</td></tr>
+  </table>
+
+  <h2 id="contract-first">Contract-first development — the XSD comes first</h2>
+  <pre><code>&lt;xs:element name="submitMoveRequest"&gt;
+  &lt;xs:complexType&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element name="serviceMemberName" type="xs:string"/&gt;
+      &lt;xs:element name="rank" type="xs:string"/&gt;
+      &lt;xs:element name="originBase" type="xs:string"/&gt;
+      &lt;xs:element name="destinationBase" type="xs:string"/&gt;
+      &lt;xs:element name="moveDate" type="xs:date"/&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:complexType&gt;
+&lt;/xs:element&gt;</code></pre>
+  <p>The <code>org.jvnet.jaxb:jaxb-maven-plugin</code> reads this file at build time and auto-generates
+    matching Java classes — the exact opposite direction from every REST DTO built so far in this project,
+    where the Java class comes first and nothing formally verifies a client matches it ahead of time. With no
+    explicit output package configured, the plugin derives one from the XSD's <code>targetNamespace</code>
+    (<code>http://movetrack.com/soap/moverequest</code>) automatically — it landed on
+    <code>com.movetrack.soap.moverequest</code>, producing <code>SubmitMoveRequest.java</code> and
+    <code>SubmitMoveRequestResponse.java</code>, confirmed by actually inspecting
+    <code>target/generated-sources/xjc</code> rather than guessing the package name ahead of time.</p>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — a malformed plugin config, twice</div>
+    Configuring this plugin's <code>&lt;execution&gt;</code> block needs a nested
+    <code>&lt;goals&gt;&lt;goal&gt;generate&lt;/goal&gt;&lt;/goals&gt;</code> — an orphan closing
+    <code>&lt;/goals&gt;</code> tag with no matching opening tag (missing the whole
+    <code>&lt;goals&gt;&lt;goal&gt;generate&lt;/goal&gt;</code> line above it) produced
+    <code>Non-parseable POM ... end tag name &lt;/goals&gt; must match start tag name &lt;execution&gt;</code>
+    from Maven. A separate, earlier version of this same file also broke from a literal <code>...</code>
+    placeholder character sequence landing in the XML by mistake. Both are the same root lesson: a Maven POM
+    is strict, well-formed XML — any incomplete tag pair fails the entire build before a single class
+    compiles, not just the plugin using it.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">Not a real error — editor "package does not match" warning</div>
+    A freshly-added Java file under <code>src/main/java/com/movetrackops/soapadapter/config/</code> can show
+    <code>The declared package "..." does not match the expected package "main.java...."</code> in an editor's
+    Java language server, even though the file sits in exactly the right place on disk. This means the editor
+    hasn't recognized the new Maven module's <code>src/main/java</code> source root yet — a project
+    reload/reindex fixes it. <code>mvn compile</code> reads the source root from <code>pom.xml</code>
+    directly and was never affected by this at all — confirmed by comparing the physical file path against
+    what the error message implied before assuming anything was actually misplaced.
+  </div>
+
+  <h2 id="endpoint-example">A SOAP endpoint, translating to REST — the real, working code</h2>
+  <pre><code>@Endpoint
+public class MoveRequestEndpoint {
+
+    private static final String NAMESPACE_URI = "http://movetrack.com/soap/moverequest";
+    private static final String MOVE_ENTITLEMENT_URL = "http://move-entitlement-service:8082/api/move-requests";
+
+    private final RestTemplate restTemplate;
+
+    public MoveRequestEndpoint(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "submitMoveRequest")
+    @ResponsePayload
+    public SubmitMoveRequestResponse submitMoveRequest(@RequestPayload SubmitMoveRequest request) {
+        Map&lt;String, Object&gt; dto = toRestDto(request);
+
+        Map&lt;String, Object&gt; restResponse = restTemplate.postForObject(MOVE_ENTITLEMENT_URL, dto, Map.class);
+
+        return toSoapResponse(restResponse);
+    }
+
+    private Map&lt;String, Object&gt; toRestDto(SubmitMoveRequest request) {
+        Map&lt;String, Object&gt; dto = new HashMap&lt;&gt;();
+        dto.put("serviceMemberName", request.getServiceMemberName());
+        dto.put("rank", request.getRank());
+        dto.put("originBase", request.getOriginBase());
+        dto.put("destinationBase", request.getDestinationBase());
+        dto.put("moveDate", request.getMoveDate().toXMLFormat());
+        return dto;
+    }
+
+    private SubmitMoveRequestResponse toSoapResponse(Map&lt;String, Object&gt; restResponse) {
+        SubmitMoveRequestResponse response = new SubmitMoveRequestResponse();
+        response.setId(Long.parseLong(restResponse.get("id").toString()));
+        response.setEntitlementLbs(Integer.parseInt(restResponse.get("entitlementLbs").toString()));
+        return response;
+    }
+}</code></pre>
+  <table>
+    <tr><th>Piece</th><th>What it does</th></tr>
+    <tr><td><code>@PayloadRoot</code></td><td>Routes any SOAP request whose XML body's root element matches this namespace+name to this specific method — same routing idea as <code>@PostMapping</code>, different match criteria (an XML element name instead of a URL path). <code>localPart</code> matches the XSD element name exactly (<code>submitMoveRequest</code>, not <code>submitMoveRequestRequest</code> — the generated class name and the payload-root name aren't required to match each other)</td></tr>
+    <tr><td><code>@RequestPayload</code>/<code>@ResponsePayload</code></td><td>Marks which parameter is the parsed incoming XML, and that the return value becomes the outgoing XML — Spring-WS handles the actual XML parsing/generation</td></tr>
+    <tr><td><code>RestTemplate</code></td><td>Spring's classic HTTP client — calls Move &amp; Entitlement's real REST API exactly the same way <code>curl</code>/<code>Invoke-RestMethod</code> would, just from Java code</td></tr>
+    <tr><td>Raw <code>Map&lt;String, Object&gt;</code> instead of a shared DTO class</td><td>Deliberate — the adapter shouldn't need a compile-time dependency on Move &amp; Entitlement's internal DTO classes. If a field name ever drifts between the two services, this is the one place that breaks, which is the point of keeping them decoupled</td></tr>
+  </table>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — assumed <code>moveDate</code> would generate as a normal date type</div>
+    JAXB generates <code>xs:date</code> XSD fields as <code>javax.xml.datatype.XMLGregorianCalendar</code>, not
+    <code>java.time.LocalDate</code> or <code>String</code> — confirmed by actually reading the generated
+    <code>SubmitMoveRequest.java</code> rather than assuming. Calling <code>.toString()</code> on it doesn't
+    reliably produce a clean ISO date string; <code>.toXMLFormat()</code> is the correct method for that.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">Two build prerequisites the original step plan missed</div>
+    A working, runnable Spring Boot module needs a <code>@SpringBootApplication</code> main class and an
+    <code>application.properties</code> (for <code>server.port=8083</code>) — neither was part of the
+    original Steps 91-98 plan, since earlier phases' step-by-step docs assumed they'd already exist from an
+    initial scaffold. Caught before it became a runtime failure, not after. Same category of gap as the
+    missing Maven wrapper (<code>mvnw</code>/<code>.mvn/</code>) needed for this module's Dockerfile — copied
+    directly from <code>move-entitlement-service</code> to guarantee the exact same Maven version, rather than
+    regenerating one that might drift.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">Real mistake — missing test dependency for <code>MockWebServiceClient</code></div>
+    <code>MockWebServiceClient</code> (used for the Step 96 integration test below) lives in
+    <code>org.springframework.ws:spring-ws-test</code>, a separate artifact from the
+    <code>spring-boot-starter-web-services</code> dependency already in the project — not pulled in
+    automatically. Added as a test-scope dependency once the integration test needed it.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">Framework-version detail — <code>@MockitoBean</code>, not <code>@MockBean</code></div>
+    This project's Spring Boot version (4.1.0) uses <code>@MockitoBean</code> from
+    <code>org.springframework.test.context.bean.override.mockito</code> for mocking a bean inside a
+    <code>@SpringBootTest</code>/<code>@WebMvcTest</code> context — the older <code>@MockBean</code> annotation
+    from earlier Spring Boot versions doesn't apply here. Confirmed by reading
+    <code>MoveRequestControllerTest.java</code> in <code>move-entitlement-service</code> for the pattern this
+    project already uses, rather than assuming the older name still applied.
+  </div>
+
+  <h2 id="verifying-the-round-trip">Verifying the real round trip, end to end</h2>
+  <p>Confirmed with a real SOAP request against the fully containerized service, cross-checked directly
+    against Postgres, not just "the endpoint returned 200":</p>
+  <div class="diagram">PowerShell: send a real SOAP envelope
+  ▼
+http://localhost:8083/ws  (soap-legacy-adapter, inside Docker)
+  ▼
+translated to a real REST POST → move-entitlement-service:8082
+  ▼
+PostgreSQL: real row inserted — id=19, service_member_name='Jane Doe', rank='E5'
+  ▼
+translated back to SOAP → response received in PowerShell:
+  &lt;id&gt;19&lt;/id&gt; &lt;entitlementLbs&gt;7000&lt;/entitlementLbs&gt;
+  ▼
+Cross-checked independently via:
+docker compose exec postgres psql -U movetrack -d move_entitlement_db
+  -c "SELECT id, service_member_name, rank FROM move_requests ORDER BY id DESC LIMIT 1;"
+  → same id=19, same Jane Doe / E5 — proves the SOAP response wasn't just echoing
+    input, it reflects a real database write</div>
+  <div class="box gotcha">
+    <div class="box-title">Not a real error — PowerShell hides the response by default</div>
+    <code>Invoke-RestMethod</code> auto-parses an XML response body into an object; printing that object
+    directly just shows the root element's tag name (<code>Envelope</code>) instead of the nested content —
+    easy to mistake for an empty or broken response. Assigning the result to a variable and reading
+    <code>$response.OuterXml</code> shows the full raw XML, including the actual <code>&lt;id&gt;</code> and
+    <code>&lt;entitlementLbs&gt;</code> values.
+  </div>
+
+  <h2 id="standalone-by-design">Why this phase is standalone</h2>
+  <p>Unlike every other phase in this project, nothing else in the system calls this adapter — the React
+    dashboard, the other services, the Kafka/RabbitMQ event flows never send it a request. Move &amp;
+    Entitlement's REST API already fully serves every real user flow on its own; the adapter doesn't unlock
+    any new user-facing capability.</p>
+  <p>That's intentional, not a gap. The value here is the demonstration itself — proof of a real, working
+    protocol-translation adapter in front of an existing REST service, answering a specific, common
+    enterprise/government integration requirement (see <a href="#why-this-here">Why this phase exists</a>
+    above) — not a piece the rest of MoveTrack Ops' request flow depends on.</p>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-soap-contract-first">
+    <div class="q">What does "contract-first" mean, and why does Spring-WS use that order instead of code-first?</div>
+    <div class="a">Contract-first means the formal shape of a service (its XSD/WSDL) is written before any
+      Java code exists, and the code gets generated from that contract — not the other way around. This
+      matters for SOAP specifically because SOAP clients are often generated automatically from a WSDL by
+      completely separate teams/systems; if the contract could silently drift from whatever the code happens
+      to do, every client generated against an older WSDL version would break. Code-first (like this
+      project's REST APIs) is fine when the API and its one client evolve together — SOAP's traditional use
+      case (loosely coupled legacy systems) specifically assumes they don't.</div>
+  </div>
+  <div class="qa" id="qa-soap-still-relevant">
+    <div class="q">Is SOAP actually still relevant, or is this just historical trivia?</div>
+    <div class="a">Still genuinely relevant at real system boundaries — government, banking, insurance, and
+      healthcare systems built 15-20+ years ago standardized on SOAP and are often too risky or expensive to
+      replace outright. A real job in an enterprise environment can absolutely involve building an adapter
+      like this one, translating between an old SOAP-only system and a modern REST-based one, exactly the
+      scenario this phase demonstrates.</div>
+  </div>
+  <div class="qa" id="qa-soap-adapter-vs-rewrite">
+    <div class="q">Why build a translation adapter instead of just adding SOAP support directly to Move &amp; Entitlement?</div>
+    <div class="a">Keeps the two concerns fully separate — Move &amp; Entitlement stays a clean REST service
+      with no idea SOAP clients exist at all, and the adapter is the only place that has to know about XML
+      envelopes and WSDLs. If the legacy system is ever retired, the adapter is deleted with zero risk to the
+      real service; if Move &amp; Entitlement's REST API changes, only the adapter's translation logic needs
+      updating, not two different endpoint implementations living in the same service.</div>
+  </div>
+  <div class="qa" id="qa-soap-xmlgregoriancalendar">
+    <div class="q">Why does a JAXB-generated <code>xs:date</code> field come back as <code>XMLGregorianCalendar</code> instead of <code>LocalDate</code>?</div>
+    <div class="a">JAXB predates <code>java.time</code> (introduced in Java 8) and has never been updated to
+      generate against it by default — <code>XMLGregorianCalendar</code> is the original, XML-Schema-aligned
+      date/time type it's always used. Converting it cleanly needs <code>.toXMLFormat()</code>, not
+      <code>.toString()</code>, to get a reliable ISO-8601 string. Worth checking the actually-generated code
+      under <code>target/generated-sources</code> before writing translation logic against it, rather than
+      assuming a modern type.</div>
+  </div>
+  <div class="qa" id="qa-soap-verify-not-just-200">
+    <div class="q">The SOAP endpoint returned an HTTP 200 with a response body — how do you know it actually worked end to end?</div>
+    <div class="a">A 200 with a response only proves the adapter itself didn't crash — it doesn't prove the
+      REST call underneath it actually reached Move &amp; Entitlement, or that anything was really persisted.
+      Real proof here was cross-checking the SOAP response's <code>id</code> value directly against Postgres
+      (<code>SELECT ... FROM move_requests ORDER BY id DESC LIMIT 1</code>) and confirming it matched — the
+      same "verify against the actual data store, not just the HTTP status" instinct used to confirm Phase 4's
+      RabbitMQ events and Phase 10's Kafka offsets.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

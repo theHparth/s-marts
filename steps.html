@@ -25,6 +25,8 @@
   <a href="tech/jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -2313,7 +2315,9 @@ git pull origin main</code></pre>
     green Jenkins build against <code>main</code> after merge. The gotcha-prone phase before this one
     (Phase 5) got beaten by this one — see every box below and
     <a href="tech/rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
-  <a href="tech/kafka.html">Kafka</a> / <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a> / <a href="tech/java-spring.html">Java, Spring &amp; Maven</a>
     for the full reference depth.</p>
 
   <div class="step" id="step63">
@@ -2754,7 +2758,9 @@ git pull origin main</code></pre>
     11th, 12th, and 13th container (broker, UI, demo consumer), the Go Ingestion Service publishes every
     shipment ping, a Python consumer proves real cross-language consumption with zero lag. This phase hit the
     densest run of real infrastructure gotchas yet — every one documented inline below and on
-    <a href="tech/kafka.html">Kafka</a>.</p>
+    <a href="tech/kafka.html">Kafka</a>
+  <a href="tech/websocket.html">Node.js & WebSockets</a>
+  <a href="tech/soap.html">SOAP & Spring-WS</a>.</p>
 
   <div class="step" id="step75">
     <div class="step-header">
@@ -3021,6 +3027,832 @@ git pull origin main</code></pre>
         group-coordinator-dependent path silently stalled, while the completely separate write path kept
         working the entire time — which is exactly what made this bug so confusing to isolate.</div>
     </div>
+  </div>
+
+  <h2 id="phase9">Phase 9 — WebSocket Live Feed</h2>
+  <p class="pill">7 steps (84–90), 1 branch. First Node.js backend service in this project — first real use
+    of a WebSocket instead of a REST request. <strong>Complete</strong> — a live shipment feed renders on
+    the dashboard with zero page refresh, fully inside Docker, closing the loop Phase 10's Kafka topic
+    opened. Full concept explanation on <a href="tech/websocket.html">Node.js &amp; WebSockets</a>.</p>
+
+  <div class="step" id="step84">
+    <div class="step-header">
+      <span class="step-num">STEP 84</span>
+      <span class="step-title">Node.js project skeleton + basic WebSocket server</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step, and why Node.js specifically:</strong> holding many simultaneous, mostly-idle
+      browser connections open (one per dashboard tab) is exactly the shape Node's event loop handles
+      cheaply — same class of reasoning as Go's goroutines in Phase 6, different mechanism, and it's also
+      where the frontend team's existing JavaScript/TypeScript skillset already lives. Full explanation on
+      <a href="tech/websocket.html#why-node">Node.js &amp; WebSockets → Why Node.js specifically</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/websocket-live-feed
+
+mkdir services/ws-live-feed
+cd services/ws-live-feed
+npm init -y
+npm install ws
+
+# write server.js — a WebSocketServer on port 8095, tracks connected clients in a Set
+
+node server.js</code></pre>
+    <p><strong>How to check:</strong> open the browser's dev console at <code>http://localhost:3000</code>
+      (or any page) and run:</p>
+    <pre><code>const s = new WebSocket("ws://localhost:8095");
+s.onopen = () =&gt; console.log("connected");</code></pre>
+    <p><strong>Expected:</strong> <code>connected</code> printed in the console — proves the server accepts a
+      real WebSocket connection.</p>
+    <p>Pasting code into the browser console the first time triggers a built-in browser safety warning
+      ("Don't paste code you don't understand..."). Typing <code>allow pasting</code> once and re-pasting is
+      the expected, safe way past it — not an error with anything built here.</p>
+    <pre><code>git add services/ws-live-feed
+git commit -m "scaffold websocket server"</code></pre>
+  </div>
+
+  <div class="step" id="step85">
+    <div class="step-header">
+      <span class="step-num">STEP 85</span>
+      <span class="step-title">Kafka consumer inside the Node service, broadcasts to connected clients</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> this is the actual point of the whole phase — the moment a Kafka
+      message becomes a live push to every open browser tab. Full explanation on
+      <a href="tech/websocket.html#kafkajs-consumer">Node.js &amp; WebSockets → Consuming Kafka from Node</a>.</p>
+    <pre><code>npm install kafkajs
+
+# write kafkaConsumer.js — subscribes to shipment.tracking, group id "ws-live-feed",
+# fromBeginning: false (a live feed only cares about new pings, not history)
+# each message calls broadcast() from server.js
+
+git add services/ws-live-feed
+git commit -m "consume kafka shipment.tracking, broadcast to websocket clients"</code></pre>
+    <p><strong>How to check:</strong> with the dev console still connected from Step 84's test (<code>s.onmessage
+      = (e) =&gt; console.log(e.data);</code> added first), send a real ping:</p>
+    <pre><code>Invoke-RestMethod -Uri http://localhost:8090/ingest -Method Post -ContentType "application/json" -Body '{"device_id":"DEVICE-1","latitude":38.9,"longitude":-77.0,"timestamp":"2026-08-16T14:00:00Z"}'</code></pre>
+    <p><strong>Expected:</strong> the ping's JSON appears in the browser console within a second or two — the
+      full chain (Go → Kafka → Node → WebSocket → browser) working end to end for the first time.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — ran <code>server.js</code> instead of <code>kafkaConsumer.js</code></div>
+      <code>server.js</code> only starts the WebSocket server — it never loads <code>kafkaConsumer.js</code>
+      at all, so the Kafka consumer never started. Since <code>kafkaConsumer.js</code> already
+      <code>require("./server")</code>s the WebSocket server as a side effect and then begins consuming,
+      <strong>it's the correct single entry point</strong> — <code>node kafkaConsumer.js</code>, not
+      <code>node server.js</code>. No error was thrown either way, which made this genuinely easy to miss —
+      the WebSocket server ran fine, it just had nothing to ever broadcast.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — a stale connection from before the server swapped</div>
+      After switching to the correct entry point, the browser console still showed nothing — because the
+      dev-console <code>s</code> variable was still the connection made to the <em>old</em> (now-replaced)
+      server process. Checking <code>s.readyState</code> (<code>3</code> = <code>CLOSED</code>) confirmed it,
+      not <code>1</code> (<code>OPEN</code>). Fixed by opening a fresh <code>new WebSocket(...)</code>
+      connection after the correct server was actually running.
+    </div>
+  </div>
+
+  <div class="step" id="step86">
+    <div class="step-header">
+      <span class="step-num">STEP 86</span>
+      <span class="step-title">React dashboard — WebSocket client hook + live feed UI</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> Step 85 proved the pipeline works from a raw dev-console script — this
+      makes it a real, permanent part of the actual UI a user sees. Full explanation on
+      <a href="tech/websocket.html#react-ws-client">Node.js &amp; WebSockets → Connecting from React</a>.</p>
+    <pre><code>cd frontend/dashboard
+
+# write src/hooks/useLiveFeed.ts — opens a WebSocket, keeps the last 50 pings in state
+# write src/pages/LiveFeedPage.tsx — uses the hook, renders the list
+# add a Link + Route for it in App.tsx
+
+git add frontend/dashboard/src
+git commit -m "add live shipment feed to dashboard via websocket"</code></pre>
+    <p><strong>How to check:</strong> open <code>http://localhost:3000</code>, click into the live feed page
+      via the nav link, then send another ping via <code>Invoke-RestMethod</code> like Step 85.</p>
+    <p><strong>Expected:</strong> the new ping appears at the top of the on-screen list within a second or
+      two — no page refresh, no manual action beyond sending the ping.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the hook got built, but nothing actually used it</div>
+      Only <code>useLiveFeed.ts</code> got created — no page rendered it, and no nav link or route existed to
+      even reach one. This wasn't caught until testing all the way at Step 90, since the app still ran fine
+      with no errors — there was just genuinely nowhere on the site to see the feed. Fixed by adding
+      <code>LiveFeedPage.tsx</code> (calling the hook, rendering the list) plus a <code>&lt;Link&gt;</code>
+      and <code>&lt;Route&gt;</code> for it in <code>App.tsx</code>. Worth remembering generally: a hook with
+      no component using it produces zero errors and zero visible behavior — "nothing happened" after adding
+      a hook is a real signal to check whether anything actually calls it yet, before assuming the hook
+      itself is broken.
+    </div>
+  </div>
+
+  <div class="step" id="step87">
+    <div class="step-header">
+      <span class="step-num">STEP 87</span>
+      <span class="step-title">Reconnection handling — WS drops, Kafka unavailable</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> a WebSocket connection can drop for all kinds of ordinary reasons (the
+      server restarts, a laptop sleeps, a network blip) — a live feed that silently stays broken until a
+      manual page refresh defeats the entire point of building it.</p>
+    <pre><code># React hook: on socket.onclose, retry with a short backoff (e.g. 2s) instead of giving up
+# Node service: if the Kafka consumer disconnects, log and let KafkaJS's own retry logic
+#   handle reconnection rather than crashing the whole process
+
+git add frontend/dashboard/src services/ws-live-feed
+git commit -m "add reconnection handling for websocket and kafka consumer"</code></pre>
+    <p>Manually testing this mid-phase (stopping/restarting a locally-run <code>node</code> process) was
+      confusing enough to skip in the moment — <code>docker compose restart ws-live-feed</code> in Step 90,
+      once the service is a real container, is a much cleaner version of this same check, and is what
+      actually confirmed the reconnect logic works.</p>
+  </div>
+
+  <div class="step" id="step88">
+    <div class="step-header">
+      <span class="step-num">STEP 88</span>
+      <span class="step-title">Tests</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> the broadcast logic (which connected clients receive a message) is
+      pure and testable without a real network — same "separate pure logic from I/O" discipline already used
+      for Go's <code>validatePing</code> and the Kafka message-building tests in Phase 10.</p>
+    <pre><code>npm install --save-dev node:test
+
+# write test/broadcast.test.js — a fake client object, assert broadcast() only sends
+# to clients whose readyState is OPEN
+
+node --test</code></pre>
+    <p><strong>How to check:</strong> the command's own output.</p>
+    <p><strong>Expected:</strong> all tests pass, no real WebSocket or Kafka connection needed to run them.</p>
+    <pre><code>git add services/ws-live-feed
+git commit -m "add tests for websocket broadcast logic"</code></pre>
+  </div>
+
+  <div class="step" id="step89">
+    <div class="step-header">
+      <span class="step-num">STEP 89</span>
+      <span class="step-title">Dockerize</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Goal:</strong> a standard single-stage Node Dockerfile, same shape as the Python services'
+      pattern.</p>
+    <pre><code># write Dockerfile, .dockerignore
+# CMD ["node", "kafkaConsumer.js"] — NOT server.js, same reason as Step 85's gotcha
+
+docker build -t ws-live-feed services/ws-live-feed
+
+git add services/ws-live-feed/Dockerfile services/ws-live-feed/.dockerignore
+git commit -m "containerize websocket live feed service"</code></pre>
+    <p><strong>How to check:</strong> the build command's own output. <strong>Expected:</strong> builds
+      clean, no errors.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the Dockerfile repeated Step 85's exact mistake</div>
+      The first version of this Dockerfile's <code>CMD</code> ran <code>node server.js</code> — the same
+      wrong-entry-point bug from Step 85, just baked into the image this time instead of typed into a
+      terminal. The build itself succeeded cleanly (nothing about the mistake breaks a Docker build), so it
+      only surfaced once the container was actually tested, in Step 90. Fixed the same way:
+      <code>CMD ["node", "kafkaConsumer.js"]</code>.
+    </div>
+  </div>
+
+  <div class="step" id="step90">
+    <div class="step-header">
+      <span class="step-num">STEP 90</span>
+      <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <pre><code># add ws-live-feed to docker-compose.yml — port 8095, KAFKA_BROKER=kafka:29092, depends_on kafka
+# update the dashboard's WebSocket URL to use the compose service name in production
+
+docker compose up -d --build
+docker compose ps
+# expect 14 containers now: the 13 from Phase 10 plus ws-live-feed
+
+git add docker-compose.yml
+git commit -m "wire websocket live feed into compose"
+git push -u origin feature/websocket-live-feed
+gh pr create --title "Add WebSocket live feed"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>How to check:</strong> open <code>http://localhost:3000</code>'s live feed page, then send a
+      ping via <code>Invoke-RestMethod</code>.</p>
+    <p><strong>Expected:</strong> the new ping appears on screen within a second or two, fully inside Docker
+      this time, no locally-run Node process involved.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the same local-vs-Docker Kafka address problem, a third time</div>
+      <code>kafkaConsumer.js</code> still had <code>localhost:9092</code> hardcoded from Phase 10's local
+      testing pattern (see <a href="tech/kafka.html#kafka-listeners">Kafka → Host vs. Docker-network
+      listeners</a>) — now that this service runs inside a container, that produced
+      <code>ECONNREFUSED 127.0.0.1:9092</code> and crashed the whole process (an unhandled Kafka connection
+      rejection is fatal to Node by default). Fixed by switching back to <code>kafka:29092</code>, the
+      Docker-network listener — the exact "switch it back once containerized" step that got promised back in
+      Step 85 but initially missed when Step 90 actually arrived.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real process mistake — a fix landed directly on <code>main</code>, twice</div>
+      The Kafka-address fix above got committed straight onto <code>main</code> after the phase's real PR
+      (#45) had already merged — not on its own branch — and duplicated into two identical commits in the
+      process. Caught by checking <code>git status</code> (<code>"ahead of origin/main by 2 commits"</code>)
+      before pushing anything. Fixed with the same recovery pattern as every earlier instance of this mistake
+      (now the 4th time in this project): branch off from the current position to preserve the fix,
+      <code>git reset --hard origin/main</code> to put <code>main</code> back in sync, then a real PR for the
+      preserved branch. Full pattern: <a href="tech/git.html#wrong-branch-recovery">Git &amp; GitHub →
+      Recovering from a commit on the wrong branch</a>. One extra wrinkle this time: the recovery was split
+      across two separate messages — the branch got created and pushed, but the actual
+      <code>gh pr create</code>/<code>gh pr merge</code> steps were initially skipped, leaving the fix
+      sitting on an open, unmerged branch while <code>main</code> looked clean. Caught by explicitly
+      diff-checking the fix's actual content on <code>main</code> (<code>grep brokers:
+      kafkaConsumer.js</code>) rather than trusting <code>git status</code> alone — a clean working tree
+      only proves nothing is <em>uncommitted</em>, not that everything intended is <em>merged</em>.
+    </div>
+    <p><strong>Final verification:</strong> the live feed page rendered a real ping —
+      <code>DEVICE-1 — 38.9, -77 @ 2026-08-16T15:10:00Z</code> — appearing on screen with zero manual
+      refresh, the full chain (Go → Postgres + Kafka → Node consumer → WebSocket → React) working end to end
+      inside Docker.</p>
+    <p><strong>This completes Phase 9</strong> — 7 steps, 84–90.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-hook-with-no-consumer">
+      <div class="q">A React hook was built and committed with no errors, but nothing changed on screen — how do you debug that?</div>
+      <div class="a">Check whether anything actually calls the hook at all, before assuming the hook's logic
+        is broken. A hook (or any function) that's never invoked produces zero errors and zero visible
+        behavior — it's indistinguishable from "working but doing nothing" unless you specifically verify
+        something is using it. In this case, the hook existed, but no page component called it and no route
+        existed to reach one.</div>
+    </div>
+    <div class="qa" id="qa-clean-status-vs-merged">
+      <div class="q">Why isn't <code>git status</code> showing "clean" enough proof that a fix actually made it into the codebase?</div>
+      <div class="a">A clean working tree only proves there's nothing <em>uncommitted</em> sitting around
+        locally — it says nothing about whether a commit you made actually reached the branch you think it
+        did, or whether it was ever merged. In this case, <code>main</code> looked completely clean after a
+        <code>git reset --hard origin/main</code>, but the actual fix was sitting on a separate, still-open,
+        unmerged branch. The real proof is checking the file's live content on the branch that matters
+        (<code>main</code>), not just the absence of local changes.</div>
+    </div>
+  </div>
+
+  <h2 id="phase7">Phase 7 — SOAP Legacy Adapter</h2>
+  <p class="pill">8 steps (91–98), 1 branch. First SOAP/XML service in this project — a pure translation
+    layer in front of Move &amp; Entitlement's existing REST API, no changes to that service at all.
+    <strong>Complete</strong> — verified with a real SOAP request that round-tripped through a real Postgres
+    write and back. Standalone by design: unlike every other phase, nothing else in the system calls this
+    adapter. Full concept explanation on <a href="tech/soap.html">SOAP &amp; Spring-WS</a>
+  <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>.</p>
+
+  <div class="step" id="step91">
+    <div class="step-header">
+      <span class="step-num">STEP 91</span>
+      <span class="step-title">Spring-WS project skeleton + XSD schema</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step, and why the XSD comes first:</strong> Spring-WS is contract-first — the XSD is
+      the formal, machine-readable description of every field a SOAP request/response can contain, written
+      before any Java class exists. Every REST DTO in this project so far went the opposite direction (Java
+      first, no formal contract file required). Full explanation on
+      <a href="tech/soap.html#contract-first">SOAP &amp; Spring-WS → Contract-first development</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/soap-legacy-adapter
+
+# new Maven module: services/soap-legacy-adapter (spring-boot-starter-web-services)
+mkdir -p services/soap-legacy-adapter/src/main/resources
+# write moveRequest.xsd — submitMoveRequest / submitMoveRequestResponse elements,
+# same fields Move &amp; Entitlement's REST DTO already has (serviceMemberName, rank, originBase, destinationBase, moveDate)
+
+git add services/soap-legacy-adapter
+git commit -m "scaffold soap legacy adapter, add moveRequest.xsd"</code></pre>
+    <p><strong>How to check:</strong> <code>mvn compile</code> inside the new module.</p>
+    <p><strong>Expected:</strong> builds clean — this step only adds the schema file and project skeleton, no
+      generated code depends on it yet.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — malformed <code>pom.xml</code>, plus a house-style mismatch</div>
+      A stray literal <code>...</code> placeholder character sequence landed directly in the
+      <code>&lt;project&gt;</code> tag, producing <code>Non-parseable POM: start tag unexpected character</code>
+      from Maven before a single dependency was even resolved. Separately, the first version used a generic
+      Spring Boot parent version, Java version, and <code>groupId</code> instead of matching this project's
+      actual convention (Spring Boot parent <code>4.1.0</code>, Java <code>25</code>,
+      <code>com.movetrackops</code>, <code>spring-boot-starter-webmvc</code> — confirmed by reading
+      <code>move-entitlement-service/pom.xml</code> directly rather than assuming generic defaults).
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — <code>mkdir -p</code> run from the wrong directory</div>
+      <code>mkdir -p services/soap-legacy-adapter/src/main/resources</code> assumes the current directory is
+      the project root — running it from inside <code>services/soap-legacy-adapter</code> itself nested the
+      path a second time (<code>services/soap-legacy-adapter/services/soap-legacy-adapter/src/...</code>).
+      Fixed by moving the XSD to the correct path and deleting the stray nested folder.
+    </div>
+  </div>
+
+  <div class="step" id="step92">
+    <div class="step-header">
+      <span class="step-num">STEP 92</span>
+      <span class="step-title">WSDL auto-generation from the XSD + endpoint mapping config</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> a WSDL is what a real SOAP client actually points at — it describes
+      every operation the service offers, built from the XSD's element definitions plus a mapping that says
+      which URL serves it. Spring-WS generates this dynamically from the XSD rather than it being hand-written.</p>
+    <pre><code># add org.jvnet.jaxb:jaxb-maven-plugin to pom.xml — generates Java classes from moveRequest.xsd at build time
+# write WebServiceConfig.java + XsdSchemaBean.java — @EnableWs, a MessageDispatcherServlet bean at /ws,
+# a DefaultWsdl11Definition bean pointing at the XSD, exposed as moveRequest.wsdl
+
+mvn compile
+# confirm target/generated-sources/xjc has SubmitMoveRequest.java / SubmitMoveRequestResponse.java
+
+git add services/soap-legacy-adapter
+git commit -m "generate wsdl from xsd, configure ws endpoint mapping"</code></pre>
+    <p><strong>How to check:</strong> start the app, then open
+      <code>http://localhost:8083/ws/moveRequest.wsdl</code> in a browser.</p>
+    <p><strong>Expected:</strong> a full WSDL XML document renders, listing the <code>submitMoveRequest</code>
+      operation and the exact field shape from Step 91's XSD.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — an orphan <code>&lt;/goals&gt;</code> tag, missed across several tries</div>
+      The plugin's <code>&lt;execution&gt;</code> block needs a nested
+      <code>&lt;goals&gt;&lt;goal&gt;generate&lt;/goal&gt;&lt;/goals&gt;</code> — a version with just a bare
+      <code>&lt;/goals&gt;</code> closing tag and no matching opening tag produced
+      <code>end tag name &lt;/goals&gt; must match start tag name &lt;execution&gt;</code>. This one took
+      several rounds to actually land in the file (the intended fix was described correctly each time but
+      didn't make it into the saved file until it was applied directly) — a reminder that a described fix and
+      an applied fix aren't the same thing until the file is actually re-read and confirmed.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Not a real error — editor "package does not match" warning</div>
+      Both new config classes showed <code>The declared package "..." does not match the expected package
+      "main.java...."</code> in the editor, even though both files sat in exactly the right place on disk
+      (<code>src/main/java/com/movetrackops/soapadapter/config/</code>). This is the editor's Java language
+      server not having recognized the new Maven module's source root yet — a project reload fixes it.
+      <code>mvn compile</code> reads the source root from <code>pom.xml</code> and was never actually
+      affected, confirmed by checking the real file paths before assuming anything was misplaced.
+    </div>
+  </div>
+
+  <div class="step" id="step93">
+    <div class="step-header">
+      <span class="step-num">STEP 93</span>
+      <span class="step-title">@Endpoint class — receives and parses the SOAP request</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> <code>@Endpoint</code>/<code>@PayloadRoot</code> is Spring-WS's
+      equivalent of <code>@RestController</code>/<code>@PostMapping</code> — routes an incoming SOAP request
+      to a specific method by matching its XML root element instead of a URL path. Full explanation on
+      <a href="tech/soap.html#endpoint-example">SOAP &amp; Spring-WS → A SOAP endpoint, translating to REST</a>.</p>
+    <pre><code>mvn generate-sources
+# confirm the real generated package/class names before writing any imports against them —
+# landed on com.movetrack.soap.moverequest (auto-derived from the XSD's targetNamespace),
+# classes SubmitMoveRequest / SubmitMoveRequestResponse
+
+# write MoveRequestEndpoint.java — @Endpoint, @PayloadRoot(namespace=..., localPart="submitMoveRequest")
+# method takes @RequestPayload SubmitMoveRequest, returns @ResponsePayload SubmitMoveRequestResponse
+
+git add services/soap-legacy-adapter
+git commit -m "add MoveRequestEndpoint"</code></pre>
+    <p><strong>How to check:</strong> send a raw SOAP request with <code>Invoke-RestMethod</code>, a
+      <code>Content-Type: text/xml</code> body containing the full <code>&lt;soap:Envelope&gt;</code> wrapping
+      a <code>&lt;submitMoveRequest&gt;</code> element.</p>
+    <p><strong>Expected:</strong> a well-formed SOAP response envelope comes back — proves parsing and routing
+      both work.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real gap — no main application class or <code>application.properties</code> existed yet</div>
+      Nothing in Steps 91-92 had created a <code>@SpringBootApplication</code> main class or set
+      <code>server.port=8083</code> — without both, the module can compile but can never actually run. Added
+      <code>SoapLegacyAdapterApplication.java</code> and <code>application.properties</code> before the
+      endpoint could be tested at all, a prerequisite the original step plan assumed already existed.
+    </div>
+  </div>
+
+  <div class="step" id="step94">
+    <div class="step-header">
+      <span class="step-num">STEP 94</span>
+      <span class="step-title">Translate to a REST call against Move &amp; Entitlement, translate the response back to SOAP</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> this is the actual point of the whole phase — the moment a SOAP/XML
+      request becomes a real REST/JSON call against Move &amp; Entitlement's existing API, with nothing about
+      that service changed at all. Move &amp; Entitlement has no idea a SOAP client exists.</p>
+    <pre><code># add a RestTemplate bean (RestClientConfig.java)
+# extend MoveRequestEndpoint.submitMoveRequest():
+#   1. toRestDto(request) — map SOAP fields into a plain Map (no shared DTO class with Move & Entitlement)
+#   2. restTemplate.postForObject("http://move-entitlement-service:8082/api/move-requests", dto, Map.class)
+#   3. toSoapResponse(restResponse) — map the REST JSON response back into SubmitMoveRequestResponse
+
+git add services/soap-legacy-adapter
+git commit -m "translate soap request to rest call, translate response back"</code></pre>
+    <p><strong>How to check:</strong> same raw SOAP request as Step 93, with Move &amp; Entitlement running
+      alongside it.</p>
+    <p><strong>Expected:</strong> the SOAP response comes back with a real, database-generated ID and
+      entitlement value.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — assumed <code>moveDate</code> would generate as a normal date type</div>
+      The generated <code>SubmitMoveRequest.getMoveDate()</code> returns
+      <code>javax.xml.datatype.XMLGregorianCalendar</code>, not <code>LocalDate</code> or <code>String</code> —
+      only discovered by actually reading the generated file rather than assuming. Fixed with
+      <code>.toXMLFormat()</code>, the correct method for a clean ISO date string; <code>.toString()</code>
+      isn't reliable for this type. Full explanation on <a href="tech/soap.html#qa-soap-xmlgregoriancalendar">SOAP
+      &amp; Spring-WS → Interview Q&amp;A</a>.
+    </div>
+  </div>
+
+  <div class="step" id="step95">
+    <div class="step-header">
+      <span class="step-num">STEP 95</span>
+      <span class="step-title">Unit tests</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> the translation logic (SOAP request → <code>Map</code> → SOAP response)
+      is plain Java with no network or SOAP machinery involved once isolated — a fast, ordinary JUnit test,
+      matching this project's real test style (constructor injection, <code>@Mock</code>, AssertJ) with
+      <code>RestTemplate</code> mocked so no real HTTP call happens.</p>
+    <pre><code># write MoveRequestEndpointTest.java — @ExtendWith(MockitoExtension.class), @Mock RestTemplate,
+# verify submitMoveRequest() maps a known input/output pair correctly, without hitting a real
+# Move & Entitlement instance
+
+mvn test
+
+git add services/soap-legacy-adapter
+git commit -m "add unit tests for soap/rest translation mapping"</code></pre>
+    <p><strong>How to check:</strong> the test command's own output.</p>
+    <p><strong>Expected:</strong> passes — confirmed, <code>Tests run: 1, Failures: 0, Errors: 0</code>.</p>
+  </div>
+
+  <div class="step" id="step96">
+    <div class="step-header">
+      <span class="step-num">STEP 96</span>
+      <span class="step-title">Integration tests (MockWebServiceClient)</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> unit tests prove the mapping logic is correct, but not that a real SOAP
+      envelope actually parses and routes correctly end to end. Spring-WS's <code>MockWebServiceClient</code>
+      sends a real XML envelope through the real Spring context (routing, marshalling, everything) without a
+      real network socket — same spirit as <code>MockMvc</code> for REST controllers elsewhere in this project.</p>
+    <pre><code># write MoveRequestEndpointIntegrationTest.java — @SpringBootTest, @MockitoBean RestTemplate,
+# MockWebServiceClient.sendRequest(...) with a real XML envelope,
+# .andExpect(payload(...)) assertion on the response XML shape
+
+mvn verify
+
+git add services/soap-legacy-adapter
+git commit -m "add soap integration tests via MockWebServiceClient"</code></pre>
+    <p><strong>How to check:</strong> the test command's own output.</p>
+    <p><strong>Expected:</strong> passes — confirmed, <code>Tests run: 1, Failures: 0, Errors: 0</code>.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — missing test dependency for <code>MockWebServiceClient</code></div>
+      <code>MockWebServiceClient</code> lives in <code>org.springframework.ws:spring-ws-test</code>, a
+      separate artifact not pulled in automatically by <code>spring-boot-starter-web-services</code>. Added as
+      a test-scope dependency once the integration test actually needed it.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Framework-version detail — <code>@MockitoBean</code>, not <code>@MockBean</code></div>
+      This project's Spring Boot version (4.1.0) uses <code>@MockitoBean</code> from
+      <code>org.springframework.test.context.bean.override.mockito</code> for mocking a bean inside a
+      <code>@SpringBootTest</code> context — confirmed by reading <code>MoveRequestControllerTest.java</code>
+      in <code>move-entitlement-service</code> for the pattern this project already uses, rather than assuming
+      the older <code>@MockBean</code> annotation still applied.
+    </div>
+  </div>
+
+  <div class="step" id="step97">
+    <div class="step-header">
+      <span class="step-num">STEP 97</span>
+      <span class="step-title">Dockerize</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> same multi-stage Maven→JRE Dockerfile pattern as every other Java
+      service in this project — nothing SOAP-specific changes here.</p>
+    <pre><code># write Dockerfile — multi-stage: eclipse-temurin:25-jdk build stage (using ./mvnw), eclipse-temurin:25-jre run stage
+# same pattern as move-entitlement-service
+
+docker build -t soap-legacy-adapter services/soap-legacy-adapter
+
+git add services/soap-legacy-adapter/Dockerfile
+git commit -m "containerize soap legacy adapter"</code></pre>
+    <p><strong>How to check:</strong> the build command's own output.</p>
+    <p><strong>Expected:</strong> builds clean, no errors.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real gap — this module was missing the Maven wrapper the Dockerfile depends on</div>
+      <code>move-entitlement-service</code>'s Dockerfile builds with <code>./mvnw</code>, but
+      <code>soap-legacy-adapter</code> never had a <code>mvnw</code>/<code>.mvn/</code> generated for it.
+      Copied directly from <code>move-entitlement-service</code> instead of regenerating one, guaranteeing the
+      exact same Maven version across services rather than risking drift.
+    </div>
+  </div>
+
+  <div class="step" id="step98">
+    <div class="step-header">
+      <span class="step-num">STEP 98</span>
+      <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <pre><code># add soap-legacy-adapter to docker-compose.yml — port 8083, depends_on move-entitlement-service
+
+docker compose up -d --build
+docker compose ps
+# 15 containers now: the 14 from Phase 9 plus soap-legacy-adapter
+
+git add docker-compose.yml
+git commit -m "wire soap legacy adapter into compose"
+git push -u origin feature/soap-legacy-adapter
+gh pr create --title "Add SOAP legacy adapter"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>How to check:</strong> send a real SOAP request to <code>http://localhost:8083/ws</code>, fully
+      inside Docker, then cross-check the response against Postgres directly.</p>
+    <pre><code>docker compose exec postgres psql -U movetrack -d move_entitlement_db `
+  -c "SELECT id, service_member_name, rank FROM move_requests ORDER BY id DESC LIMIT 1;"</code></pre>
+    <div class="box gotcha">
+      <div class="box-title">Not a real error — PowerShell hides the XML response by default</div>
+      <code>Invoke-RestMethod</code> auto-parses the XML response into an object; printing it directly just
+      shows the root element's tag name (<code>Envelope</code>), which reads like an empty/broken response.
+      Assigning it to a variable and reading <code>$response.OuterXml</code> shows the real content.
+    </div>
+    <p><strong>Final verification:</strong> a real SOAP request returned <code>&lt;id&gt;19&lt;/id&gt;</code>
+      and <code>&lt;entitlementLbs&gt;7000&lt;/entitlementLbs&gt;</code> — cross-checked directly against
+      Postgres, which showed the exact same row (<code>id=19</code>, <code>Jane Doe</code>, <code>E5</code>).
+      Proves the full chain (SOAP client → adapter → Move &amp; Entitlement REST → Postgres → back) works end
+      to end inside Docker, not just that the endpoint returned HTTP 200.</p>
+    <p><strong>This completes Phase 7</strong> — 8 steps, 91–98.</p>
+
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-soap-described-vs-applied-fix">
+      <div class="q">If a code fix is described correctly but the bug persists, what's the first thing to check?</div>
+      <div class="a">Whether the fix actually landed in the file at all, before re-diagnosing the logic. In
+        this project's Step 92, the correct fix for a malformed <code>pom.xml</code> block was described
+        several times but the file itself hadn't been re-read and confirmed changed — re-reading the actual
+        file content directly, rather than trusting that an instruction was followed, is what caught it.</div>
+    </div>
+    <div class="qa" id="qa-soap-verify-not-just-200-steps">
+      <div class="q">A SOAP endpoint returns HTTP 200 with a response body — is that enough to call the feature done?</div>
+      <div class="a">No — a 200 with a response only proves the adapter itself didn't crash, not that the
+        underlying REST call reached the real service or that anything was actually persisted. Real proof
+        here was cross-checking the SOAP response's <code>id</code> value directly against a
+        <code>SELECT</code> against Postgres and confirming they matched exactly.</div>
+    </div>
+  </div>
+
+  <h2 id="phase13">Phase 13 — Raw Sockets + WireGuard + Failover</h2>
+  <p class="pill">11 steps (99–109), 1 branch. Extends Phase 6's Go service directly — no new service box in
+    the architecture diagram. Adds raw UDP (primary) and raw TCP (failover) listeners alongside the existing
+    REST endpoint, both traveling through a WireGuard-encrypted tunnel. <strong>In progress.</strong> Full
+    concept explanation on <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>.</p>
+
+  <div class="step" id="step99">
+    <div class="step-header">
+      <span class="step-num">STEP 99</span>
+      <span class="step-title">WireGuard tunnel container — keypair, peer config, verify tunnel</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step first:</strong> raw UDP/TCP have no encryption of their own — building the
+      listeners before the tunnel exists would mean testing them over an unencrypted connection and having to
+      retrofit security later. The tunnel needs to exist and be provably working before anything travels
+      through it. Full explanation on
+      <a href="tech/raw-sockets.html#wireguard-basics">Raw Sockets &amp; WireGuard → WireGuard basics</a>.</p>
+    <pre><code>git checkout main
+git pull origin main
+git checkout -b feature/raw-sockets-wireguard
+
+mkdir -p infra/wireguard
+# generate a keypair for the "server" side (the shipment-ingestion side of the tunnel)
+wg genkey | tee server_private.key | wg pubkey > server_public.key
+# generate a keypair for the "device" side (the simulated tracking device / test client)
+wg genkey | tee device_private.key | wg pubkey > device_public.key
+
+# write infra/wireguard/wg0.conf — server's own private key, a peer entry for the
+# device's public key, AllowedIPs scoped to a small private tunnel subnet (e.g. 10.13.13.0/24)
+
+git add infra/wireguard
+git commit -m "add wireguard keypairs and tunnel config"</code></pre>
+    <p><strong>How to check:</strong> bring the interface up locally and run <code>wg show</code>.</p>
+    <p><strong>Expected:</strong> the interface shows the configured peer, with a public key matching what was
+      generated — proves the config is valid and WireGuard recognizes the peer, before any real traffic
+      exists to send through it.</p>
+  </div>
+
+  <div class="step" id="step100">
+    <div class="step-header">
+      <span class="step-num">STEP 100</span>
+      <span class="step-title">Shared ping-processing handler — extract validate+persist+publish out of the REST handler</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> Steps 101 and 103 add two more ways bytes can arrive at this service —
+      doing this refactor first means both new listeners are built against one already-correct shared
+      function from day one, instead of copy-pasting Phase 6's REST logic twice and risking drift. Full
+      explanation on <a href="tech/raw-sockets.html#go-listeners">Raw Sockets &amp; WireGuard → Raw listeners
+      in Go</a>.</p>
+    <pre><code># in services/shipment-ingestion, extract the existing POST /ingest logic
+# (validatePing, insertPing, publishPing from Phase 6/10) into one function:
+#   func handlePing(raw []byte) error
+# update the existing REST handler to call handlePing() instead of inlining that logic
+
+go test ./...
+
+git add services/shipment-ingestion
+git commit -m "extract shared handlePing function from REST handler"</code></pre>
+    <p><strong>How to check:</strong> re-run Phase 6/10's existing tests, plus a manual REST ping.</p>
+    <p><strong>Expected:</strong> identical behavior to before this refactor — same validation, same Postgres
+      row, same Kafka publish. This step should be invisible from the outside; it only changes internal
+      structure.</p>
+  </div>
+
+  <div class="step" id="step101">
+    <div class="step-header">
+      <span class="step-num">STEP 101</span>
+      <span class="step-title">Raw UDP listener on 8091, reuses the shared handler</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step, and why UDP is the primary transport:</strong> frequent location pings can
+      tolerate occasionally losing one — the next ping supersedes it. UDP's lack of a handshake or delivery
+      guarantee is a fair tradeoff for that specific traffic shape, not a shortcut. Full explanation on
+      <a href="tech/raw-sockets.html#udp-vs-tcp">Raw Sockets &amp; WireGuard → UDP vs. TCP</a>.</p>
+    <pre><code># write udp.go — net.ListenUDP on :8091, reads datagrams in a loop,
+# calls the shared handlePing() from Step 100 for each one
+
+go build ./...
+
+git add services/shipment-ingestion
+git commit -m "add raw udp listener on 8091"</code></pre>
+    <p><strong>How to check:</strong> send a raw UDP datagram with a small test script (PowerShell's
+      <code>System.Net.Sockets.UdpClient</code>, or a one-off Go/Python script).</p>
+    <p><strong>Expected:</strong> the same Postgres row appears as a REST-submitted ping would produce —
+      proves the shared handler behaves identically regardless of which listener called it.</p>
+  </div>
+
+  <div class="step" id="step102">
+    <div class="step-header">
+      <span class="step-num">STEP 102</span>
+      <span class="step-title">UDP ack datagram — lets a client confirm delivery over a connectionless protocol</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> UDP itself never tells a sender whether a datagram arrived — without
+      an application-level ack, Step 104's failover logic would have nothing to react to. This is a small,
+      deliberate addition on top of raw UDP, not something UDP provides for free.</p>
+    <pre><code># after handlePing() succeeds inside the UDP listener, write a small ack
+# datagram (e.g. "ACK") back to the sender's address
+
+git add services/shipment-ingestion
+git commit -m "send udp ack after successful ping processing"</code></pre>
+    <p><strong>How to check:</strong> same manual UDP test as Step 101, but read a response back on the same
+      socket.</p>
+    <p><strong>Expected:</strong> the ack datagram arrives shortly after sending — confirms the round trip a
+      real failover-aware client depends on.</p>
+  </div>
+
+  <div class="step" id="step103">
+    <div class="step-header">
+      <span class="step-num">STEP 103</span>
+      <span class="step-title">Raw TCP listener on 8092, reuses the shared handler</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> TCP's own handshake and retransmission already guarantee delivery — no
+      separate ack scheme is needed here the way UDP required one in Step 102. This listener exists
+      specifically as the fallback path for Step 104's failover logic.</p>
+    <pre><code># write tcp.go — net.Listen("tcp", ":8092"), one goroutine per accepted
+# connection, reads the full payload, calls the same handlePing()
+
+go build ./...
+
+git add services/shipment-ingestion
+git commit -m "add raw tcp listener on 8092"</code></pre>
+    <p><strong>How to check:</strong> send the same ping payload over a raw TCP connection (e.g. PowerShell's
+      <code>System.Net.Sockets.TcpClient</code>).</p>
+    <p><strong>Expected:</strong> the same Postgres row appears, and the connection succeeding or failing
+      outright is itself the delivery confirmation — no extra ack logic needed.</p>
+  </div>
+
+  <div class="step" id="step104">
+    <div class="step-header">
+      <span class="step-num">STEP 104</span>
+      <span class="step-title">Failover-capable test client — UDP first, retries over TCP after N missed acks</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> this is the actual point of the whole phase — proving a client can
+      detect an unreliable UDP path and fail over to TCP on its own, without the server orchestrating
+      anything. Full explanation on <a href="tech/raw-sockets.html#failover">Raw Sockets &amp; WireGuard → The
+      failover pattern</a>.</p>
+    <pre><code># write a small standalone test client (Go or Python) — sends a ping via UDP,
+# waits briefly for the Step 102 ack, retries up to N times, then falls back
+# to sending the same ping over TCP (:8092) if no ack ever arrived
+
+git add tools/failover-test-client
+git commit -m "add udp-then-tcp failover test client"</code></pre>
+    <p><strong>How to check:</strong> run it normally (UDP listener up), then run it again with the UDP
+      listener temporarily stopped.</p>
+    <p><strong>Expected:</strong> normal run succeeds via UDP with no TCP fallback triggered; the second run
+      times out on UDP acks and the ping still lands in Postgres via the TCP fallback — proof the failover
+      decision genuinely changes the outcome, not just logs a message.</p>
+  </div>
+
+  <div class="step" id="step105">
+    <div class="step-header">
+      <span class="step-num">STEP 105</span>
+      <span class="step-title">Config plumbing — env vars for ports, enable/disable each listener</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> hardcoded ports made sense for local testing in Steps 101-104, but the
+      containerized version (Step 108) needs these configurable the same way every other service's ports are
+      — matching this project's existing convention rather than being a one-off special case.</p>
+    <pre><code># read UDP_PORT / TCP_PORT from environment variables (default 8091/8092),
+# same pattern as this service's existing config reads
+
+git add services/shipment-ingestion
+git commit -m "make udp/tcp ports configurable via env vars"</code></pre>
+    <p><strong>How to check:</strong> run with the env vars overridden to different ports, confirm both
+      listeners bind to the overridden values.</p>
+    <p><strong>Expected:</strong> works identically to the hardcoded version, just configurable.</p>
+  </div>
+
+  <div class="step" id="step106">
+    <div class="step-header">
+      <span class="step-num">STEP 106</span>
+      <span class="step-title">Unit tests — UDP/TCP payload parsing</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> same table-driven Go test style already used for the REST handler in
+      Phase 6 — the parsing/validation logic is plain Go once isolated from the actual socket I/O.</p>
+    <pre><code># write udp_test.go / tcp_test.go — table-driven tests covering valid and
+# malformed raw payloads, no real socket involved
+
+go test ./...
+
+git add services/shipment-ingestion
+git commit -m "add unit tests for udp/tcp payload parsing"</code></pre>
+    <p><strong>How to check:</strong> the test command's own output.</p>
+    <p><strong>Expected:</strong> passes.</p>
+  </div>
+
+  <div class="step" id="step107">
+    <div class="step-header">
+      <span class="step-num">STEP 107</span>
+      <span class="step-title">Integration tests — real UDP/TCP packets in-process, confirm Postgres row</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> unit tests prove parsing is correct in isolation — this step proves a
+      real UDP datagram and a real TCP connection, sent to an actually-running listener in the test process,
+      both still end up as a real Postgres row through the shared handler.</p>
+    <pre><code># write udp_integration_test.go / tcp_integration_test.go — start each
+# listener on a random local port, send a real packet via net.DialUDP /
+# net.Dial("tcp", ...), assert the row exists in a real test database
+
+go test -tags=integration ./...
+
+git add services/shipment-ingestion
+git commit -m "add udp/tcp integration tests"</code></pre>
+    <p><strong>How to check:</strong> the test command's own output.</p>
+    <p><strong>Expected:</strong> passes — confirms real socket I/O end to end, not just the parsing logic in
+      isolation.</p>
+  </div>
+
+  <div class="step" id="step108">
+    <div class="step-header">
+      <span class="step-num">STEP 108</span>
+      <span class="step-title">Dockerize — WireGuard sidecar, Go service shares its network namespace</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <p><strong>Why this step:</strong> the WireGuard tunnel needs to exist as its own container (it needs
+      elevated network privileges the main service shouldn't have), with <code>shipment-ingestion</code>
+      sharing that container's network namespace so its raw UDP/TCP traffic actually travels through the
+      tunnel interface rather than the regular Docker bridge network.</p>
+    <pre><code># write infra/wireguard/Dockerfile (or use an existing wireguard image) —
+# needs NET_ADMIN capability and the wg0.conf from Step 99
+# shipment-ingestion's Dockerfile itself is unchanged — the network sharing
+# happens in docker-compose.yml (Step 109), not in either image
+
+docker build -t movetrack-wireguard infra/wireguard
+
+git add infra/wireguard
+git commit -m "add wireguard sidecar dockerfile"</code></pre>
+    <p><strong>How to check:</strong> the build command's own output.</p>
+    <p><strong>Expected:</strong> builds clean, no errors.</p>
+  </div>
+
+  <div class="step" id="step109">
+    <div class="step-header">
+      <span class="step-num">STEP 109</span>
+      <span class="step-title">Wire into docker-compose.yml, verify tunnel + failover end-to-end, merge</span>
+      <span class="step-status planned">Planned</span>
+    </div>
+    <pre><code># add a wireguard service to docker-compose.yml — cap_add: NET_ADMIN, the
+# wg0.conf mounted in, published UDP port for the tunnel itself
+# shipment-ingestion gets: network_mode: "service:wireguard" — so its raw
+# UDP/TCP listeners bind inside the tunnel's network namespace
+
+docker compose up -d --build
+docker compose ps
+# 16 containers now: the 15 from Phase 7 plus wireguard (shipment-ingestion
+# container count itself doesn't change — it's sharing wireguard's network)
+
+git add docker-compose.yml
+git commit -m "wire wireguard tunnel + shared network namespace into compose"
+git push -u origin feature/raw-sockets-wireguard
+gh pr create --title "Add raw UDP/TCP transports with WireGuard tunnel and failover"
+gh pr merge --squash --delete-branch
+git checkout main
+git pull origin main</code></pre>
+    <p><strong>How to check:</strong> run Step 104's failover test client against the containerized service,
+      through the tunnel, once normally and once with the UDP path blocked.</p>
+    <p><strong>Expected:</strong> both scenarios succeed — a real ping lands in Postgres via UDP in the normal
+      case, and via the TCP fallback when UDP is unavailable, all traveling through the WireGuard tunnel
+      rather than the open Docker network.</p>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

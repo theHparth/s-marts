@@ -25,6 +25,9 @@
   <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
   <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
   <a href="kafka.html">Kafka</a>
+  <a href="websocket.html">Node.js & WebSockets</a>
+  <a href="soap.html">SOAP & Spring-WS</a>
+  <a href="raw-sockets.html">Raw Sockets & WireGuard</a>
   <a href="comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="../interview.html">All Interview Questions</a>
@@ -370,7 +373,7 @@ gh pr merge --squash --delete-branch
 git checkout main
 git pull</code></pre>
 
-  <h2 id="wrong-branch-recovery">Recovering from a commit on the wrong branch <span class="tag" style="margin-left:0;">not previously documented as its own section — happened 3 times in this project</span></h2>
+  <h2 id="wrong-branch-recovery">Recovering from a commit on the wrong branch <span class="tag" style="margin-left:0;">happened 4 times in this project</span></h2>
   <p>The single most common real mistake across this whole project: forgetting to <code>git checkout -b</code>
     a new branch before starting a new PR's work, so the new commits land on whatever branch was already
     checked out instead. Recognizable pattern, same fix every time.</p>
@@ -398,6 +401,18 @@ git branch -D &lt;wrong-branch-name&gt;  # delete the old branch once its real c
     incidents this exact pattern fixed: Move &amp; Entitlement's Step 21 port-fix commit, the Dashboard's
     Step 31 containerize commit, and Phase 6's Step 50 Docker/compose commit — all landed on an already-open
     branch instead of a fresh one, all recovered the same way with zero lost work.
+  </div>
+  <div class="box gotcha">
+    <div class="box-title">4th incident — a variant: the wrong branch was <code>main</code> itself</div>
+    Phase 9's Step 90 hit a slightly different shape of this same mistake: a fix landed directly on
+    <code>main</code> (not another feature branch) after the phase's real PR had already merged — caught by
+    <code>git status</code> showing <code>"ahead of origin/main by 2 commits."</code> Since the "wrong
+    branch" this time was the one everything else branches <em>from</em>, the fix was to branch off from the
+    current position (preserving the commits), then <code>git reset --hard origin/main</code> to put
+    <code>main</code> back in sync with GitHub — safe specifically because the commits were copied to the new
+    branch first. Same underlying principle as <code>cherry-pick</code> above (preserve first, clean up
+    second), just reset instead of cherry-pick since <em>all</em> of main's ahead-of-origin commits needed to
+    move, not just one specific commit out of several.
   </div>
 
   <h2 id="branch-deleted-after-merge">A branch disappearing right after merge — not a bug</h2>
