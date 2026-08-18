@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Terraform, VPC &amp; EKS</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
+  <a href="websocket.html">Node.js &amp; WebSockets</a>
+  <a href="soap.html">SOAP &amp; Spring-WS</a>
+  <a href="raw-sockets.html">Raw Sockets &amp; WireGuard</a>
+  <a href="terraform-eks.html" class="active">Terraform, VPC &amp; EKS</a>
+  <a href="ansible-ssm.html">Ansible &amp; SSM</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Terraform, VPC &amp; EKS <span class="tag">Phase 15</span></h1>
+  <p class="subtitle">
+    Written from zero — assumes no prior Terraform or Kubernetes experience, but does assume the general AWS
+    service definitions (VPC, EC2, IAM, RDS, ALB) already covered on <a href="../notes/aws.html">AWS Notes</a>.
+    This page focuses on what that page doesn't: Terraform itself, Kubernetes itself, and how this specific
+    project wires them together. For when each piece was introduced, see the
+    <a href="../steps.html#phase15">Steps page → Phase 15</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 15 is starting now — this is by far the largest phase in the project (VPC, EKS, RDS, Kubernetes
+    manifests, HPA all in one phase). Everything on this page reflects the <em>planned</em> implementation —
+    read it now to build the fundamentals before touching real AWS, then it gets corrected/confirmed once each
+    step is really built and (deliberately, to control cost) torn back down.
+  </div>
+
+  <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project need this at all?</td><td>Everything built so far runs on one machine via <code>docker compose up</code> — a real production system runs on real cloud infrastructure, with real scaling, real networking isolation, and a real managed database. This phase is the difference between "a demo that runs on my laptop" and "a system deployed the way a real company would deploy it."</td></tr>
+    <tr><td>What does it actually do?</td><td>Provisions a real AWS VPC, a real EKS (managed Kubernetes) cluster, and a real RDS Postgres instance — all via Terraform, not clicked together by hand — then deploys every existing service onto that cluster, replacing local Docker Compose with real Kubernetes orchestration.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>Underneath everything, the same way Docker Compose did — except now "underneath everything" means a real VPC with public/private subnets, an EKS control plane, and worker nodes running the same container images already built in every prior phase.</td></tr>
+    <tr><td>When would you reach for this pattern in a real job?</td><td>The moment a project needs to run anywhere other than a developer's own machine — Terraform for anything provisioning real cloud infrastructure, Kubernetes for anything beyond a handful of services on a single host.</td></tr>
+  </table>
+
+  <h2 id="story">The story, in plain terms — three separate new ideas, stacked</h2>
+  <p>This phase is really three distinct new concepts layered on top of each other, and it's worth keeping
+    them separate in your head before diving into any one of them:</p>
+  <div class="diagram">1. Infrastructure as Code (Terraform)
+   Instead of clicking around the AWS Console to create a VPC/EKS cluster/RDS instance by
+   hand, you write a text file describing what you want, and a tool creates exactly that.
+
+2. Container orchestration (Kubernetes / EKS)
+   Docker Compose runs containers on ONE machine. Kubernetes runs containers across MANY
+   machines (nodes), deciding which node each container runs on, restarting it if it dies,
+   and scaling the number of copies up or down.
+
+3. This project's specific architecture decisions
+   Which pieces move to managed AWS services (Postgres → RDS) vs. stay self-hosted on
+   Kubernetes (Kafka, RabbitMQ, MongoDB, Redis) — a real, deliberate tradeoff, not a default.</div>
+
+  <h2 id="terraform-fundamentals">Terraform fundamentals</h2>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>HCL</strong></td><td>HashiCorp Configuration Language — the syntax Terraform files (<code>.tf</code>) are written in. Declarative: you describe the end state you want, not the steps to get there.</td></tr>
+    <tr><td><strong>Provider</strong></td><td>A plugin that knows how to talk to a specific API — the <code>aws</code> provider knows how to create VPCs, EKS clusters, RDS instances, etc. via AWS's API.</td></tr>
+    <tr><td><strong>Resource</strong></td><td>One real thing Terraform manages — <code>resource "aws_vpc" "main" { ... }</code> declares one real VPC.</td></tr>
+    <tr><td><strong>State</strong></td><td>Terraform's own record of what it already created (resource IDs, current config) — how it knows the difference between "create this" and "this already exists, update it" on the next run.</td></tr>
+    <tr><td><strong>Module</strong></td><td>A reusable, packaged group of resources — write the VPC once as a module, reuse it, instead of copy-pasting the same 15 resources every time you need a VPC.</td></tr>
+  </table>
+
+  <h3>The core workflow</h3>
+  <pre><code>terraform init      # downloads the aws provider plugin, sets up the backend
+terraform plan      # shows exactly what would change, without changing anything yet
+terraform apply     # actually creates/updates the real AWS resources
+terraform destroy   # tears everything down — the step that actually matters for cost control here</code></pre>
+  <div class="box why">
+    <div class="box-title">Why <code>plan</code> before <code>apply</code> matters, specifically for this project</div>
+    <code>terraform plan</code> is a dry run — it shows exactly which resources would be created, changed, or
+    destroyed, with no real AWS API calls that create anything. Given this phase deliberately spins real
+    infrastructure up and back down to control cost, reading the plan output carefully before every
+    <code>apply</code> (and especially before every <code>destroy</code>) is the actual safety mechanism —
+    not a formality.
+  </div>
+
+  <h3>A minimal real example — one S3 bucket</h3>
+  <pre><code>terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_s3_bucket" "example" {
+  bucket = "movetrack-ops-example"
+}</code></pre>
+  <p>Three blocks: which provider(s) this configuration needs, how to configure that provider (which AWS
+    region), and one real resource. <code>terraform apply</code> against just this file creates one real S3
+    bucket — the same pattern scales up to the VPC/EKS/RDS resources this phase actually needs, just with
+    many more resource blocks and references between them.</p>
+
+  <h3>Why state needs a <em>remote</em> backend, not a local file</h3>
+  <p>By default, Terraform writes its state to a local <code>terraform.tfstate</code> file — fine solo, but
+    it's a single point of failure (lost laptop = lost record of what's real) and can't be safely shared if
+    more than one person ever runs Terraform against the same infrastructure.</p>
+  <div class="diagram">Local state (default):
+  terraform.tfstate sits on your machine only — no locking, no sharing, easy to lose
+
+Remote state (this project's plan):
+  S3 bucket: stores the actual state file, versioned
+  DynamoDB table: holds a lock while an apply is in progress, so two
+                  simultaneous applies can't corrupt the state</div>
+
+  <h2 id="kubernetes-fundamentals">Kubernetes fundamentals — the concepts EKS is built on</h2>
+  <p><a href="../notes/aws.html#serverless-containers">AWS Notes → Containers</a> already covers what EKS
+    <em>is</em> (AWS's managed Kubernetes control plane) — this section covers what Kubernetes itself actually
+    does, since nothing in this project has used it yet.</p>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>Cluster</strong></td><td>The whole system — a control plane (the "brain," managed by AWS in EKS) plus worker nodes (real EC2 instances that actually run your containers).</td></tr>
+    <tr><td><strong>Node</strong></td><td>One worker machine (an EC2 instance) — has some amount of CPU/memory capacity, and runs however many Pods fit in it.</td></tr>
+    <tr><td><strong>Pod</strong></td><td>The smallest deployable unit — one or more containers that always run together, on the same node, sharing network/storage. Almost always exactly one container per Pod in practice.</td></tr>
+    <tr><td><strong>Deployment</strong></td><td>Declares "I want N copies of this Pod running, always" — Kubernetes continuously works to keep that true, replacing a Pod automatically if it crashes.</td></tr>
+    <tr><td><strong>Service</strong></td><td>A stable network identity for a set of Pods — Pods get replaced constantly (new IP each time), a Service gives other things a fixed name/address to reach whichever Pods are currently alive.</td></tr>
+    <tr><td><strong>Ingress</strong></td><td>Routes external HTTP(S) traffic into the cluster, to the right Service, based on path/hostname — this project's equivalent of what nginx did for the dashboard locally.</td></tr>
+    <tr><td><strong>ConfigMap / Secret</strong></td><td>Kubernetes-native ways to inject configuration/env vars into a Pod — the cluster-native replacement for docker-compose's <code>environment:</code> block and the local <code>.env</code> file.</td></tr>
+    <tr><td><strong>StatefulSet</strong></td><td>Like a Deployment, but for things that need stable identity and storage across restarts — the right choice for self-hosted Kafka/RabbitMQ/MongoDB/Redis, since a plain Deployment assumes Pods are fully interchangeable and stateless.</td></tr>
+    <tr><td><strong>HPA (Horizontal Pod Autoscaler)</strong></td><td>Watches a metric (usually CPU%) and automatically changes a Deployment's replica count to match real load — the Kubernetes-native version of an AWS Auto Scaling Group, but scaling Pod count instead of EC2 instance count.</td></tr>
+  </table>
+
+  <h3>Docker Compose → Kubernetes, term by term</h3>
+  <table>
+    <tr><th>docker-compose.yml concept</th><th>Kubernetes equivalent</th></tr>
+    <tr><td>One service's <code>build:</code>/<code>image:</code></td><td>A container image, pushed to ECR, referenced in a Deployment's Pod spec</td></tr>
+    <tr><td><code>environment:</code></td><td>A ConfigMap (plain config) or Secret (sensitive values), referenced by the Deployment</td></tr>
+    <tr><td><code>ports:</code></td><td>A Service exposing the Pod's container port inside the cluster</td></tr>
+    <tr><td><code>depends_on:</code></td><td>No direct equivalent — Kubernetes doesn't guarantee startup order the way Compose's <code>depends_on</code> implies; services are expected to retry their own dependencies (a real, deliberate philosophy difference, not a missing feature)</td></tr>
+    <tr><td>One <code>docker compose up</code> for everything</td><td>One Deployment + Service (+ sometimes Ingress) YAML file per service, applied individually or together</td></tr>
+  </table>
+
+  <h3>A minimal real Deployment + Service</h3>
+  <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: move-entitlement-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: move-entitlement-service }
+  template:
+    metadata:
+      labels: { app: move-entitlement-service }
+    spec:
+      containers:
+        - name: move-entitlement-service
+          image: &lt;account-id&gt;.dkr.ecr.us-east-1.amazonaws.com/move-entitlement-service:latest
+          ports: [{ containerPort: 8082 }]
+          envFrom:
+            - configMapRef: { name: move-entitlement-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: move-entitlement-service
+spec:
+  selector: { app: move-entitlement-service }
+  ports: [{ port: 8082, targetPort: 8082 }]</code></pre>
+  <p><code>replicas: 2</code> is the whole point of moving to Kubernetes over Compose — two independent
+    copies of this service run simultaneously, on whichever nodes have capacity, and Kubernetes keeps that
+    true automatically if either one crashes.</p>
+
+  <h2 id="architecture-decisions">This project's specific decisions</h2>
+  <div class="box why">
+    <div class="box-title">Why Postgres moves to RDS, but Kafka/RabbitMQ/MongoDB/Redis stay self-hosted on EKS</div>
+    Self-hosting a stateful database on Kubernetes is genuinely operationally hard — storage, backups,
+    failover, and upgrades all become your problem instead of AWS's. Real companies almost universally use
+    RDS/Aurora over self-hosted Postgres-on-K8s for exactly that reason, which makes it the single most
+    common "why not just run it in a pod" interview question in this space. Migrating <em>every</em> data
+    service to its AWS managed equivalent (MSK for Kafka, Amazon MQ for RabbitMQ, DocumentDB for MongoDB,
+    ElastiCache for Redis) would demonstrate the same underlying idea five times over, at real added cost and
+    complexity — so this phase migrates the one that best makes the point (Postgres → RDS) and keeps the rest
+    as Kubernetes <code>StatefulSet</code>s, with the reasoning for why they'd move too in a real company
+    documented here rather than actually provisioned.
+  </div>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-terraform-why-iac">
+    <div class="q">Why use Terraform instead of just creating resources through the AWS Console?</div>
+    <div class="a">Infrastructure as Code makes the environment reproducible, reviewable, and versioned the
+      same way application code is — a teammate can see exactly what infrastructure exists by reading the
+      <code>.tf</code> files, changes go through the same pull-request review process as code, and rebuilding
+      an identical environment (or a second one) is a command, not a multi-hour manual click-through that's
+      easy to get subtly wrong.</div>
+  </div>
+  <div class="qa" id="qa-terraform-state-why-remote">
+    <div class="q">Why does Terraform state need a remote backend instead of a local file?</div>
+    <div class="a">Local state is a single point of failure (lost laptop = lost record of what's actually
+      real) and can't be safely used by more than one person — two people running <code>apply</code>
+      simultaneously against the same local-state setup can corrupt it. A remote backend (S3 for the state
+      file itself, DynamoDB for a lock) makes the state durable and shared, and the lock table prevents two
+      concurrent applies from racing each other.</div>
+  </div>
+  <div class="qa" id="qa-k8s-deployment-vs-statefulset">
+    <div class="q">When would you use a StatefulSet instead of a Deployment?</div>
+    <div class="a">A Deployment assumes every Pod is fully interchangeable and stateless — any replica can be
+      killed and replaced with a fresh one with no consequence. A StatefulSet is for workloads that need
+      stable network identity and persistent storage tied to a specific Pod across restarts — a database is
+      the textbook example, since replacing "database Pod #2" needs to come back with the same data and
+      identity, not a blank new instance.</div>
+  </div>
+  <div class="qa" id="qa-rds-vs-k8s-postgres">
+    <div class="q">Why not just run Postgres in a Kubernetes StatefulSet instead of using RDS?</div>
+    <div class="a">You technically can, but it shifts real operational burden onto your own team — storage
+      provisioning, backup scheduling, failover, and version upgrades all become manual/self-managed problems
+      instead of AWS's. RDS handles all of that as a managed service. Most real companies choose RDS/Aurora
+      for exactly this reason; self-hosting a database on Kubernetes is usually reserved for cases with a
+      specific reason a managed service doesn't fit (cost at extreme scale, a database engine RDS doesn't
+      support, or a deliberate multi-cloud/portability requirement).</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>

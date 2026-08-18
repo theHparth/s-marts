@@ -51,6 +51,8 @@
   <a href="tech/websocket.html">Node.js & WebSockets</a>
   <a href="tech/soap.html">SOAP & Spring-WS</a>
   <a href="tech/raw-sockets.html">Raw Sockets & WireGuard</a>
+  <a href="tech/terraform-eks.html">Terraform, VPC & EKS</a>
+  <a href="tech/ansible-ssm.html">Ansible & SSM</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -81,7 +83,7 @@
         </defs>
 
         <rect x="15" y="15" width="1130" height="640" rx="10" fill="none" stroke="#9aa39f" stroke-width="1.5" stroke-dasharray="6 4"/>
-        <text x="30" y="35" font-size="11" fill="#5b6663">Target: Kubernetes on AWS (Terraform + Ansible + Jenkins CI) — Phase 15, not started</text>
+        <text x="30" y="35" font-size="11" fill="#5b6663">Target: Kubernetes on AWS (Terraform + Ansible + Jenkins CI) — Phase 15, in progress, Steps 110-128. This diagram stays the service-level view (same services, same connections); the real AWS deployment topology (VPC/EKS/RDS) is on <tspan font-style="italic">Request &amp; Failure Flow Map</tspan> instead.</text>
 
         <!-- ===== EDGES (drawn first, under nodes) ===== -->
         <g id="edges">
@@ -293,7 +295,7 @@
     <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>TBD</td><td>~4</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
     <tr><td>13</td><td><a href="steps.html#phase13">Raw sockets + WireGuard + failover</a></td><td>99–109</td><td>11</td><td class="mark">Done</td><td>Extends Phase 6's Go service directly, not a separate service (done)</td></tr>
     <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 8's production model to compare against</td></tr>
-    <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>TBD</td><td>~30</td><td>Not started</td><td>Needs: all services to exist first (nothing to deploy yet)</td></tr>
+    <tr><td>15</td><td><a href="steps.html#phase15">VPC/Terraform/EKS/HPA/SSM/Ansible</a></td><td>110–128</td><td>19</td><td class="prog">In progress</td><td>Needs: all services to exist first (done). Real AWS, spun up then torn down to control cost.</td></tr>
     <tr><td>16</td><td>k6/Locust load test</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 15 (verifies autoscaling actually works)</td></tr>
   </table>
 

@@ -109,3 +109,42 @@ incident, since steps.html referenced it but the real explanation didn't exist a
 project's "link to the tech page, don't repeat the explanation" convention. All 6 touched files
 (steps.html, tech/git.html, tech/raw-sockets.html, architecture.html, architecture-2.html, interview.html)
 tag-balance validated clean. Next entries go here once a new phase starts.)
+
+---
+
+(Empty — last full pass covered Phase 15 KICKOFF, VPC/Terraform/EKS/RDS/HPA/SSM/Ansible — by far the largest
+phase in the project. User picked "real AWS, spin up then destroy" over local/never-applied alternatives to
+control cost. Two judgment calls made and explained (not asked, since user delegated "pick best for
+learning"): Postgres → RDS while Kafka/RabbitMQ/MongoDB/Redis stay as EKS StatefulSets (bounds cost/scope
+while still teaching the core managed-vs-self-hosted tradeoff with one concrete example); Ansible configures
+EKS worker nodes over the AWS SSM connection plugin instead of SSH (ties Ansible+SSM into one real technique
+instead of two disconnected checkboxes). Two new tech pages created from zero: tech/terraform-eks.html
+(Terraform fundamentals, Kubernetes fundamentals, Docker-Compose-to-K8s term mapping, this project's specific
+architecture decisions, 4 Q&As) and tech/ansible-ssm.html (Ansible fundamentals, the real SSM-over-SSH
+technique, 4 Q&As) — both deliberately scoped to NOT duplicate notes/aws.html's already-comprehensive general
+AWS reference, linking back to it for generic service definitions (IAM, EKS-as-a-concept, Systems Manager)
+and focusing only on what's genuinely new (Terraform itself, Kubernetes itself, Ansible itself, and how this
+project specifically wires them together). Sidebar wired into all 24 existing pages plus the 2 new ones —
+caught 2 real pre-existing gaps unrelated to this phase while doing it: architecture-2.html's sidebar was
+missing raw-sockets.html entirely, and steps.html's sidebar was too (both silent casualties of an earlier
+sed's pattern not matching); fixed both. Also hit 3 files using &amp; instead of raw & in their sidebar text
+(tech/websocket.html, tech/soap.html, tech/raw-sockets.html's own self-active link) — same recurring
+inconsistency-across-the-site pattern as Phase 13's kickoff, fixed with a separate &amp;-pattern sed pass.
+architecture.html: updated the existing "Target: Kubernetes on AWS... Phase 15, not started" placeholder note
+(it already anticipated this phase) to in-progress with real step numbers, and clarified the existing SVG
+diagram stays the service-level view — the real AWS topology lives on architecture-2.html instead, not as a
+new SVG here; phase table row 15 updated with the real 19-step plan (not the rough ~30 estimate). steps.html
+got the full 19-step Phase 15 section (Steps 110-128), Planned status, following the new no-boilerplate rule
+— but real terraform/kubectl/aws-cli/ansible commands were KEPT since those are the substantive technical
+content of this phase, not routine ceremony the way git commit/push is; only git ceremony itself was omitted.
+interview.html got both new "From Terraform, VPC & EKS" and "From Ansible & SSM" sections. architecture-2.html
+got a new #flow-aws-deployment planned diagram (ALB → EKS Ingress/Service/Pod → RDS, with the
+StatefulSet-vs-managed distinction called out) — hit the same TOC-position mistake twice before landing it
+correctly before #failure-signatures on the third attempt (a mid-response server error interrupted the first
+attempt right after finishing a Read with no Edit yet, so no content was actually lost — the second attempt's
+own Edit accidentally duplicated the #growth heading, caught immediately via a heading-order grep and fixed
+by removing then re-inserting the block cleanly). User then set a new standing workflow for actually building
+this phase: strict step-by-step — Claude explains why, gives exact location (code file or real AWS Console
+path) and how to test (terminal/browser/AWS dashboard), user runs it and reports the result, Claude confirms
+against expected before giving the next step. No steps have been executed yet as of this entry — Step 110
+(AWS credentials) is next. Next entries go here once Phase 15 makes real progress or another phase starts.)

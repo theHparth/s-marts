@@ -36,6 +36,9 @@
   <a href="tech/kafka.html">Kafka</a>
   <a href="tech/websocket.html">Node.js & WebSockets</a>
   <a href="tech/soap.html">SOAP & Spring-WS</a>
+  <a href="tech/raw-sockets.html">Raw Sockets & WireGuard</a>
+  <a href="tech/terraform-eks.html">Terraform, VPC & EKS</a>
+  <a href="tech/ansible-ssm.html">Ansible & SSM</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html">All Interview Questions</a>
@@ -330,6 +333,7 @@
     <li><a href="#flow-websocket-live-feed">WebSocket live feed</a> — Kafka to browser, no refresh</li>
     <li><a href="#flow-soap-legacy-adapter">SOAP legacy adapter</a> — SOAP/XML in, REST out, standalone (nothing else calls it)</li>
     <li><a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> — UDP primary, TCP fallback, real tunnel</li>
+    <li><a href="#flow-aws-deployment">Real request through AWS</a> — planned, ALB → EKS → RDS</li>
     <li><a href="#failure-signatures">Common failure signatures, cross-cutting reference</a></li>
     <li><a href="#growth">How this page grows with each new phase</a></li>
   </ul>
@@ -824,6 +828,41 @@ Either path: a real ping lands in Postgres, encrypted end-to-end by the
 WireGuard tunnel the entire way — raw UDP/TCP never touch the open network.
 Confirmed with real timestamps cross-checked directly against Postgres.</div>
 
+  <h2 id="flow-aws-deployment">Real request through AWS — planned</h2>
+  <p>Planned — <a href="steps.html#phase15">Steps page → Phase 15</a>, in progress. Full concept explanation on
+    <a href="tech/terraform-eks.html">Terraform, VPC &amp; EKS</a>. This is the first flow on this page that
+    isn't a local Docker Compose request at all — every box below is a real AWS resource, provisioned by
+    Terraform, not a container on this machine.</p>
+  <div class="box warn">
+    <div class="box-title">Planned, not yet built — corrected once Phase 15 is confirmed</div>
+    <div class="diagram">Browser — real internet request, not localhost
+  │
+  │ HTTPS request to the real ALB's DNS name
+  ▼
+Application Load Balancer (public subnets, spans 2 AZs)
+  │ routes by path — same idea as this project's nginx config, now AWS-managed
+  ▼
+Ingress → Kubernetes Service → Pod (private subnet, on an EKS worker node)
+  │ e.g. move-entitlement-service, running as 2 replicas via its Deployment
+  │
+  ├─ Pod reads config ─► ConfigMap / Secret (cluster-native, replaces the
+  │      local .env file docker-compose used)
+  │
+  ▼ needs to persist a move request
+move-entitlement-service — same Java code from Phase 1, unchanged
+  ▼
+RDS (Postgres) — private subnet, security group allows only the EKS
+node security group, nothing else
+  │ managed backups, managed patching, none of it this project's problem anymore
+  ▼
+Response flows back: Pod → Service → Ingress → ALB → browser
+
+Meanwhile, independently: Kafka/RabbitMQ/MongoDB/Redis run as StatefulSets
+on the same EKS cluster — self-hosted, not migrated to managed AWS
+equivalents this phase (see tech/terraform-eks.html#architecture-decisions
+for why Postgres moved and these didn't)</div>
+  </div>
+
   <h2 id="failure-signatures">Common failure signatures — cross-cutting reference</h2>
   <p>The same handful of failure shapes keep recurring across totally different technologies. This table is
     the fast way to recognize which one you're looking at.</p>
@@ -856,12 +895,7 @@ Confirmed with real timestamps cross-checked directly against Postgres.</div>
     new service is expected to do, before any of it is built. Once that phase is confirmed working, the
     diagram gets replaced with the normal style, corrected to match what was actually built (including
     whatever real failure branches got hit along the way, the same as every flow above).</p>
-  <div class="box warn">
-    <div class="box-title">No phase currently planned/in-progress</div>
-    Phase 13 (raw sockets + WireGuard) is the most recently completed phase as of this page's last update —
-    see <a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> above for its confirmed
-    flow. The next phase's planned flow diagram will appear here the moment a new phase is picked.
-  </div>
+  <p>Currently planned: <a href="#flow-aws-deployment">Real request through AWS</a>, above.</p>
 
   <footer class="page-footer">MoveTrack Ops — companion to Architecture &amp; Progress. That page shows what
     exists; this one shows what happens when a request actually moves through it. Grows by one confirmed flow

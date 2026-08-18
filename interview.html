@@ -28,6 +28,8 @@
   <a href="tech/websocket.html">Node.js & WebSockets</a>
   <a href="tech/soap.html">SOAP & Spring-WS</a>
   <a href="tech/raw-sockets.html">Raw Sockets & WireGuard</a>
+  <a href="tech/terraform-eks.html">Terraform, VPC & EKS</a>
+  <a href="tech/ansible-ssm.html">Ansible & SSM</a>
   <a href="tech/comparison.html">Cross-Tech Comparison</a>
   <div class="group-label">Interview Prep</div>
   <a href="interview.html" class="active">All Interview Questions</a>
@@ -953,6 +955,77 @@
       waits for and reads, not just a successful call on its own socket.</div>
   </div>
   <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-tcp-write-not-proof">Raw Sockets &amp; WireGuard</a></p>
+
+  <h2 id="from-terraform-eks">From Terraform, VPC &amp; EKS <span class="tag">Phase 15</span></h2>
+
+  <div class="qa">
+    <div class="q">Why use Terraform instead of just creating resources through the AWS Console?</div>
+    <div class="a">Infrastructure as Code makes the environment reproducible, reviewable, and versioned the
+      same way application code is — a teammate can see exactly what infrastructure exists by reading the
+      <code>.tf</code> files, changes go through the same pull-request review process as code, and rebuilding
+      an identical environment (or a second one) is a command, not a multi-hour manual click-through that's
+      easy to get subtly wrong.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/terraform-eks.html#qa-terraform-why-iac">Terraform, VPC &amp; EKS</a></p>
+
+  <div class="qa">
+    <div class="q">Why does Terraform state need a remote backend instead of a local file?</div>
+    <div class="a">Local state is a single point of failure (lost laptop = lost record of what's actually
+      real) and can't be safely used by more than one person — two people running <code>apply</code>
+      simultaneously against the same local-state setup can corrupt it. A remote backend (S3 for the state
+      file itself, DynamoDB for a lock) makes the state durable and shared, and the lock table prevents two
+      concurrent applies from racing each other.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/terraform-eks.html#qa-terraform-state-why-remote">Terraform, VPC &amp; EKS</a></p>
+
+  <div class="qa">
+    <div class="q">When would you use a StatefulSet instead of a Deployment?</div>
+    <div class="a">A Deployment assumes every Pod is fully interchangeable and stateless — any replica can be
+      killed and replaced with a fresh one with no consequence. A StatefulSet is for workloads that need
+      stable network identity and persistent storage tied to a specific Pod across restarts — a database is
+      the textbook example, since replacing "database Pod #2" needs to come back with the same data and
+      identity, not a blank new instance.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/terraform-eks.html#qa-k8s-deployment-vs-statefulset">Terraform, VPC &amp; EKS</a></p>
+
+  <div class="qa">
+    <div class="q">Why not just run Postgres in a Kubernetes StatefulSet instead of using RDS?</div>
+    <div class="a">You technically can, but it shifts real operational burden onto your own team — storage
+      provisioning, backup scheduling, failover, and version upgrades all become manual/self-managed problems
+      instead of AWS's. RDS handles all of that as a managed service. Most real companies choose RDS/Aurora
+      for exactly this reason; self-hosting a database on Kubernetes is usually reserved for cases with a
+      specific reason a managed service doesn't fit.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/terraform-eks.html#qa-rds-vs-k8s-postgres">Terraform, VPC &amp; EKS</a></p>
+
+  <h2 id="from-ansible-ssm">From Ansible &amp; SSM <span class="tag">Phase 15</span></h2>
+
+  <div class="qa">
+    <div class="q">What's the actual difference between Terraform and Ansible — don't they both do "infrastructure as code"?</div>
+    <div class="a">Terraform provisions infrastructure itself — does a VPC/EKS cluster/EC2 instance exist at
+      all. Ansible configures what's already running inside machines that already exist — install a package,
+      enforce a config file, restart a service. They're often used together, in that order: Terraform creates
+      the machine, Ansible configures what runs on it.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/ansible-ssm.html#qa-ansible-vs-terraform">Ansible &amp; SSM</a></p>
+
+  <div class="qa">
+    <div class="q">What does idempotency mean in Ansible, and why does it matter?</div>
+    <div class="a">Running the same playbook twice produces the same end state both times — the second run
+      reports "nothing changed" instead of erroring or redoing work. It matters because it makes a playbook
+      safe to re-run at any time without needing to reason about whether it's "already been run before."</div>
+  </div>
+  <p class="pill">↳ <a href="tech/ansible-ssm.html#qa-ansible-idempotency">Ansible &amp; SSM</a></p>
+
+  <div class="qa">
+    <div class="q">Why connect Ansible over AWS Systems Manager instead of plain SSH?</div>
+    <div class="a">SSM authenticates using the IAM role already attached to the EC2 instance — nothing extra
+      to distribute, rotate, or leak, and no inbound port needs to be open on the target at all, even for
+      instances in a fully private subnet with no bastion host. Every session is also automatically logged
+      through CloudTrail. The tradeoff is that it only works for AWS-managed instances with the SSM agent
+      present and the right IAM permissions — not a general-purpose SSH replacement outside AWS.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/ansible-ssm.html#qa-ansible-ssm-why">Ansible &amp; SSM</a></p>
 
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>

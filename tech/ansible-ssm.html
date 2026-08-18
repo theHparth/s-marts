@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MoveTrack Ops — Ansible &amp; SSM</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="brand">MoveTrack <span>Ops</span></div>
+  <div class="group-label">Big Picture</div>
+  <a href="../architecture.html">Architecture &amp; Progress</a>
+  <a href="../architecture-2.html">Request &amp; Failure Flow Map</a>
+  <div class="group-label">Build Log</div>
+  <a href="../steps.html">Steps</a>
+  <div class="group-label">Technology Reference</div>
+  <a href="git.html">Git &amp; GitHub</a>
+  <a href="java-spring.html">Java, Spring &amp; Maven</a>
+  <a href="docker.html">Docker &amp; Compose</a>
+  <a href="react-redux.html">React, Redux &amp; TypeScript</a>
+  <a href="python-fastapi.html">Python, FastAPI &amp; scikit-learn</a>
+  <a href="go.html">Go</a>
+  <a href="jenkins.html">Jenkins, Trivy &amp; OWASP ZAP</a>
+  <a href="rabbitmq-mongodb.html">RabbitMQ &amp; MongoDB</a>
+  <a href="kafka.html">Kafka</a>
+  <a href="websocket.html">Node.js &amp; WebSockets</a>
+  <a href="soap.html">SOAP &amp; Spring-WS</a>
+  <a href="raw-sockets.html">Raw Sockets &amp; WireGuard</a>
+  <a href="terraform-eks.html">Terraform, VPC &amp; EKS</a>
+  <a href="ansible-ssm.html" class="active">Ansible &amp; SSM</a>
+  <a href="comparison.html">Cross-Tech Comparison</a>
+  <div class="group-label">Interview Prep</div>
+  <a href="../interview.html">All Interview Questions</a>
+  <a href="../notes/sql.html">SQL Notes</a>
+  <a href="../notes/aws.html">AWS Notes</a>
+  <a href="../notes/methodologies.html">Agile &amp; SDLC Methodologies</a>
+  <a href="../notes/linux.html">Linux/Unix Notes</a>
+  <a href="../notes/redis.html">Redis Notes</a>
+</nav>
+
+<main>
+  <h1>Ansible &amp; SSM <span class="tag">Phase 15</span></h1>
+  <p class="subtitle">
+    Written from zero — assumes no prior Ansible experience. Systems Manager itself is already introduced on
+    <a href="../notes/aws.html#monitoring">AWS Notes → Monitoring &amp; management</a> — this page focuses on
+    Ansible, and specifically how the two combine. For when each piece was introduced, see the
+    <a href="../steps.html#phase15">Steps page → Phase 15</a>.
+  </p>
+
+  <div class="box warn">
+    <div class="box-title">Status: written ahead of the build</div>
+    Phase 15 is starting now. Everything on this page reflects the <em>planned</em> implementation — read it
+    now to build the fundamentals before touching real AWS, then it gets corrected/confirmed once this step is
+    really built and tested.
+  </div>
+
+  <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>Why does this project need this at all?</td><td>Terraform provisions infrastructure (a VPC exists, an EKS cluster exists, worker nodes exist) — it deliberately doesn't configure what runs <em>inside</em> those worker nodes after they boot. Ansible is the tool for that second job: real configuration management against real running machines.</td></tr>
+    <tr><td>What does it actually do?</td><td>Runs a real Ansible playbook against the EKS cluster's worker node EC2 instances — not over SSH, but over AWS Systems Manager, so no bastion host, no open SSH port, and no SSH key to manage or leak.</td></tr>
+    <tr><td>Where does it sit in the system?</td><td>After Terraform (Step 5 in this phase) has already created the worker nodes, and alongside SSM Parameter Store (this same phase) holding this project's secrets.</td></tr>
+    <tr><td>When would you reach for this pattern in a real job?</td><td>Any time you need to configure real servers after they exist — patching, installing an agent, enforcing a config file — especially in an environment where opening SSH access to every instance is itself considered a security risk worth avoiding.</td></tr>
+  </table>
+
+  <h2 id="story">The story, in plain terms</h2>
+  <p>Terraform and Ansible solve two genuinely different problems, and conflating them is a common early
+    mistake:</p>
+  <div class="diagram">Terraform (provisioning):
+  "Does a VPC exist? Does an EKS cluster exist? Do 3 worker node EC2 instances exist?"
+  Answers by creating/destroying whole AWS resources. Declarative — describes the end state.
+
+Ansible (configuration management):
+  "Given these 3 EC2 instances already exist, what should be TRUE about what's running
+   inside them?" — install a package, enforce a config file, restart a service.
+  Also declarative in intent, but operates on the inside of machines Terraform already made.
+
+Normally: Ansible reaches a machine over SSH.
+This project: Ansible reaches it over AWS Systems Manager instead — no SSH at all.</div>
+
+  <h2 id="ansible-fundamentals">Ansible fundamentals</h2>
+  <table>
+    <tr><th>Term</th><th>Plain-language meaning</th></tr>
+    <tr><td><strong>Agentless</strong></td><td>No permanent software needs to run on the target machine ahead of time — Ansible connects, runs what it needs, and disconnects. (Contrast with tools like Puppet/Chef, which need a persistent agent installed first.)</td></tr>
+    <tr><td><strong>Inventory</strong></td><td>The list of machines Ansible will manage — can be a static file, or generated dynamically (this project's case: pulled live from AWS, not hand-maintained).</td></tr>
+    <tr><td><strong>Playbook</strong></td><td>A YAML file describing what should be true on a set of hosts — a sequence of <strong>tasks</strong>, each one usually a single <strong>module</strong> call.</td></tr>
+    <tr><td><strong>Module</strong></td><td>A single unit of work Ansible knows how to do — <code>apt</code>/<code>yum</code> (install a package), <code>copy</code> (put a file somewhere), <code>service</code> (start/stop/restart something), and hundreds more.</td></tr>
+    <tr><td><strong>Idempotency</strong></td><td>Running the same playbook twice produces the same end state, with the second run reporting "nothing changed" rather than re-doing work or erroring — the same core idea as Terraform's plan/apply model, applied to configuration instead of infrastructure.</td></tr>
+  </table>
+
+  <h3>A minimal real playbook</h3>
+  <pre><code>- name: Confirm and label EKS worker nodes
+  hosts: eks_worker_nodes
+  tasks:
+    - name: Confirm the container runtime is active
+      ansible.builtin.service:
+        name: containerd
+        state: started
+
+    - name: Write a node-identity marker file
+      ansible.builtin.copy:
+        content: "managed-by: movetrack-ops-ansible\n"
+        dest: /etc/movetrack-node-info</code></pre>
+  <p><code>hosts: eks_worker_nodes</code> refers to a group name defined in the inventory — the actual list of
+    which real EC2 instances that group means comes from the dynamic inventory below, not a hardcoded list
+    in the playbook itself.</p>
+
+  <h2 id="ssm-connection">The real technique — Ansible over SSM, no SSH</h2>
+  <p><a href="../notes/aws.html#monitoring">AWS Notes</a> already covers what Systems Manager Session Manager
+    is (browser-based shell access, no SSH keys/bastion needed) — Ansible's <code>aws_ssm</code> connection
+    plugin uses that exact same mechanism programmatically, instead of a human clicking into the console.</p>
+  <table>
+    <tr><th></th><th>Traditional Ansible (SSH)</th><th>This project (SSM)</th></tr>
+    <tr><td>Connection</td><td>SSH, port 22 open on the target</td><td>AWS Systems Manager API — no inbound port needs to be open at all</td></tr>
+    <tr><td>Credentials</td><td>An SSH key pair, distributed and kept secret</td><td>The IAM role already attached to the EC2 instance — nothing extra to distribute</td></tr>
+    <tr><td>Network requirement</td><td>Direct network path to port 22 (often needs a bastion host for private-subnet instances)</td><td>None — SSM works even for an instance with zero inbound rules, as long as it can reach the SSM API outbound</td></tr>
+    <tr><td>Audit trail</td><td>Whatever the SSH server itself logs</td><td>Every session is logged in CloudTrail/SSM automatically</td></tr>
+  </table>
+  <pre><code># inventory/aws_ec2.yml — dynamic inventory, queries AWS directly instead of a static host list
+plugin: aws_ec2
+regions: [us-east-1]
+filters:
+  tag:kubernetes.io/cluster/movetrack-ops: owned
+keyed_groups:
+  - key: tags
+    prefix: tag</code></pre>
+  <pre><code># ansible.cfg — the actual switch from SSH to SSM
+[defaults]
+inventory = inventory/aws_ec2.yml
+
+[ssm_connection]
+connection = aws_ssm
+retries = 3</code></pre>
+  <div class="box why">
+    <div class="box-title">Why this matters beyond "it's more secure"</div>
+    Every worker node in this project's EKS cluster sits in a private subnet with no public IP and no open
+    SSH port at all — there is no bastion host to compromise, no SSH key that could leak. The IAM role
+    already attached to each node (needed for it to function as an EKS worker in the first place) is the
+    entire authentication mechanism Ansible relies on here — no separate credential to create, rotate, or
+    protect.
+  </div>
+
+  <h2 id="interview-qa">Interview Q&amp;A</h2>
+  <div class="qa" id="qa-ansible-vs-terraform">
+    <div class="q">What's the actual difference between Terraform and Ansible — don't they both do "infrastructure as code"?</div>
+    <div class="a">Terraform provisions infrastructure itself — does a VPC/EKS cluster/EC2 instance exist at
+      all. Ansible configures what's already running inside machines that already exist — install a package,
+      enforce a config file, restart a service. They're often used together, in that order: Terraform creates
+      the machine, Ansible configures what runs on it. Using Terraform for configuration management (or vice
+      versa) is possible but fights against what each tool is actually designed for.</div>
+  </div>
+  <div class="qa" id="qa-ansible-idempotency">
+    <div class="q">What does idempotency mean in Ansible, and why does it matter?</div>
+    <div class="a">Running the same playbook twice produces the same end state both times — the second run
+      reports "nothing changed" instead of erroring or redoing work. It matters because it makes a playbook
+      safe to re-run at any time, for any reason (recovering from a partial failure, confirming current state
+      matches intent), without needing to reason about whether it's "already been run before."</div>
+  </div>
+  <div class="qa" id="qa-ansible-agentless">
+    <div class="q">What does "agentless" mean for Ansible, and why is that a real advantage?</div>
+    <div class="a">No persistent software needs to be pre-installed on a target machine before Ansible can
+      manage it — it connects (via SSH, or here, via SSM), runs what's needed, and disconnects, leaving
+      nothing permanently running. Tools like Puppet/Chef require an agent installed and running continuously
+      on every managed machine, which is itself something to provision, update, and secure. Agentless removes
+      that whole category of operational overhead.</div>
+  </div>
+  <div class="qa" id="qa-ansible-ssm-why">
+    <div class="q">Why connect Ansible over AWS Systems Manager instead of plain SSH?</div>
+    <div class="a">SSM authenticates using the IAM role already attached to the EC2 instance — nothing extra
+      to distribute, rotate, or leak, and no inbound port needs to be open on the target at all, even for
+      instances in a fully private subnet with no bastion host. Every session is also automatically logged
+      through CloudTrail, giving a real audit trail with no extra configuration. The tradeoff is that it only
+      works for AWS-managed instances with the SSM agent present and the right IAM permissions — not a
+      general-purpose replacement for SSH outside AWS.</div>
+  </div>
+
+  <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>
+</main>
+</div>
+<script src="../assets/page-nav.js"></script>
+</body>
+</html>
