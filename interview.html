@@ -933,6 +933,27 @@
   </div>
   <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-shared-handler">Raw Sockets &amp; WireGuard</a></p>
 
+  <div class="qa">
+    <div class="q">A UDP client retries on a lost ack — how do you stop the server from processing the same message twice?</div>
+    <div class="a">Give the client a way to say "this retry is the same logical message, not a new one" — a
+      request ID generated once and reused across every retry of that specific send. The server keeps a
+      short-lived cache of recently-seen request IDs; if one shows up again, it re-sends the ack without
+      reprocessing the underlying work. This is the same at-least-once-delivery problem every UDP-based
+      protocol has to solve — the transport can duplicate a message, so idempotency has to be handled one
+      layer up.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-udp-dedup">Raw Sockets &amp; WireGuard</a></p>
+
+  <div class="qa">
+    <div class="q">If a TCP <code>Write()</code> call returns no error, does that prove the other side received the data?</div>
+    <div class="a">No — it only proves the local kernel accepted the bytes into its send buffer. Anything
+      between the client and the real application (a proxy, a NAT layer, Docker's own port-publishing proxy)
+      can accept a connection and a write independently of whether the real backend is even running. The only
+      real proof of delivery is an explicit response from the application itself — an ack the client actually
+      waits for and reads, not just a successful call on its own socket.</div>
+  </div>
+  <p class="pill">↳ <a href="tech/raw-sockets.html#qa-rawsockets-tcp-write-not-proof">Raw Sockets &amp; WireGuard</a></p>
+
   <footer class="page-footer">MoveTrack Ops — every interview Q&amp;A on the site, kept in sync as new ones get added anywhere else.</footer>
 </main>
 </div>

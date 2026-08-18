@@ -187,7 +187,7 @@
           <text x="1030" y="237" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f2523">Shipment Ingestion</text>
           <text x="1030" y="252" text-anchor="middle" font-size="11" fill="#1f2523">Go — REST first, Phase 6</text>
           <text x="1030" y="268" text-anchor="middle" font-size="10" fill="#1f2523">+ raw UDP/TCP + WireGuard (Phase 13)</text>
-          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#b7791f">REST done — Phase 13 in progress, Steps 99-109</text>
+          <text x="1030" y="281" text-anchor="middle" font-size="10" font-style="italic" fill="#0f8a6b">Steps 41-52, 99-109 done, containerized, running</text>
         </g>
 
         <g class="node" data-node="postgres">
@@ -291,7 +291,7 @@
     <tr><td>10</td><td><a href="steps.html#phase10">Kafka</a></td><td>75–83</td><td>9</td><td class="mark">Done</td><td>Needs: Phase 6 (Go service to publish to it, already done). Feeds: Phase 8's ML pipeline, Phase 9's live feed once those exist</td></tr>
     <tr><td>11</td><td>Svelte micro-widget</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 3 (embeds into the React shell)</td></tr>
     <tr><td>12</td><td>Plain-JS CLI dev tool</td><td>TBD</td><td>~4</td><td>Not started</td><td>Standalone dev utility, no real dependency</td></tr>
-    <tr><td>13</td><td><a href="steps.html#phase13">Raw sockets + WireGuard + failover</a></td><td>99–109</td><td>11</td><td class="prog">In progress</td><td>Extends Phase 6's Go service directly, not a separate service (done)</td></tr>
+    <tr><td>13</td><td><a href="steps.html#phase13">Raw sockets + WireGuard + failover</a></td><td>99–109</td><td>11</td><td class="mark">Done</td><td>Extends Phase 6's Go service directly, not a separate service (done)</td></tr>
     <tr><td>14</td><td>ML research track (SciPy/PyTorch/TensorFlow)</td><td>TBD</td><td>~10</td><td>Not started</td><td>Needs: Phase 8's production model to compare against</td></tr>
     <tr><td>15</td><td>VPC/Terraform/EKS/HPA/SSM/Ansible</td><td>TBD</td><td>~30</td><td>Not started</td><td>Needs: all services to exist first (nothing to deploy yet)</td></tr>
     <tr><td>16</td><td>k6/Locust load test</td><td>TBD</td><td>~5</td><td>Not started</td><td>Needs: Phase 15 (verifies autoscaling actually works)</td></tr>
@@ -418,9 +418,9 @@
       ]
     },
     goingest: {
-      name: "Shipment Ingestion Service", tech: "Go", status: "in-progress",
-      port: "8090 (REST, done), 8091 (UDP, planned), 8092 (TCP, planned)",
-      input: "Phase 6: REST POST from carriers/simulated devices (done). Phase 13, in progress: raw UDP (frequent, lightweight) and raw TCP (failover, higher-reliability) over a WireGuard tunnel",
+      name: "Shipment Ingestion Service", tech: "Go", status: "done",
+      port: "8090 (REST), 8091 (UDP), 8092 (TCP) — all three inside a shared WireGuard tunnel namespace",
+      input: "Phase 6: REST POST from carriers/simulated devices. Phase 13: raw UDP (primary, frequent/lightweight) and raw TCP (failover, higher-reliability), both over a WireGuard tunnel",
       output: "Phase 6: persisted to its own Postgres database (shipment_ingestion). Phase 10: normalized events also published to Kafka (shipment.tracking topic)",
       why: "Go's goroutines hold many concurrent, mostly-idle device connections far more cheaply than a JVM thread-per-request model — the language choice and this service's whole reason to exist are the same fact. Built REST-first so the ingestion contract and persistence exist before the harder raw-socket transport is added.",
       steps: [
@@ -436,17 +436,17 @@
         {n:"Step 50", t:"Multi-stage Dockerfile — Go build stage, minimal run stage", href:"steps.html#step50", done:true},
         {n:"Step 51", t:"Wired into docker-compose.yml", href:"steps.html#step51", done:true},
         {n:"Step 52", t:"Verify, closes PR D", href:"steps.html#step52", done:true},
-        {n:"Step 99", t:"WireGuard tunnel container — keypair, peer config, verify tunnel", href:null, done:false},
-        {n:"Step 100", t:"Shared ping-processing handler — extract validate+persist+publish out of the REST handler", href:null, done:false},
-        {n:"Step 101", t:"Raw UDP listener on 8091, reuses the shared handler", href:null, done:false},
-        {n:"Step 102", t:"UDP ack datagram — lets a client confirm delivery over a connectionless protocol", href:null, done:false},
-        {n:"Step 103", t:"Raw TCP listener on 8092, reuses the shared handler", href:null, done:false},
-        {n:"Step 104", t:"Failover-capable test client — UDP first, retries over TCP after N missed acks", href:null, done:false},
-        {n:"Step 105", t:"Config plumbing — env vars for ports, enable/disable each listener", href:null, done:false},
-        {n:"Step 106", t:"Unit tests — UDP/TCP payload parsing", href:null, done:false},
-        {n:"Step 107", t:"Integration tests — real UDP/TCP packets in-process, confirm Postgres row", href:null, done:false},
-        {n:"Step 108", t:"Dockerize — WireGuard sidecar, Go service shares its network namespace", href:null, done:false},
-        {n:"Step 109", t:"Wire into docker-compose.yml, verify tunnel + failover end-to-end, merge", href:null, done:false}
+        {n:"Step 99", t:"WireGuard tunnel container — keypair, peer config, verify tunnel", href:"steps.html#step99", done:true},
+        {n:"Step 100", t:"Shared ping-processing handler — extract validate+persist+publish out of the REST handler", href:"steps.html#step100", done:true},
+        {n:"Step 101", t:"Raw UDP listener on 8091 + delivery ack, reuses the shared handler", href:"steps.html#step101", done:true},
+        {n:"Step 102", t:"Raw TCP listener on 8092, reuses the shared handler", href:"steps.html#step102", done:true},
+        {n:"Step 103", t:"Failover-capable test client — UDP first, falls back to TCP", href:"steps.html#step103", done:true},
+        {n:"Step 104", t:"Config plumbing — env vars for ports, enable/disable each listener", href:"steps.html#step104", done:true},
+        {n:"Step 105", t:"Unit tests — payload parsing, dedup cache", href:"steps.html#step105", done:true},
+        {n:"Step 106", t:"Integration tests — real UDP/TCP packets in-process, confirm Postgres row", href:"steps.html#step106", done:true},
+        {n:"Step 107", t:"Dockerize — WireGuard sidecar, Go service shares its network namespace", href:"steps.html#step107", done:true},
+        {n:"Step 108", t:"Wire into docker-compose.yml, verify tunnel + failover end-to-end", href:"steps.html#step108", done:true},
+        {n:"Step 109", t:"Fix duplicate UDP inserts, async Kafka publish, TCP half-close bug — merge", href:"steps.html#step109", done:true}
       ]
     },
     postgres: {

@@ -45,12 +45,13 @@
     introduced, see the <a href="../steps.html#phase13">Steps page → Phase 13</a>.
   </p>
 
-  <div class="box warn">
-    <div class="box-title">Status: written ahead of the build</div>
-    Phase 13 (raw sockets + WireGuard) is starting now, extending Phase 6's Go service rather than creating a
-    new one. Everything on this page reflects the <em>planned</em> implementation — read it now to get
-    familiar with the tools before writing code, then it gets corrected/confirmed once each step is really
-    built and tested.
+  <div class="box why">
+    <div class="box-title">Confirmed — built and verified through Step 109</div>
+    Phase 13 (raw sockets + WireGuard) is complete. Verified with a live WireGuard tunnel (real keys, real
+    peer handshake), a real UDP ping that landed in Postgres, and a genuine TCP failover (UDP disabled for
+    real, TCP path confirmed with a real acknowledgment, not just a successful connection). Live testing
+    surfaced three real bugs the original design didn't anticipate — all documented inline below, along with
+    the actual fixes.
   </div>
 
   <h2 id="why-this-here">Why this phase exists, what it does, where it fits</h2>
@@ -105,42 +106,107 @@ WireGuard (Phase 13 — wraps both):
     <tr><td>Why it's the primary transport here</td><td colspan="2">Frequent location pings can tolerate occasionally losing one — the next ping a few seconds later makes up for it. Paying TCP's overhead on every single ping isn't worth it for that traffic shape.</td></tr>
   </table>
 
-  <h2 id="go-listeners">Raw listeners in Go — planned code</h2>
+  <h2 id="go-listeners">Raw listeners in Go — the real, working code</h2>
   <pre><code>// UDP — connectionless, read one datagram at a time
 conn, err := net.ListenUDP("udp", &amp;net.UDPAddr{Port: 8091})
 buf := make([]byte, 1024)
 for {
-    n, addr, err := conn.ReadFromUDP(buf)
-    go handlePing(buf[:n])           // same shared handler REST/TCP use
-    conn.WriteToUDP([]byte("ACK"), addr)  // UDP has no built-in delivery confirmation —
-                                           // this ack is what lets a client detect a drop
+    n, remoteAddr, err := conn.ReadFromUDP(buf)
+    p, err := parsePingPayload(buf[:n])
+
+    if udpDedup.seenBefore(p.RequestID) {
+        conn.WriteToUDP([]byte("ACK"), remoteAddr)  // re-ack a retry without reprocessing
+        continue
+    }
+
+    handlePing(p)                         // same shared handler REST/TCP use
+    conn.WriteToUDP([]byte("ACK"), remoteAddr)  // UDP has no built-in delivery confirmation —
+                                                 // this ack is what lets a client detect a drop
 }</code></pre>
-  <pre><code>// TCP — connection-oriented, one goroutine per accepted connection
+  <pre><code>// TCP — connection-oriented, one goroutine per accepted connection.
+// Reads a 4-byte length prefix, then exactly that many bytes — no reliance
+// on EOF/connection-close to know a message is complete. See the gotcha
+// below for why that matters.
 listener, err := net.Listen("tcp", ":8092")
 for {
     conn, err := listener.Accept()
     go func(c net.Conn) {
         defer c.Close()
-        data, err := io.ReadAll(c)
-        handlePing(data)              // same shared handler
+        var length uint32
+        binary.Read(c, binary.BigEndian, &amp;length)
+        data := make([]byte, length)
+        io.ReadFull(c, data)
+
+        p, err := parsePingPayload(data)
+        handlePing(p)          // same shared handler
+        c.Write([]byte("ACK"))
     }(conn)
 }</code></pre>
   <p><code>handlePing(...)</code> is the same validate → persist to Postgres → publish to Kafka logic Phase 6
     and Phase 10 already built for the REST handler — refactored into one shared function so all three
     transports (REST, UDP, TCP) feed the identical pipeline instead of three separate, drifting copies of it.</p>
 
+  <div class="box gotcha">
+    <div class="box-title">Real bug — UDP retries caused duplicate database rows</div>
+    A live test produced <strong>3 identical rows</strong> from a single client run. The client resends a
+    ping (up to 3 times) if it doesn't get an ack quickly enough — but the server has no way to tell "this is
+    a retry" from "this is a new ping," so it processed and inserted every datagram it received. Root cause:
+    the first UDP round trip through the WireGuard tunnel took longer than the client's ack-wait window,
+    triggering retries even though the server had already succeeded each time. Fixed with a
+    <code>RequestID</code> field the client reuses across retries of the same logical ping, and a small
+    server-side dedup cache (<code>dedup.go</code>) that still acks a duplicate without reprocessing it —
+    the client's retry means the earlier ack got lost, not that the ping itself did.
+  </div>
+
+  <div class="box gotcha">
+    <div class="box-title">Real bug — a "successful" TCP write that never actually arrived</div>
+    Testing the TCP fallback by stopping the service produced a false positive: the client reported success
+    even though the real container was down. Docker Desktop's port-publishing proxy was still listening and
+    accepted the connection independently of the backend container's state — a successful
+    <code>Write()</code> only proves the local kernel accepted the bytes, not that the real application ever
+    received them. Fixed by requiring a genuine application-level ack: the server writes <code>"ACK"</code>
+    only after <code>handlePing</code> actually succeeds, and the client must read it back before declaring
+    success.
+  </div>
+
+  <div class="box gotcha">
+    <div class="box-title">Real bug — the ack fix above then broke on a second, unrelated Docker quirk</div>
+    The first attempt at a real TCP ack had the client write its payload, then half-close the connection
+    (<code>net.TCPConn.CloseWrite()</code>) so the server's <code>io.ReadAll</code> would see EOF and finish
+    reading, while the client kept listening for the ack. This works on a direct TCP connection — but Docker
+    Desktop's port-publishing proxy doesn't pass a half-close through correctly: it tears down the whole
+    connection on the client's FIN, so an ack written after that point never arrives. Fixed by removing the
+    dependency on connection state entirely — a 4-byte length prefix tells the server exactly how many bytes
+    to read, so the connection never needs to half-close at all. More robust in general, not just a
+    Docker-specific workaround.
+  </div>
+
+  <div class="box why">
+    <div class="box-title">A fourth fix, found the same way — Kafka publish wasn't actually non-blocking</div>
+    <code>handlePing</code>'s Kafka publish already only <em>logged</em> a failure instead of returning one —
+    the intent was clearly "don't let Kafka block the response." But the call was still synchronous, so a
+    slow or unreachable Kafka broker delayed the caller anyway (confirmed directly: 2.7 seconds to fail
+    against an unresolvable broker address, long enough to make a UDP integration test's ack window time out).
+    Fixed by firing the publish in a goroutine — now genuinely non-blocking, matching what the code already
+    claimed to do.
+  </div>
+
   <h2 id="failover">The failover pattern — client-driven, not server-driven</h2>
-  <div class="diagram">Device sends ping via UDP :8091
+  <div class="diagram">Device sends ping via UDP :8091 (same RequestID reused across retries)
   │
   ├─ ACK received within timeout ─► done, ping delivered
   │
   ▼ no ACK after N attempts (UDP is silently unreliable — could be a dropped
     packet, a dropped ack, or the link genuinely being down; the device
     can't tell which, and doesn't need to)
-Device falls back to TCP :8092 for this ping
+Device falls back to TCP :8092 for this same ping
   │
-  ▼ TCP's own handshake either succeeds or fails outright
-Delivery confirmed by TCP itself — no separate ack scheme needed on top of it</div>
+  ▼ length-prefixed message sent, connection stays fully open
+Server processes it, writes back an explicit "ACK"
+  │
+  ▼ client reads the ack before declaring success
+Delivery genuinely confirmed — a successful TCP handshake/write alone
+turned out NOT to be enough proof (see the gotcha below)</div>
   <p>The decision to fail over lives entirely on the <strong>client</strong> side — the Go service doesn't
     orchestrate anything, it just exposes both listeners and lets whichever one gets used, get used. This
     mirrors how failover actually works in real IoT firmware: the constrained device is the one that has to
@@ -178,6 +244,23 @@ Delivery confirmed by TCP itself — no separate ack scheme needed on top of it<
       Writing it three times means three places that can silently drift out of sync as the logic evolves; one
       shared function called from three thin transport-specific handlers guarantees all three transports
       behave identically.</div>
+  </div>
+  <div class="qa" id="qa-rawsockets-udp-dedup">
+    <div class="q">A UDP client retries on a lost ack — how do you stop the server from processing the same message twice?</div>
+    <div class="a">Give the client a way to say "this retry is the same logical message, not a new one" — a
+      request ID generated once and reused across every retry of that specific send. The server keeps a
+      short-lived cache of recently-seen request IDs; if one shows up again, it re-sends the ack (the client
+      still needs to know it succeeded) without reprocessing the underlying work. This is the same
+      at-least-once-delivery problem every UDP-based protocol has to solve — the transport can duplicate a
+      message, so idempotency has to be handled one layer up.</div>
+  </div>
+  <div class="qa" id="qa-rawsockets-tcp-write-not-proof">
+    <div class="q">If a TCP <code>Write()</code> call returns no error, does that prove the other side received the data?</div>
+    <div class="a">No — it only proves the local kernel accepted the bytes into its send buffer. Anything
+      between the client and the real application (a proxy, a NAT layer, Docker's own port-publishing proxy)
+      can accept a connection and a write independently of whether the real backend is even running. The only
+      real proof of delivery is an explicit response from the application itself — an ack the client actually
+      waits for and reads, not just a successful call on its own socket.</div>
   </div>
 
   <footer class="page-footer">MoveTrack Ops — technology reference, grown alongside the build. See the <a href="../steps.html">Steps page</a> for exactly when each part of this was introduced.</footer>

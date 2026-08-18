@@ -114,12 +114,7 @@ cd MoveTrack_Ops
 
 <a href="tech/git.html#git-init">git init</a>
 
-# create .gitignore and README.md (content given in chat)
-
-<a href="tech/git.html#git-status">git status</a>
-<a href="tech/git.html#git-add">git add</a> .
-git status
-<a href="tech/git.html#git-commit">git commit</a> -m "initial commit: project scaffold + gitignore"</code></pre>
+# create .gitignore and README.md (content given in chat)</code></pre>
 
     <div class="box gotcha">
       <div class="box-title">Incident — wrong folder, bad filename, wrong branch name</div>
@@ -143,10 +138,6 @@ git status
     <pre><code>Move-Item "...\MoveTrack_Military" "...\MoveTrack_Ops"
 cd "...\MoveTrack_Ops"
 Rename-Item .\gitignore .gitignore
-git status
-git add -A
-git status
-git commit -m "fix gitignore filename"
 git branch -M main</code></pre>
 
     <h3>GitHub — repo creation, remote, push, protection</h3>
@@ -258,12 +249,6 @@ MoveTrack_Ops/
     <h3>Commands run</h3>
     <p>Issue + branch, per the
       <a href="tech/git.html#per-step-workflow">Git &amp; GitHub → Per-Step workflow template</a>:</p>
-    <pre><code>gh issue create --title "PR #1: Move & Entitlement Service — skeleton + local DB" --body "Spring Boot project generated, connects to local Postgres."
-
-git checkout main
-git pull
-git checkout -b feat/move-entitlement-skeleton</code></pre>
-
     <div class="box gotcha">
       <div class="box-title">Real mistake — internal labels leaked into GitHub-facing text</div>
       The issue body originally read "Steps 1-2 of Phase 1. Spring Boot project generated..." — the
@@ -310,11 +295,6 @@ Remove-Item move-entitlement-service.zip</code></pre>
       <code>spring-boot-starter-web</code> → <code>spring-boot-starter-webmvc</code>).</p>
 
     <h3>Committed</h3>
-    <pre><code>cd "C:\Users\hpart\OneDrive - stevens.edu\Desktop\MoveTrack_Ops"
-git status
-git add services/
-git status
-git commit -m "feat: scaffold move-entitlement-service with spring initializr"</code></pre>
     <p class="pill">Pushed with <code>git push -u origin feat/move-entitlement-skeleton</code>. PR opens after Step 2 (Postgres) is also done, since PR #1 covers both.</p>
 
     <h3>Interview Q&amp;A</h3>
@@ -407,14 +387,6 @@ docker compose ps   # confirmed 0.0.0.0:5432->5432/tcp this time</code></pre>
       the app can reach Postgres, not just that Spring can boot with nothing to connect to.</p>
 
     <h3>Committed, pushed, PR opened and merged</h3>
-    <pre><code>git add docker-compose.yml .env.example services/move-entitlement-service/src/main/resources/application.properties
-git commit -m "feat: add local postgres via docker compose, wire datasource config"
-git push
-
-gh pr create --title "Move & Entitlement Service: project skeleton + local Postgres" --body "Closes #1" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>PR merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/2" target="_blank">#2</a>
       (became #2 since issue #1 already claimed that number — issues and PRs share one counter per repo).
       Local + remote copies of <code>feat/move-entitlement-skeleton</code> both deleted; confirmed with
@@ -463,11 +435,6 @@ git pull</code></pre>
     <p><strong>Goal (PR #1, Steps 3–4):</strong> a buildable Claims Service project skeleton, same stack
       as Move &amp; Entitlement — reused the exact same Spring Initializr dependency set and reasoning,
       see <a href="tech/java-spring.html#spring-initializr">Java, Spring &amp; Maven → Spring Initializr</a>.</p>
-    <pre><code>gh issue create --title "Claims Service: project skeleton + local Postgres" --body "Spring Boot project generated for the Claims Service, connects to its own claims_db in the shared local Postgres container."
-
-git checkout main
-git pull
-git checkout -b feat/claims-service-skeleton</code></pre>
     <pre><code>mkdir services\claims-service
 cd services\claims-service
 
@@ -533,14 +500,6 @@ cd ..\move-entitlement-service
 .\mvnw.cmd test</code></pre>
 
     <h3>Committed, pushed, PR opened and merged</h3>
-    <pre><code>git add docker-compose.yml infra/ services/claims-service/
-git commit -m "feat: add claims-service skeleton with its own claims_db"
-git push -u origin feat/claims-service-skeleton
-
-gh pr create --title "Claims Service: project skeleton + local Postgres" --body "Closes #3" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/4" target="_blank">#4</a>.</p>
 
     <h3>Interview Q&amp;A</h3>
@@ -597,11 +556,6 @@ git pull</code></pre>
       data consistent.
     </div>
 
-    <h3>Committed</h3>
-    <pre><code>git add services/claims-service/src/main/java/com/movetrackops/claims/entity/ services/claims-service/src/main/java/com/movetrackops/claims/repository/
-git commit -m "feat: add claim entity, status enum, and repository"
-git push -u origin feat/claims-domain-model</code></pre>
-
     <h3>Interview Q&amp;A</h3>
     <div class="qa" id="qa-annotation-vs-decorator-2">
       <div class="q">Is a Java annotation the same thing as a Python decorator?</div>
@@ -632,9 +586,6 @@ git push -u origin feat/claims-domain-model</code></pre>
       the properties class would just be an inert class Spring never instantiates.</p>
 
     <h3>Committed</h3>
-    <pre><code>git add .gitignore services/claims-service/src/main/java/com/movetrackops/claims/ClaimsServiceApplication.java services/claims-service/src/main/resources/application.properties services/claims-service/src/main/java/com/movetrackops/claims/config/
-git commit -m "feat: add claims approval threshold config"
-git push</code></pre>
     <p class="pill">A stray <code>.gitignore</code> change (<code>/.metadata/</code>) rode along in this
       commit — VS Code's Java extension workspace-reload folder, harmless, correctly belongs ignored.</p>
 
@@ -668,9 +619,6 @@ git push</code></pre>
       <li><code>Optional.orElseThrow()</code> — forces handling the "claim not found" case explicitly.</li>
       <li>Each method guards the claim's current status before acting — can't supervisor-approve a claim that was never escalated.</li>
     </ul>
-    <pre><code>git add services/claims-service/src/main/java/com/movetrackops/claims/service/
-git commit -m "feat: add claim approval business logic"
-git push</code></pre>
   </div>
 
   <div class="step" id="step8">
@@ -691,14 +639,6 @@ git push</code></pre>
       splitting the helper so <code>save()</code> is only stubbed in tests that actually trigger it.
     </div>
 
-    <pre><code>git add services/claims-service/src/test/java/com/movetrackops/claims/service/
-git commit -m "test: add unit tests for claim approval logic"
-git push
-
-gh pr create --title "Claims Service: claim domain model and approval logic" --body "Closes #3" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/6" target="_blank">#6</a> — closes out PR #2 of Phase 2 (Steps 5–8).</p>
 
     <h3>Interview Q&amp;A</h3>
@@ -728,12 +668,6 @@ git pull</code></pre>
       <li><code>POST /api/claims</code>, <code>GET /api/claims/{id}</code>, <code>POST /api/claims/{id}/adjuster-decision</code>, <code>POST /api/claims/{id}/supervisor-decision</code></li>
       <li>One small addition to <code>ClaimApprovalService</code> — a <code>getClaim(id)</code> lookup, needed for the GET endpoint</li>
     </ul>
-    <pre><code>gh issue create --title "Claims Service: REST API" --body "DTOs and controller exposing the claim filing and approval workflow over HTTP."
-git checkout -b feat/claims-rest-api
-
-git add services/claims-service/src/main/java/com/movetrackops/claims/dto/ services/claims-service/src/main/java/com/movetrackops/claims/web/ services/claims-service/src/main/java/com/movetrackops/claims/service/ClaimApprovalService.java
-git commit -m "feat: add claim REST API with DTOs"
-git push -u origin feat/claims-rest-api</code></pre>
   </div>
 
   <div class="step" id="step10">
@@ -750,14 +684,6 @@ git push -u origin feat/claims-rest-api</code></pre>
       <li>3 tests: file a claim (200), missing <code>claimantName</code> (400 — proves Step 9's <code>@Valid</code> works end-to-end), get a claim (200)</li>
       <li>Sidestepped Jackson 3.x's namespace change by writing request bodies as raw JSON text blocks instead of serializing via <code>ObjectMapper</code></li>
     </ul>
-    <pre><code>git add services/claims-service/src/test/java/com/movetrackops/claims/web/
-git commit -m "test: add integration tests for claim REST API"
-git push
-
-gh pr create --title "Claims Service: REST API" --body "Closes #5" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/8" target="_blank">#8</a> — closes PR #3 (Steps 9–10).</p>
   </div>
 
@@ -781,12 +707,6 @@ git pull</code></pre>
       branch — caught before committing. Finished/merged PR #3 first, then properly opened
       <code>feat/claims-containerize</code> before committing this step's files.
     </div>
-    <pre><code>gh issue create --title "Claims Service: containerize" --body "Multi-stage Dockerfile, .dockerignore, and a dedicated port to avoid colliding with Move & Entitlement."
-git checkout -b feat/claims-containerize
-
-git add services/claims-service/src/main/resources/application.properties services/claims-service/.dockerignore services/claims-service/Dockerfile
-git commit -m "feat: containerize claims-service with multi-stage Dockerfile"
-git push -u origin feat/claims-containerize</code></pre>
     <p>Verified with <code>docker build -t claims-service .</code> — all 7 layers built clean.</p>
   </div>
 
@@ -814,14 +734,6 @@ git push -u origin feat/claims-containerize</code></pre>
       port published) → <code>docker compose logs claims-service</code> — clean boot, and the Hibernate log
       line itself proved the fix: <code>Database JDBC URL [jdbc:postgresql://postgres:5432/claims_db]</code>,
       not <code>localhost</code>.</p>
-    <pre><code>git add docker-compose.yml
-git commit -m "feat: wire claims-service into docker-compose"
-git push
-
-gh pr create --title "Claims Service: containerize" --body "Closes #7" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/10" target="_blank">#10</a> —
       closes PR #4. <strong>This completes Phase 2 (Claims Service) entirely</strong> — 4 PRs, Steps 3–12.</p>
   </div>
@@ -846,12 +758,6 @@ git pull</code></pre>
       <li><code>Rank</code> enum — E1–E9, O1–O10, a representative subset of real JTR pay grades, not exhaustive</li>
       <li><code>MoveRequest</code> entity + <code>MoveRequestRepository</code> — no entitlement/weight field yet, that needs a JTR weight-allowance lookup table that doesn't exist until a later step</li>
     </ul>
-    <pre><code>gh issue create --title "Move & Entitlement Service: domain model" --body "MoveRequest entity, Rank enum, and repository."
-git checkout -b feat/moveent-domain-model
-
-git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/ services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/
-git commit -m "feat: add move request entity and rank enum"
-git push -u origin feat/moveent-domain-model</code></pre>
   </div>
 
   <div class="step" id="step14">
@@ -865,9 +771,6 @@ git push -u origin feat/moveent-domain-model</code></pre>
       Postgres-level database creation. Full explanation, including why it needs
       <code>ON CONFLICT DO NOTHING</code>, on
       <a href="tech/java-spring.html#sql-seeding">Java, Spring &amp; Maven → Seeding reference data</a>.</p>
-    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/WeightAllowance.java services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/WeightAllowanceRepository.java services/move-entitlement-service/src/main/resources/data.sql services/move-entitlement-service/src/main/resources/application.properties
-git commit -m "feat: add weight allowance entity and JTR seed data"
-git push</code></pre>
   </div>
 
   <div class="step" id="step15">
@@ -879,9 +782,6 @@ git push</code></pre>
     <p><strong>Goal:</strong> looks up a move request's rank against Step 14's weight-allowance table. Same
       <code>@Service</code>/constructor-injection/<code>orElseThrow</code> pattern as Claims'
       <code>ClaimApprovalService</code> — nothing new conceptually.</p>
-    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/service/EntitlementCalculationService.java
-git commit -m "feat: add entitlement calculation service"
-git push</code></pre>
   </div>
 
   <div class="step" id="step16">
@@ -895,9 +795,6 @@ git push</code></pre>
     <p><strong>Why this exists at all:</strong> this is a government/military system — a weight-allowance
       number silently changing with no record of who changed it or why is a real compliance problem, not
       just a nice-to-have. This entity is the data shape Step 17's actual logging service writes into.</p>
-    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/entity/ChangeControlRecord.java services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/repository/ChangeControlRecordRepository.java
-git commit -m "feat: add change control record entity and repository"
-git push</code></pre>
   </div>
 
   <div class="step" id="step17">
@@ -909,9 +806,6 @@ git push</code></pre>
     <p><strong>Goal:</strong> <code>WeightAllowanceChangeService</code> — the actual feature the deep spec
       calls out as "adheres to program configuration change control standards." Any change to a
       weight-allowance number gets logged (old value, new value, who, when) <em>before</em> it's applied.</p>
-    <pre><code>git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/service/WeightAllowanceChangeService.java
-git commit -m "feat: add change-control logging for weight allowance updates"
-git push</code></pre>
   </div>
 
   <div class="step" id="step18">
@@ -925,14 +819,6 @@ git push</code></pre>
       this project — proves the change-control record actually logged the right old/new values, not just
       that <em>something</em> got saved. Full explanation on
       <a href="tech/java-spring.html#argument-captor">Java, Spring &amp; Maven → ArgumentCaptor</a>.</p>
-    <pre><code>git add services/move-entitlement-service/src/test/java/com/movetrackops/moveentitlement/service/
-git commit -m "test: add unit tests for entitlement calc and change control"
-git push
-
-gh pr create --title "Move & Entitlement Service: domain model and business logic" --body "Closes #11" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/12" target="_blank">#12</a> — closes PR #2 (Steps 13–18).</p>
   </div>
 
@@ -946,12 +832,6 @@ git pull</code></pre>
       <code>@RestController</code>/<code>@Valid</code> pattern as Claims' <code>ClaimController</code>
       (<a href="tech/java-spring.html#rest-controller">Java, Spring &amp; Maven → REST controller basics</a>),
       nothing new here.</p>
-    <pre><code>gh issue create --title "Move & Entitlement Service: REST API" --body "DTOs and controller exposing move request submission and entitlement calculation over HTTP."
-git checkout -b feat/moveent-rest-api
-
-git add services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/dto/ services/move-entitlement-service/src/main/java/com/movetrackops/moveentitlement/web/
-git commit -m "feat: add move request REST API"
-git push -u origin feat/moveent-rest-api</code></pre>
   </div>
 
   <div class="step" id="step20">
@@ -963,14 +843,6 @@ git push -u origin feat/moveent-rest-api</code></pre>
     <p><strong>Goal:</strong> <code>MoveRequestControllerTest</code> — same <code>@WebMvcTest</code> /
       <code>@MockitoBean</code> / raw-JSON-text-block pattern as Claims' Step 10, same reasons (Jackson 3.x
       namespace change, <code>@WebMvcTest</code> package move) apply here too.</p>
-    <pre><code>git add services/move-entitlement-service/src/test/java/com/movetrackops/moveentitlement/web/
-git commit -m "test: add integration tests for move request REST API"
-git push
-
-gh pr create --title "Move & Entitlement Service: REST API" --body "Closes #12" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/14" target="_blank">#14</a> — closes PR #3.</p>
   </div>
 
@@ -1001,17 +873,6 @@ git pull</code></pre>
       small separate PR rather than trying to force a direct commit onto protected <code>main</code>.
     </div>
 
-    <pre><code>gh issue create --title "Move & Entitlement Service: containerize" --body "Multi-stage Dockerfile and docker-compose wiring."
-git checkout -b feat/moveent-containerize
-
-git add services/move-entitlement-service/.dockerignore services/move-entitlement-service/Dockerfile docker-compose.yml
-git commit -m "feat: containerize move-entitlement-service"
-git push -u origin feat/moveent-containerize
-
-gh pr create --title "Move & Entitlement Service: containerize" --body "Closes #13" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/16" target="_blank">#16</a>.
       Port fix merged separately as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/18" target="_blank">#18</a>.
       <strong>This completes Phase 1 (Move &amp; Entitlement Service) entirely</strong> — 4 PRs, Steps 1–2, 13–21.
@@ -1051,21 +912,12 @@ git pull</code></pre>
 npm --version
 npm install -g npm@latest
 
-gh issue create --title "React Dashboard: project skeleton" --body "Vite + React + TypeScript scaffold with Redux Toolkit added."
-git checkout main
-git pull
-git checkout -b feat/dashboard-skeleton
-
 mkdir frontend
 cd frontend
 npm create vite@latest dashboard -- --template react-ts
 cd dashboard
 npm install
-npm install @reduxjs/toolkit react-redux
-
-git add frontend/dashboard
-git commit -m "feat: generate vite react-ts dashboard skeleton with redux toolkit"
-git push -u origin feat/dashboard-skeleton</code></pre>
+npm install @reduxjs/toolkit react-redux</code></pre>
     <p class="pill">npm was stale for the Node version installed (9.8.1 vs. Node 24's expected 10.x/11.x) — updated with <code>npm install -g npm@latest</code> before scaffolding anything, per the standing "check tooling" rule.</p>
   </div>
 
@@ -1082,9 +934,6 @@ git push -u origin feat/dashboard-skeleton</code></pre>
       readable from multiple, unrelated components (the form that submits it, a future summary view) —
       plain <code>useState</code> only lives inside one component, and passing it down through props gets
       unmanageable fast once more than one or two components need the same data.</p>
-    <pre><code>git add frontend/dashboard/src/app/ frontend/dashboard/src/main.tsx
-git commit -m "feat: add redux store and wire provider"
-git push</code></pre>
   </div>
 
   <div class="step" id="step24">
@@ -1102,9 +951,6 @@ git push</code></pre>
       like <code>postgres</code> only resolves inside Docker's private network. The browser has to hit the
       ports published to the host (<code>8081</code>, <code>8082</code>).
     </div>
-    <pre><code>git add frontend/dashboard/src/api/
-git commit -m "feat: add API client for move-entitlement and claims services"
-git push</code></pre>
   </div>
 
   <div class="step" id="step25">
@@ -1116,9 +962,6 @@ git push</code></pre>
     <p><strong>Goal:</strong> <code>movesSlice</code> + <code>claimsSlice</code>, using
       <code>createAsyncThunk</code> to wrap the API calls. Full breakdown on
       <a href="tech/react-redux.html#redux-concepts">React, Redux &amp; TypeScript → Redux Toolkit concepts</a>.</p>
-    <pre><code>git add frontend/dashboard/src/features/ frontend/dashboard/src/app/store.ts
-git commit -m "feat: add redux slices for moves and claims"
-git push</code></pre>
   </div>
 
   <div class="step" id="step26">
@@ -1130,11 +973,7 @@ git push</code></pre>
     <p><strong>Goal:</strong> <code>react-router-dom</code> wired up, two placeholder pages. Full reference
       on <a href="tech/react-redux.html#routing">React, Redux &amp; TypeScript → React Router basics</a>.</p>
     <pre><code>cd frontend/dashboard
-npm install react-router-dom
-
-git add frontend/dashboard/package.json frontend/dashboard/package-lock.json frontend/dashboard/src/App.tsx frontend/dashboard/src/pages/
-git commit -m "feat: add routing and page layout"
-git push</code></pre>
+npm install react-router-dom</code></pre>
   </div>
 
   <div class="step" id="step27">
@@ -1146,9 +985,6 @@ git push</code></pre>
     <p><strong>Goal:</strong> a working form using <code>useState</code>/<code>useDispatch</code>/
       <code>useSelector</code> — first real usage of all three hooks, reference on
       <a href="tech/react-redux.html#hooks">React, Redux &amp; TypeScript → React hooks</a>.</p>
-    <pre><code>git add frontend/dashboard/src/pages/MovesPage.tsx
-git commit -m "feat: build moves page with entitlement submission"
-git push</code></pre>
   </div>
 
   <div class="step" id="step28">
@@ -1158,9 +994,6 @@ git push</code></pre>
       <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> same pattern as Step 27, applied to claims — no new concepts.</p>
-    <pre><code>git add frontend/dashboard/src/pages/ClaimsPage.tsx
-git commit -m "feat: build claims page with claim filing"
-git push</code></pre>
   </div>
 
   <div class="step" id="step29">
@@ -1179,20 +1012,7 @@ git push</code></pre>
       <code>test.setupFiles</code> in <code>vite.config.ts</code>. Without it, neither the runtime
       assertion nor its TypeScript type exists yet.
     </div>
-    <pre><code>npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
-
-git add frontend/dashboard/src/test/setup.ts frontend/dashboard/vite.config.ts
-git commit -m "fix: register jest-dom matchers via vitest setup file"
-git push
-
-git add frontend/dashboard/vite.config.ts frontend/dashboard/package.json frontend/dashboard/package-lock.json frontend/dashboard/src/pages/MovesPage.test.tsx
-git commit -m "test: add component test for moves page"
-git push
-
-gh pr create --title "React Dashboard: skeleton, Redux, API integration, pages" --body "Closes #19" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
+    <pre><code>npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom</code></pre>
     <p>Merged as <a href="https://github.com/theHparth/MoveTrack_Ops/pull/20" target="_blank">#20</a> — closes PR #2 (Steps 22–29).</p>
   </div>
 
@@ -1205,12 +1025,6 @@ git pull</code></pre>
     <p><strong>Goal:</strong> multi-stage Dockerfile — Node build stage, Nginx run stage. Genuinely
       different shape from the Java Dockerfiles; full breakdown on
       <a href="tech/docker.html#node-nginx-stage">Docker &amp; Compose → The Node/Nginx variant</a>.</p>
-    <pre><code>gh issue create --title "React Dashboard: containerize" --body "Multi-stage Dockerfile: Node build stage, Nginx serves the static output."
-git checkout -b feat/dashboard-containerize
-
-git add frontend/dashboard/.dockerignore frontend/dashboard/Dockerfile
-git commit -m "feat: containerize dashboard with multi-stage build"
-git push -u origin feat/dashboard-containerize</code></pre>
   </div>
 
   <div class="step" id="step31">
@@ -1240,17 +1054,6 @@ git reset --hard origin/main</code></pre>
       safely on the other branch and the working tree was clean — nothing lost.
     </div>
 
-    <pre><code>docker compose up -d --build
-docker compose ps
-
-git add docker-compose.yml
-git commit -m "feat: wire dashboard into docker-compose"
-git push
-
-gh pr create --title "React Dashboard: containerize" --body "Closes #20" --base main
-gh pr merge --squash --delete-branch
-git checkout main
-git pull</code></pre>
     <p><strong>This completes Phase 3 entirely</strong> — 3 PRs, Steps 22–31. All 4 containers
       (<code>postgres</code>, <code>claims-service</code>, <code>move-entitlement-service</code>,
       <code>dashboard</code>) run together; <code>http://localhost:3000</code> serves the real dashboard.</p>
@@ -1304,14 +1107,7 @@ pip freeze &gt; requirements.txt</code></pre>
       <code>claim_amount</code>, <code>days_since_incident</code>, <code>claim_type</code>,
       <code>description_length</code> as features, <code>priority</code> as the label. Concept reference on
       <a href="tech/python-fastapi.html#pandas">Python, FastAPI &amp; scikit-learn → pandas</a>.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/ml-training-data
-
-# create services/claims-triage-ml/data/claims_sample.csv
-
-git add services/claims-triage-ml/data/claims_sample.csv
-git commit -m "data: add sample training dataset for claims triage model"</code></pre>
+    <pre><code># create services/claims-triage-ml/data/claims_sample.csv</code></pre>
   </div>
 
   <div class="step" id="step34">
@@ -1329,17 +1125,7 @@ python train_model.py
 # expected: prints "Test accuracy: 0.NN", creates model/triage_model.joblib
 
 pip install joblib
-pip freeze &gt; requirements.txt
-
-git add services/claims-triage-ml/train_model.py services/claims-triage-ml/model/triage_model.joblib services/claims-triage-ml/requirements.txt
-git commit -m "feat: train scikit-learn triage classifier and save model artifact"
-git push -u origin feature/ml-training-data
-
-gh issue create --title "Train claims triage classifier" --body "Add a sample training dataset and a scikit-learn pipeline that trains and saves a triage-priority classifier."
-gh pr create --title "Add training dataset and trained triage classifier" --body "Closes #&lt;real-issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+pip freeze &gt; requirements.txt</code></pre>
     <div class="box tip">
       <div class="box-title">Portfolio-project shortcut, worth naming as such</div>
       The trained <code>.joblib</code> file gets committed to git so the service is runnable without a
@@ -1379,15 +1165,10 @@ gh issue close &lt;real-issue-number&gt;</code></pre>
     <p><strong>Goal:</strong> expose the trained model over a <code>POST /predict</code> endpoint. Full
       explanation on <a href="tech/python-fastapi.html#fastapi-basics">Python, FastAPI &amp; scikit-learn → Defining the API</a>
       and <a href="tech/python-fastapi.html#pydantic">→ Pydantic</a>.</p>
-    <pre><code>git checkout -b feature/ml-api
-
-# write app/__init__.py, app/schemas.py, app/main.py
+    <pre><code># write app/__init__.py, app/schemas.py, app/main.py
 
 uvicorn app.main:app --reload --port 8000
-# verify at http://localhost:8000/docs
-
-git add services/claims-triage-ml/app
-git commit -m "feat: add FastAPI predict endpoint for claims triage"</code></pre>
+# verify at http://localhost:8000/docs</code></pre>
     <div class="box warn">
       <div class="box-title">Real mistake — <code>curl</code> doesn't work as expected in PowerShell</div>
       <code>curl</code> here is just an alias for <code>Invoke-WebRequest</code> — it doesn't understand Unix
@@ -1430,17 +1211,7 @@ git commit -m "feat: add FastAPI predict endpoint for claims triage"</code></pre
 docker run -d --name redis-dev -p 6379:6379 redis:alpine
 uvicorn app.main:app --reload --port 8000
 # call /predict twice with the same body — second response should show "cached": true
-docker rm -f redis-dev
-
-git add services/claims-triage-ml/app
-git commit -m "feat: cache triage predictions in Redis"
-git push -u origin feature/ml-api
-
-gh issue create --title "Add FastAPI predict endpoint with Redis caching" --body "Expose the trained triage model over a FastAPI /predict endpoint, caching repeated predictions in Redis."
-gh pr create --title "Add FastAPI prediction service and Redis caching" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+docker rm -f redis-dev</code></pre>
   </div>
 
   <div class="step" id="step37">
@@ -1451,15 +1222,10 @@ git pull origin main</code></pre>
     </div>
     <p><strong>Goal:</strong> pytest coverage for the trained model directly. Full explanation on
       <a href="tech/python-fastapi.html#pytest-testclient">Python, FastAPI &amp; scikit-learn → Testing</a>.</p>
-    <pre><code>git checkout -b feature/ml-tests
-
-# write tests/__init__.py, tests/test_model.py
+    <pre><code># write tests/__init__.py, tests/test_model.py
 
 pytest
-# expected: 2 passed
-
-git add services/claims-triage-ml/tests services/claims-triage-ml/requirements.txt
-git commit -m "test: add unit tests for the triage model"</code></pre>
+# expected: 2 passed</code></pre>
   </div>
 
   <div class="step" id="step38">
@@ -1474,17 +1240,7 @@ git commit -m "test: add unit tests for the triage model"</code></pre>
     <pre><code># write tests/test_api.py — needs redis-dev container running (from Step 36) to pass
 
 pytest
-# expected: 5 passed
-
-git add services/claims-triage-ml/tests services/claims-triage-ml/requirements.txt
-git commit -m "test: add API integration tests for the predict endpoint"
-git push -u origin feature/ml-tests
-
-gh issue create --title "Add tests for triage model and API" --body "Add pytest unit tests for the model and FastAPI TestClient integration tests for the /predict endpoint."
-gh pr create --title "Add unit and integration tests" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+# expected: 5 passed</code></pre>
   </div>
 
   <div class="step" id="step39">
@@ -1496,17 +1252,12 @@ git pull origin main</code></pre>
     <p><strong>Goal:</strong> containerize the service — single-stage, unlike the Java/Node Dockerfiles. Full
       explanation on
       <a href="tech/python-fastapi.html#python-dockerfile">Python, FastAPI &amp; scikit-learn → Containerizing a Python service</a>.</p>
-    <pre><code>git checkout -b feature/ml-containerize
-
-# write Dockerfile, .dockerignore
+    <pre><code># write Dockerfile, .dockerignore
 
 docker build -t claims-triage-ml services/claims-triage-ml
 docker run -p 8000:8000 --name ml-standalone-test claims-triage-ml
 # verify with Invoke-RestMethod http://localhost:8000/health, then:
-docker rm -f ml-standalone-test
-
-git add services/claims-triage-ml/Dockerfile services/claims-triage-ml/.dockerignore
-git commit -m "feat: containerize the claims triage ML service"</code></pre>
+docker rm -f ml-standalone-test</code></pre>
 
     <h3>Interview Q&amp;A</h3>
     <div class="qa" id="qa-cmd-array-step39">
@@ -1526,20 +1277,7 @@ git commit -m "feat: containerize the claims triage ML service"</code></pre>
       alongside the existing 4 containers. <code>REDIS_HOST: redis</code> resolves via Compose's service-name
       networking — same mechanism as <code>SPRING_DATASOURCE_URL</code> using <code>postgres</code>; see
       <a href="tech/docker.html#networking">Docker &amp; Compose → Container networking</a>.</p>
-    <pre><code># add redis + claims-triage-ml services to docker-compose.yml
-
-docker compose up -d --build
-docker compose ps
-
-git add docker-compose.yml
-git commit -m "feat: wire claims triage ML service and Redis into docker-compose"
-git push -u origin feature/ml-containerize
-
-gh issue create --title "Containerize and wire claims triage ML into docker-compose" --body "Add a Dockerfile for the ML service and add both it and Redis to the root docker-compose.yml."
-gh pr create --title "Containerize claims triage ML and wire into compose" --body "Closes #&lt;real-issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+    <pre><code># add redis + claims-triage-ml services to docker-compose.yml</code></pre>
     <div class="box why">
       <div class="box-title">Verified — all 6 containers running together</div>
       <pre><code>NAME                                 SERVICE                    PORTS
@@ -1576,21 +1314,14 @@ movetrack_ops-redis-1                redis                      0.0.0.0:6379-&gt
       JVM thread-per-request model (like the two Java services) gets expensive fast at that scale. The
       language choice and this whole service's reason to exist are the same underlying fact, which is why
       it gets its own dedicated stack instead of becoming a third Spring Boot service.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/go-ingest-skeleton
-
-mkdir services/shipment-ingestion
+    <pre><code>mkdir services/shipment-ingestion
 cd services/shipment-ingestion
 go mod init shipment-ingestion
 
 # write main.go
 
 go run main.go
-# verify GET http://localhost:8090/health
-
-git add services/shipment-ingestion/go.mod services/shipment-ingestion/main.go
-git commit -m "feat: scaffold Go shipment ingestion service"</code></pre>
+# verify GET http://localhost:8090/health</code></pre>
     <p class="pill">First non-JVM, non-Node, non-Python stack — Go version checked before this step, per the
       standing "check tooling is current" rule.</p>
     <div class="box gotcha">
@@ -1613,10 +1344,7 @@ git commit -m "feat: scaffold Go shipment ingestion service"</code></pre>
     <p><strong>Goal:</strong> a <code>ShipmentPing</code> struct plus an in-memory-storing handler. Full
       explanation on <a href="tech/go.html#json-structs">Go → Structs as DTOs</a> and
       <a href="tech/go.html#concurrency">→ Concurrency</a>.</p>
-    <pre><code># update main.go with ShipmentPing struct, handleIngest, sync.Mutex-protected slice
-
-git add services/shipment-ingestion/main.go
-git commit -m "feat: add POST /ingest endpoint with in-memory storage"</code></pre>
+    <pre><code># update main.go with ShipmentPing struct, handleIngest, sync.Mutex-protected slice</code></pre>
   </div>
 
   <div class="step" id="step43">
@@ -1629,17 +1357,7 @@ git commit -m "feat: add POST /ingest endpoint with in-memory storage"</code></p
     <pre><code># add handleListIngest to main.go
 
 go run main.go
-# POST a ping, then GET /ingest, verify it comes back
-
-git add services/shipment-ingestion/main.go
-git commit -m "feat: add GET /ingest to list ingested pings"
-git push -u origin feature/go-ingest-skeleton
-
-gh issue create --title "Scaffold Go shipment ingestion service" --body "Go project skeleton with in-memory POST/GET /ingest endpoints."
-gh pr create --title "Add Go shipment ingestion service skeleton" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+# POST a ping, then GET /ingest, verify it comes back</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>405 Method Not Allowed</code> on GET /ingest</div>
       Posting worked, but <code>GET /ingest</code> returned <code>405</code>, not <code>404</code> — that
@@ -1659,15 +1377,10 @@ git pull origin main</code></pre>
     <p><strong>Goal:</strong> its own <code>shipment_ingestion</code> Postgres database, database-per-service
       like the Java services. Full explanation on
       <a href="tech/go.html#database">Go → Database, no ORM</a>.</p>
-    <pre><code>git checkout -b feature/go-ingest-persistence
-
-# add CREATE DATABASE shipment_ingestion; to the existing multi-database init script
+    <pre><code># add CREATE DATABASE shipment_ingestion; to the existing multi-database init script
 
 go get github.com/lib/pq
-# write db.go — connectDB()
-
-git add services/shipment-ingestion/db.go services/shipment-ingestion/go.mod services/shipment-ingestion/go.sum
-git commit -m "feat: add Postgres connection for shipment ingestion"</code></pre>
+# write db.go — connectDB()</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>go run main.go</code> vs. <code>go run .</code></div>
       Once <code>db.go</code> existed alongside <code>main.go</code>, running <code>go run main.go</code>
@@ -1699,10 +1412,7 @@ git commit -m "feat: add Postgres connection for shipment ingestion"</code></pre
     </div>
     <p><strong>Goal:</strong> replace the in-memory slice with a real table. Full breakdown on
       <a href="tech/go.html#database">Go → Database, no ORM</a>.</p>
-    <pre><code># add ensureSchema, insertPing to db.go; wire handleIngest to call insertPing
-
-git add services/shipment-ingestion/main.go services/shipment-ingestion/db.go
-git commit -m "feat: persist ingested pings to Postgres"</code></pre>
+    <pre><code># add ensureSchema, insertPing to db.go; wire handleIngest to call insertPing</code></pre>
   </div>
 
   <div class="step" id="step46">
@@ -1713,17 +1423,7 @@ git commit -m "feat: persist ingested pings to Postgres"</code></pre>
     </div>
     <p><strong>Goal:</strong> <code>GET /ingest</code> reads real rows back — proof it's persisted, not just
       in-memory (restart the process between POST and GET to confirm).</p>
-    <pre><code># add listPings to db.go; wire handleListIngest to call it
-
-git add services/shipment-ingestion/main.go services/shipment-ingestion/db.go
-git commit -m "feat: read ingested pings from Postgres"
-git push -u origin feature/go-ingest-persistence
-
-gh issue create --title "Persist shipment pings to Postgres" --body "Add a dedicated Postgres database and persist/read ingested pings through it instead of in-memory storage."
-gh pr create --title "Add Postgres persistence for shipment ingestion" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+    <pre><code># add listPings to db.go; wire handleListIngest to call it</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — scanning a <code>TIMESTAMPTZ</code> column into a Go <code>string</code></div>
       <code>listPings</code>'s original <code>rows.Scan(&amp;p.DeviceID, ..., &amp;p.Timestamp)</code> panicked
@@ -1744,16 +1444,11 @@ git pull origin main</code></pre>
     </div>
     <p><strong>Goal:</strong> a <code>validatePing</code> function plus table-driven tests for it. Full
       explanation on <a href="tech/go.html#testing">Go → Testing</a>.</p>
-    <pre><code>git checkout -b feature/go-ingest-tests
-
-# extract validatePing into main.go, call it from handleIngest
+    <pre><code># extract validatePing into main.go, call it from handleIngest
 # write main_test.go with a table-driven TestValidatePing
 
 go test ./...
-# expected: ok
-
-git add services/shipment-ingestion/main.go services/shipment-ingestion/main_test.go
-git commit -m "test: add table-driven unit tests for ping validation"</code></pre>
+# expected: ok</code></pre>
   </div>
 
   <div class="step" id="step48">
@@ -1767,10 +1462,7 @@ git commit -m "test: add table-driven unit tests for ping validation"</code></pr
       <a href="tech/go.html#testing">Go → Testing</a>.</p>
     <pre><code># write handlers_test.go — TestHandleIngest_MissingDeviceID
 
-go test ./...
-
-git add services/shipment-ingestion/handlers_test.go
-git commit -m "test: add HTTP integration test for /ingest validation"</code></pre>
+go test ./...</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — nil pointer panic, validation never gated the database call</div>
       <code>TestHandleIngest_MissingDeviceID</code> panicked with <code>invalid memory address or nil pointer
@@ -1807,13 +1499,10 @@ git commit -m "test: add HTTP integration test for /ingest validation"</code></p
       <span class="step-title">Shipment Ingestion — closes PR C</span>
       <span class="step-status done">Done</span>
     </div>
-    <pre><code>git push -u origin feature/go-ingest-tests
-
-gh issue create --title "Add tests for shipment ingestion" --body "Add table-driven unit tests for ping validation and an HTTP integration test for the /ingest handler."
-gh pr create --title "Add unit and integration tests" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+    <p><strong>What this marks:</strong> Steps 47-48's testing work (table-driven unit tests, then an
+      <code>httptest</code>-based HTTP integration test) lands on <code>main</code> as its own PR — kept
+      separate from Step 50's Dockerfile so "does the service's logic work" and "does it containerize
+      correctly" stay two independently reviewable, independently revertible changes.</p>
   </div>
 
   <div class="step" id="step50">
@@ -1824,15 +1513,8 @@ git pull origin main</code></pre>
     </div>
     <p><strong>Goal:</strong> a statically-compiled binary in a minimal Alpine image — even leaner than the
       Java Dockerfiles. Full explanation on <a href="tech/go.html#containerizing">Go → Containerizing</a>.</p>
-    <pre><code>git checkout -b feature/go-ingest-containerize
-
-go mod tidy
-# write Dockerfile, .dockerignore
-
-docker build -t shipment-ingestion services/shipment-ingestion
-
-git add services/shipment-ingestion/Dockerfile services/shipment-ingestion/.dockerignore services/shipment-ingestion/go.sum
-git commit -m "feat: containerize the shipment ingestion service"</code></pre>
+    <pre><code>go mod tidy
+# write Dockerfile, .dockerignore</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — Docker's Go build stage was older than <code>go.mod</code> required</div>
       <code>go mod init</code> back in Step 41 recorded the locally-installed Go version (1.26.5) into
@@ -1867,8 +1549,6 @@ git commit -m "feat: containerize the shipment ingestion service"</code></pre>
       DATABASE_URL: postgres://movetrack:localdevpassword@postgres:5432/shipment_ingestion?sslmode=disable
     depends_on:
       - postgres</code></pre>
-    <pre><code>git add docker-compose.yml
-git commit -m "feat: wire shipment ingestion service into docker-compose"</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>DATABASE_URL</code> stayed on <code>localhost</code>, and the fix wasn't verified as actually applied</div>
       The container kept crashing with <code>dial tcp [::1]:5432: connect: connection refused</code> — even
@@ -1889,17 +1569,6 @@ git commit -m "feat: wire shipment ingestion service into docker-compose"</code>
       <span class="step-title">Shipment Ingestion — verify, closes PR D</span>
       <span class="step-status done">Done</span>
     </div>
-    <pre><code>docker compose up -d --build
-docker compose ps
-# expect shipment-ingestion Up alongside the other 6 containers
-
-git push -u origin feature/go-ingest-containerize
-
-gh issue create --title "Containerize and wire shipment ingestion into docker-compose" --body "Add a multi-stage Dockerfile and add the service to the root docker-compose.yml."
-gh pr create --title "Containerize shipment ingestion and wire into compose" --body "Closes #&lt;issue-number&gt;"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — Step 50's work landed on the wrong branch, discovered at push time</div>
       <code>git push -u origin feature/go-ingest-containerize</code> failed with
@@ -1971,11 +1640,7 @@ movetrack_ops-shipment-ingestion-1   shipment-ingestion         0.0.0.0:8090-&gt
       because it's still extremely common in real enterprise environments, especially outside cloud-native
       shops — a genuinely different, resume-worthy skill from GitHub Actions, not a redundant one. Full
       comparison on <a href="tech/jenkins.html#jenkins-basics">Jenkins, Trivy &amp; OWASP ZAP → Jenkins vs. GitHub Actions</a>.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/jenkins-compliance-gate
-
-# add to docker-compose.yml:
+    <pre><code># add to docker-compose.yml:
 #   jenkins:
 #     image: jenkins/jenkins:lts-jdk17
 #     ports:
@@ -2061,11 +1726,7 @@ docker compose up -d --build jenkins</code></pre>
 #             steps { sh 'echo Jenkins can run a pipeline from this repo' }
 #         }
 #     }
-# }
-
-git add Jenkinsfile
-git commit -m "add first Jenkinsfile"
-git push -u origin feature/jenkins-compliance-gate</code></pre>
+# }</code></pre>
     <p>In the Jenkins UI: New Item → name it <code>movetrack-ops-compliance</code> → Pipeline → OK. Under
       Pipeline, set Definition to "Pipeline script from SCM," SCM to Git, Repository URL to
       <code>https://github.com/theHparth/MoveTrack_Ops.git</code>, Branch to
@@ -2098,11 +1759,7 @@ git push -u origin feature/jenkins-compliance-gate</code></pre>
 #             steps {
 #                 sh 'docker build -t shipment-ingestion services/shipment-ingestion'
 #             }
-#         }
-
-git add Jenkinsfile
-git commit -m "add docker build stage"
-git push</code></pre>
+#         }</code></pre>
     <p>Click "Build Now" again in the Jenkins UI.</p>
     <p><strong>How to check:</strong>
       <code>docker images shipment-ingestion</code> (on your host machine)
@@ -2128,11 +1785,7 @@ git push</code></pre>
 #             steps {
 #                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image shipment-ingestion'
 #             }
-#         }
-
-git add Jenkinsfile
-git commit -m "add trivy scan stage"
-git push</code></pre>
+#         }</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> Console Output for the "Trivy Scan" stage. <strong>Expected:</strong> a
       table of findings (or "No vulnerabilities found," depending on the base image) — either way, the stage
@@ -2163,11 +1816,7 @@ git push</code></pre>
       1</code> is what turns "we noticed a problem" into "the build actually stops," the real difference
       between a DevSecOps gate and a DevSecOps suggestion.</p>
     <pre><code># update the Trivy Scan stage's sh command to add the gate flags:
-#                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion'
-
-git add Jenkinsfile
-git commit -m "add severity gate to trivy stage"
-git push</code></pre>
+#                 sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --severity HIGH,CRITICAL shipment-ingestion'</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> the "Trivy Scan" stage's color in the UI.
       <strong>Expected:</strong> green — with 0 HIGH/CRITICAL findings on the now-current
@@ -2191,11 +1840,7 @@ git push</code></pre>
 #                 sh 'docker run --rm --network movetrack_ops_default -v movetrack_ops_jenkins_home:/zap/wrk/:rw -t zaproxy/zap-stable zap-baseline.py -t http://dashboard:80 -r zap-report.html || true'
 #                 sh 'cp /var/jenkins_home/zap-report.html "$WORKSPACE"/zap-report.html || true'
 #             }
-#         }
-
-git add Jenkinsfile
-git commit -m "add zap baseline scan stage"
-git push</code></pre>
+#         }</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> Console Output for the "ZAP Baseline Scan" stage.
       <strong>Expected:</strong> ZAP's own summary lines (e.g. "FAIL-NEW: 0  FAIL-INPROG: 0  WARN-NEW: N"),
@@ -2234,11 +1879,7 @@ git push</code></pre>
 #             steps {
 #                 archiveArtifacts artifacts: '*-report.html', allowEmptyArchive: true
 #             }
-#         }
-
-git add Jenkinsfile
-git commit -m "archive scan reports as build artifacts"
-git push</code></pre>
+#         }</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> open the completed build's page in the Jenkins UI.
       <strong>Expected:</strong> a "Build Artifacts" section listing <code>zap-report.html</code>, downloadable
@@ -2256,18 +1897,13 @@ git push</code></pre>
     <pre><code># temporarily edit services/shipment-ingestion/Dockerfile's first line to an old,
 # known-vulnerable base image, e.g.:
 #   FROM golang:1.16-alpine AS build
-# (an old, unpatched version — expect real HIGH/CRITICAL CVEs here)
-
-git add services/shipment-ingestion/Dockerfile
-git commit -m "temporarily use an old base image to test the gate"
-git push</code></pre>
+# (an old, unpatched version — expect real HIGH/CRITICAL CVEs here)</code></pre>
     <p>Click "Build Now."</p>
     <p><strong>How to check:</strong> the "Trivy Scan" stage.
       <strong>Expected:</strong> RED this time — the pipeline stops, proving <code>--exit-code 1</code>
       genuinely blocks a build with real findings, not just in theory.</p>
     <pre><code># revert immediately:
-git revert HEAD
-git push</code></pre>
+git revert HEAD</code></pre>
     <p><strong>How to check (after reverting):</strong> click "Build Now" once more — <strong>expected:</strong>
       back to green, confirming the revert restored the working, non-vulnerable base image.</p>
   </div>
@@ -2280,15 +1916,9 @@ git push</code></pre>
     </div>
     <p><strong>Goal:</strong> one last full green run, then close out the phase — single branch, single PR,
       per the simplified git workflow.</p>
-    <pre><code>git checkout main
-git pull origin main</code></pre>
     <p>In the Jenkins UI, edit the <code>movetrack-ops-compliance</code> job's branch back to
       <code>*/main</code> (from the phase branch used during development), then click "Build Now" one final
       time against the merged result.</p>
-    <pre><code>gh pr create --title "Add Jenkins Trivy/ZAP compliance gate"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
     <p><strong>How to check:</strong>
       <code>docker compose ps</code> — <strong>expected:</strong> 8 containers now (the 7 from Phase 6, plus
       <code>jenkins</code>), all <code>Up</code>. Then one final "Build Now" in the Jenkins UI against
@@ -2333,21 +1963,14 @@ git pull origin main</code></pre>
       structured business rules with the kind of invariants Move &amp; Entitlement/Claims have. FastAPI
       gets a working ingestion endpoint stood up fast, matching the pattern already proven with Claims
       Triage ML rather than introducing a third stack for no reason.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/compliance-service
-
-mkdir services/compliance-service
+    <pre><code>mkdir services/compliance-service
 cd services/compliance-service
 python -m venv venv
 venv\Scripts\activate
 pip install fastapi uvicorn pymongo pika requests pytest httpx mongomock
 pip freeze &gt; requirements.txt
 
-# write app/main.py — FastAPI app with a GET /health endpoint
-
-git add services/compliance-service
-git commit -m "scaffold compliance service"</code></pre>
+# write app/main.py — FastAPI app with a GET /health endpoint</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>type nul &gt;</code> is a cmd.exe trick, not PowerShell</div>
       Creating <code>app/__init__.py</code> with <code>type nul &gt; app\__init__.py</code> printed a "Cannot
@@ -2378,10 +2001,7 @@ docker compose up -d mongodb
 docker exec -it movetrack-mongodb mongosh --eval "db.runCommand({ping:1})"
 # expect { ok: 1 }
 
-# write app/db.py — get_db(), caches a single MongoClient at module level
-
-git add docker-compose.yml services/compliance-service/app/db.py
-git commit -m "connect compliance service to mongodb"</code></pre>
+# write app/db.py — get_db(), caches a single MongoClient at module level</code></pre>
   </div>
 
   <div class="step" id="step65">
@@ -2393,10 +2013,7 @@ git commit -m "connect compliance service to mongodb"</code></pre>
     <p><strong>Goal:</strong> the real ingestion endpoint. Full explanation on
       <a href="tech/rabbitmq-mongodb.html#mongodb-concepts">RabbitMQ &amp; MongoDB → Basic pymongo usage</a>.</p>
     <pre><code># write app/schemas.py — Finding Pydantic model
-# add POST /findings to app/main.py, calling db.findings.insert_one()
-
-git add services/compliance-service/app
-git commit -m "add POST /findings endpoint"</code></pre>
+# add POST /findings to app/main.py, calling db.findings.insert_one()</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — PowerShell's <code>curl</code> is not real curl</div>
       <code>curl -X POST ... -H "..." -d "..."</code> failed with a <code>Invoke-WebRequest</code> parameter
@@ -2423,10 +2040,7 @@ docker compose up -d rabbitmq
 # Exchanges tab -&gt; "compliance" -&gt; publish count moves after each POST /findings
 
 # write app/events.py — publish_finding_detected() using pika
-# call it from POST /findings when severity is HIGH/CRITICAL
-
-git add docker-compose.yml services/compliance-service/app
-git commit -m "publish finding.detected to rabbitmq"</code></pre>
+# call it from POST /findings when severity is HIGH/CRITICAL</code></pre>
     <p>No queue is bound to the exchange yet at this point — messages publish successfully and are simply
       discarded with nowhere to go. That's expected here, not a bug; a real consumer is future work beyond
       this phase. See the full click-by-click trace at
@@ -2456,10 +2070,7 @@ git commit -m "publish finding.detected to rabbitmq"</code></pre>
 #                 sh 'pip3 install requests --quiet --break-system-packages || pip3 install requests --quiet'
 #                 sh 'python3 scripts/report_findings.py || true'
 #             }
-#         }
-
-git add Jenkinsfile scripts/report_findings.py infra/jenkins/Dockerfile
-git commit -m "wire jenkins trivy output into compliance service"</code></pre>
+#         }</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — Jenkins image had no Python at all</div>
       <code>pip: not found</code> — the Jenkins container (built for running <code>docker</code>/<code>git</code>,
@@ -2487,10 +2098,7 @@ git commit -m "wire jenkins trivy output into compliance service"</code></pre>
       <span class="step-status done">Done</span>
     </div>
     <p><strong>Goal:</strong> verify persistence and retrieval both work.</p>
-    <pre><code># add GET /findings to app/main.py, querying MongoDB, converting ObjectId to str
-
-git add services/compliance-service/app
-git commit -m "add GET /findings endpoint"</code></pre>
+    <pre><code># add GET /findings to app/main.py, querying MongoDB, converting ObjectId to str</code></pre>
     <p>Testing <code>GET /findings</code> before this step was written correctly returned
       <code>405 Method Not Allowed</code>, not <code>404</code> — FastAPI recognized the path (POST already
       existed there) but had no handler for GET yet. Expected sequencing, not a bug.</p>
@@ -2514,10 +2122,7 @@ git commit -m "add GET /findings endpoint"</code></pre>
 #   (ObjectMapper + JavaTimeModule registered by hand)
 # EntitlementCalculationService.submitMoveRequest() now publishes move.created after save
 # new config/WebConfig.java — CORS mapping for http://localhost:3000
-# frontend/dashboard/nginx.conf — SPA fallback (try_files ... /index.html)
-
-git add services/move-entitlement-service frontend/dashboard
-git commit -m "publish move.created to rabbitmq"</code></pre>
+# frontend/dashboard/nginx.conf — SPA fallback (try_files ... /index.html)</code></pre>
     <p>This was the most gotcha-dense single step of the whole project so far — five real, distinct bugs,
       each one only surfacing after the last was fixed:</p>
     <div class="box gotcha">
@@ -2573,10 +2178,7 @@ git commit -m "publish move.created to rabbitmq"</code></pre>
       from an earlier phase, one fewer gotcha to hit.</p>
     <pre><code>cd services/claims-service
 # same spring-boot-starter-amqp + RabbitMQConfig + RabbitTemplate pattern as Step 69
-# ClaimApprovalService.submitForAdjusterReview() now publishes claim.filed after save
-
-git add services/claims-service
-git commit -m "publish claim.filed to rabbitmq"</code></pre>
+# ClaimApprovalService.submitForAdjusterReview() now publishes claim.filed after save</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — changing a constructor signature broke an existing test</div>
       Adding <code>RabbitTemplate</code> as a constructor parameter to <code>ClaimApprovalService</code> broke
@@ -2606,10 +2208,7 @@ git commit -m "publish claim.filed to rabbitmq"</code></pre>
 # write tests/test_findings.py — pure should_publish(severity) logic, no db/rabbitmq involved
 
 pytest
-# expect 3 passed
-
-git add services/compliance-service/tests
-git commit -m "add unit tests for findings logic"</code></pre>
+# expect 3 passed</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>ModuleNotFoundError: No module named 'app'</code></div>
       pytest's default import mode walks up from the test file looking for the first folder <em>without</em>
@@ -2631,10 +2230,7 @@ git commit -m "add unit tests for findings logic"</code></pre>
 # of one test only, real MongoDB never touched
 
 pytest
-# expect 4 passed
-
-git add services/compliance-service/tests
-git commit -m "add api integration tests"</code></pre>
+# expect 4 passed</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — running pytest from the repo root instead of the service folder</div>
       <code>pytest</code> run from <code>MoveTrack_Ops</code> (the monorepo root) instead of
@@ -2664,11 +2260,7 @@ git commit -m "add api integration tests"</code></pre>
       <a href="tech/python-fastapi.html#python-dockerfile">Python, FastAPI &amp; scikit-learn → Containerizing a Python service</a>.</p>
     <pre><code># write Dockerfile, .dockerignore matching claims-triage-ml's pattern
 
-cd services/compliance-service
-docker build -t compliance-service .
-
-git add services/compliance-service/Dockerfile services/compliance-service/.dockerignore
-git commit -m "containerize compliance service"</code></pre>
+cd services/compliance-service</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — relative path resolved from the wrong working directory</div>
       Running <code>docker build -t compliance-service services/compliance-service</code> while already
@@ -2687,20 +2279,7 @@ git commit -m "containerize compliance service"</code></pre>
       <span class="step-status done">Done</span>
     </div>
     <pre><code># add compliance-service to docker-compose.yml, MONGO_URI/RABBITMQ_URL env vars pointing at
-# service names (mongodb, rabbitmq), depends_on both
-
-docker compose up -d --build
-docker compose ps
-# 10 containers total, all Up: the 8 from Phase 5 plus mongodb and compliance-service
-# (rabbitmq already came up in Step 66)
-
-git add docker-compose.yml
-git commit -m "wire compliance service into compose"
-git push -u origin feature/compliance-service
-gh pr create --title "Add RabbitMQ and Compliance Service"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+# service names (mongodb, rabbitmq), depends_on both</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real surprise — Jenkins couldn't find the feature branch anymore</div>
       Re-running the Jenkins job (still configured to build <code>*/feature/compliance-service</code>) failed
@@ -2776,18 +2355,11 @@ git pull origin main</code></pre>
       high-volume and need to be replayable by more than one future reader (a live dashboard, an ML
       pipeline) — see <a href="tech/kafka.html#why-this-phase">Kafka → Why this phase exists</a> for the full
       RabbitMQ-vs-Kafka reasoning.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/kafka-tracking
-
-# add to docker-compose.yml: a kafka service (image: apache/kafka:3.8.0), KRaft env vars, dual listeners
+    <pre><code># add to docker-compose.yml: a kafka service (image: apache/kafka:3.8.0), KRaft env vars, dual listeners
 
 docker compose up -d kafka
 docker compose logs kafka
-# expect log lines showing the broker started, no ZooKeeper connection attempts anywhere
-
-git add docker-compose.yml
-git commit -m "add kafka broker"</code></pre>
+# expect log lines showing the broker started, no ZooKeeper connection attempts anywhere</code></pre>
   </div>
 
   <div class="step" id="step76">
@@ -2826,10 +2398,7 @@ docker exec -it movetrack-kafka /opt/kafka/bin/kafka-topics.sh --describe --topi
 go get github.com/segmentio/kafka-go
 
 # new kafka.go — a *kafka.Writer, Addr pointing at kafka:29092, Balancer: &amp;kafka.Hash{}
-# handleIngest() publishes the ping (JSON, keyed by device_id) after the Postgres insert succeeds
-
-git add services/shipment-ingestion
-git commit -m "publish shipment pings to kafka"</code></pre>
+# handleIngest() publishes the ping (JSON, keyed by device_id) after the Postgres insert succeeds</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — <code>KAFKA_ADVERTISED_LISTENERS</code> pointed at <code>localhost</code></div>
       First attempt produced <code>dial tcp [::1]:9092: connect: connection refused</code> from inside the
@@ -2880,10 +2449,7 @@ venv\Scripts\activate
 pip install kafka-python
 pip freeze &gt; requirements.txt
 
-# write consumer.py — KafkaConsumer, group_id="demo-consumer", auto_offset_reset="earliest"
-
-git add services/kafka-demo-consumer
-git commit -m "add kafka demo consumer"</code></pre>
+# write consumer.py — KafkaConsumer, group_id="demo-consumer", auto_offset_reset="earliest"</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real incident — the single-broker <code>__consumer_offsets</code> trap</div>
       Every consumer group needs Kafka's own internal <code>__consumer_offsets</code> topic to function.
@@ -2924,10 +2490,7 @@ git commit -m "add kafka demo consumer"</code></pre>
 # table-driven test asserting the message key equals device_id, same pattern as
 # Phase 6's existing tests — no real Kafka connection needed for this one
 
-go test ./...
-
-git add services/shipment-ingestion
-git commit -m "add unit tests for kafka producer"</code></pre>
+go test ./...</code></pre>
   </div>
 
   <div class="step" id="step81">
@@ -2944,10 +2507,7 @@ git commit -m "add unit tests for kafka producer"</code></pre>
 # skips itself cleanly if Kafka isn't reachable, no build tag needed (this codebase
 # doesn't use build tags anywhere else, so this stays consistent with that)
 
-go test ./... -v -run TestKafkaProduceConsumeRoundTrip
-
-git add services/shipment-ingestion
-git commit -m "add kafka integration test"</code></pre>
+go test ./... -v -run TestKafkaProduceConsumeRoundTrip</code></pre>
     <div class="box gotcha">
       <div class="box-title">Real mistake — the SAME advertised-listener problem, from a new angle</div>
       This test runs directly on the host machine (not in Docker), and hit
@@ -2972,12 +2532,7 @@ git commit -m "add kafka integration test"</code></pre>
       service's containerize step.</p>
     <pre><code># Dockerfile, .dockerignore matching compliance-service's single-stage pattern,
 # ENV PYTHONUNBUFFERED=1 so its print() output is actually visible in `docker compose logs`
-# consumer.py bootstrap_servers set to kafka:29092 (the Docker-network listener from Step 81)
-
-docker build -t kafka-demo-consumer services/kafka-demo-consumer
-
-git add services/kafka-demo-consumer/Dockerfile services/kafka-demo-consumer/.dockerignore services/kafka-demo-consumer/consumer.py
-git commit -m "containerize kafka demo consumer"</code></pre>
+# consumer.py bootstrap_servers set to kafka:29092 (the Docker-network listener from Step 81)</code></pre>
   </div>
 
   <div class="step" id="step83">
@@ -2986,17 +2541,7 @@ git commit -m "containerize kafka demo consumer"</code></pre>
       <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
       <span class="step-status done">Done</span>
     </div>
-    <pre><code># add kafka-demo-consumer to docker-compose.yml, depends_on kafka
-
-docker compose up -d --build
-docker compose ps
-# 13 containers total, all Up: the 10 from Phase 4 plus kafka, kafka-ui, and kafka-demo-consumer
-
-git push -u origin feature/kafka-tracking
-gh pr create --title "Add Kafka shipment tracking"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+    <pre><code># add kafka-demo-consumer to docker-compose.yml, depends_on kafka</code></pre>
     <p><strong>Final verification — done entirely through the Kafka UI, no terminal commands:</strong>
       <code>http://localhost:8089</code> → Consumers → <code>demo-consumer</code> showed
       <strong>State: STABLE</strong>, 1 member, all 3 partitions assigned, and — the number that actually
@@ -3046,11 +2591,7 @@ git pull origin main</code></pre>
       cheaply — same class of reasoning as Go's goroutines in Phase 6, different mechanism, and it's also
       where the frontend team's existing JavaScript/TypeScript skillset already lives. Full explanation on
       <a href="tech/websocket.html#why-node">Node.js &amp; WebSockets → Why Node.js specifically</a>.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/websocket-live-feed
-
-mkdir services/ws-live-feed
+    <pre><code>mkdir services/ws-live-feed
 cd services/ws-live-feed
 npm init -y
 npm install ws
@@ -3067,8 +2608,6 @@ s.onopen = () =&gt; console.log("connected");</code></pre>
     <p>Pasting code into the browser console the first time triggers a built-in browser safety warning
       ("Don't paste code you don't understand..."). Typing <code>allow pasting</code> once and re-pasting is
       the expected, safe way past it — not an error with anything built here.</p>
-    <pre><code>git add services/ws-live-feed
-git commit -m "scaffold websocket server"</code></pre>
   </div>
 
   <div class="step" id="step85">
@@ -3084,10 +2623,7 @@ git commit -m "scaffold websocket server"</code></pre>
 
 # write kafkaConsumer.js — subscribes to shipment.tracking, group id "ws-live-feed",
 # fromBeginning: false (a live feed only cares about new pings, not history)
-# each message calls broadcast() from server.js
-
-git add services/ws-live-feed
-git commit -m "consume kafka shipment.tracking, broadcast to websocket clients"</code></pre>
+# each message calls broadcast() from server.js</code></pre>
     <p><strong>How to check:</strong> with the dev console still connected from Step 84's test (<code>s.onmessage
       = (e) =&gt; console.log(e.data);</code> added first), send a real ping:</p>
     <pre><code>Invoke-RestMethod -Uri http://localhost:8090/ingest -Method Post -ContentType "application/json" -Body '{"device_id":"DEVICE-1","latitude":38.9,"longitude":-77.0,"timestamp":"2026-08-16T14:00:00Z"}'</code></pre>
@@ -3125,10 +2661,7 @@ git commit -m "consume kafka shipment.tracking, broadcast to websocket clients"<
 
 # write src/hooks/useLiveFeed.ts — opens a WebSocket, keeps the last 50 pings in state
 # write src/pages/LiveFeedPage.tsx — uses the hook, renders the list
-# add a Link + Route for it in App.tsx
-
-git add frontend/dashboard/src
-git commit -m "add live shipment feed to dashboard via websocket"</code></pre>
+# add a Link + Route for it in App.tsx</code></pre>
     <p><strong>How to check:</strong> open <code>http://localhost:3000</code>, click into the live feed page
       via the nav link, then send another ping via <code>Invoke-RestMethod</code> like Step 85.</p>
     <p><strong>Expected:</strong> the new ping appears at the top of the on-screen list within a second or
@@ -3157,10 +2690,7 @@ git commit -m "add live shipment feed to dashboard via websocket"</code></pre>
       manual page refresh defeats the entire point of building it.</p>
     <pre><code># React hook: on socket.onclose, retry with a short backoff (e.g. 2s) instead of giving up
 # Node service: if the Kafka consumer disconnects, log and let KafkaJS's own retry logic
-#   handle reconnection rather than crashing the whole process
-
-git add frontend/dashboard/src services/ws-live-feed
-git commit -m "add reconnection handling for websocket and kafka consumer"</code></pre>
+#   handle reconnection rather than crashing the whole process</code></pre>
     <p>Manually testing this mid-phase (stopping/restarting a locally-run <code>node</code> process) was
       confusing enough to skip in the moment — <code>docker compose restart ws-live-feed</code> in Step 90,
       once the service is a real container, is a much cleaner version of this same check, and is what
@@ -3184,8 +2714,6 @@ git commit -m "add reconnection handling for websocket and kafka consumer"</code
 node --test</code></pre>
     <p><strong>How to check:</strong> the command's own output.</p>
     <p><strong>Expected:</strong> all tests pass, no real WebSocket or Kafka connection needed to run them.</p>
-    <pre><code>git add services/ws-live-feed
-git commit -m "add tests for websocket broadcast logic"</code></pre>
   </div>
 
   <div class="step" id="step89">
@@ -3197,12 +2725,7 @@ git commit -m "add tests for websocket broadcast logic"</code></pre>
     <p><strong>Goal:</strong> a standard single-stage Node Dockerfile, same shape as the Python services'
       pattern.</p>
     <pre><code># write Dockerfile, .dockerignore
-# CMD ["node", "kafkaConsumer.js"] — NOT server.js, same reason as Step 85's gotcha
-
-docker build -t ws-live-feed services/ws-live-feed
-
-git add services/ws-live-feed/Dockerfile services/ws-live-feed/.dockerignore
-git commit -m "containerize websocket live feed service"</code></pre>
+# CMD ["node", "kafkaConsumer.js"] — NOT server.js, same reason as Step 85's gotcha</code></pre>
     <p><strong>How to check:</strong> the build command's own output. <strong>Expected:</strong> builds
       clean, no errors.</p>
     <div class="box gotcha">
@@ -3222,19 +2745,7 @@ git commit -m "containerize websocket live feed service"</code></pre>
       <span class="step-status done">Done</span>
     </div>
     <pre><code># add ws-live-feed to docker-compose.yml — port 8095, KAFKA_BROKER=kafka:29092, depends_on kafka
-# update the dashboard's WebSocket URL to use the compose service name in production
-
-docker compose up -d --build
-docker compose ps
-# expect 14 containers now: the 13 from Phase 10 plus ws-live-feed
-
-git add docker-compose.yml
-git commit -m "wire websocket live feed into compose"
-git push -u origin feature/websocket-live-feed
-gh pr create --title "Add WebSocket live feed"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+# update the dashboard's WebSocket URL to use the compose service name in production</code></pre>
     <p><strong>How to check:</strong> open <code>http://localhost:3000</code>'s live feed page, then send a
       ping via <code>Invoke-RestMethod</code>.</p>
     <p><strong>Expected:</strong> the new ping appears on screen within a second or two, fully inside Docker
@@ -3311,17 +2822,10 @@ git pull origin main</code></pre>
       before any Java class exists. Every REST DTO in this project so far went the opposite direction (Java
       first, no formal contract file required). Full explanation on
       <a href="tech/soap.html#contract-first">SOAP &amp; Spring-WS → Contract-first development</a>.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/soap-legacy-adapter
-
-# new Maven module: services/soap-legacy-adapter (spring-boot-starter-web-services)
+    <pre><code># new Maven module: services/soap-legacy-adapter (spring-boot-starter-web-services)
 mkdir -p services/soap-legacy-adapter/src/main/resources
 # write moveRequest.xsd — submitMoveRequest / submitMoveRequestResponse elements,
-# same fields Move &amp; Entitlement's REST DTO already has (serviceMemberName, rank, originBase, destinationBase, moveDate)
-
-git add services/soap-legacy-adapter
-git commit -m "scaffold soap legacy adapter, add moveRequest.xsd"</code></pre>
+# same fields Move &amp; Entitlement's REST DTO already has (serviceMemberName, rank, originBase, destinationBase, moveDate)</code></pre>
     <p><strong>How to check:</strong> <code>mvn compile</code> inside the new module.</p>
     <p><strong>Expected:</strong> builds clean — this step only adds the schema file and project skeleton, no
       generated code depends on it yet.</p>
@@ -3358,10 +2862,7 @@ git commit -m "scaffold soap legacy adapter, add moveRequest.xsd"</code></pre>
 # a DefaultWsdl11Definition bean pointing at the XSD, exposed as moveRequest.wsdl
 
 mvn compile
-# confirm target/generated-sources/xjc has SubmitMoveRequest.java / SubmitMoveRequestResponse.java
-
-git add services/soap-legacy-adapter
-git commit -m "generate wsdl from xsd, configure ws endpoint mapping"</code></pre>
+# confirm target/generated-sources/xjc has SubmitMoveRequest.java / SubmitMoveRequestResponse.java</code></pre>
     <p><strong>How to check:</strong> start the app, then open
       <code>http://localhost:8083/ws/moveRequest.wsdl</code> in a browser.</p>
     <p><strong>Expected:</strong> a full WSDL XML document renders, listing the <code>submitMoveRequest</code>
@@ -3403,10 +2904,7 @@ git commit -m "generate wsdl from xsd, configure ws endpoint mapping"</code></pr
 # classes SubmitMoveRequest / SubmitMoveRequestResponse
 
 # write MoveRequestEndpoint.java — @Endpoint, @PayloadRoot(namespace=..., localPart="submitMoveRequest")
-# method takes @RequestPayload SubmitMoveRequest, returns @ResponsePayload SubmitMoveRequestResponse
-
-git add services/soap-legacy-adapter
-git commit -m "add MoveRequestEndpoint"</code></pre>
+# method takes @RequestPayload SubmitMoveRequest, returns @ResponsePayload SubmitMoveRequestResponse</code></pre>
     <p><strong>How to check:</strong> send a raw SOAP request with <code>Invoke-RestMethod</code>, a
       <code>Content-Type: text/xml</code> body containing the full <code>&lt;soap:Envelope&gt;</code> wrapping
       a <code>&lt;submitMoveRequest&gt;</code> element.</p>
@@ -3434,10 +2932,7 @@ git commit -m "add MoveRequestEndpoint"</code></pre>
 # extend MoveRequestEndpoint.submitMoveRequest():
 #   1. toRestDto(request) — map SOAP fields into a plain Map (no shared DTO class with Move & Entitlement)
 #   2. restTemplate.postForObject("http://move-entitlement-service:8082/api/move-requests", dto, Map.class)
-#   3. toSoapResponse(restResponse) — map the REST JSON response back into SubmitMoveRequestResponse
-
-git add services/soap-legacy-adapter
-git commit -m "translate soap request to rest call, translate response back"</code></pre>
+#   3. toSoapResponse(restResponse) — map the REST JSON response back into SubmitMoveRequestResponse</code></pre>
     <p><strong>How to check:</strong> same raw SOAP request as Step 93, with Move &amp; Entitlement running
       alongside it.</p>
     <p><strong>Expected:</strong> the SOAP response comes back with a real, database-generated ID and
@@ -3467,10 +2962,7 @@ git commit -m "translate soap request to rest call, translate response back"</co
 # verify submitMoveRequest() maps a known input/output pair correctly, without hitting a real
 # Move & Entitlement instance
 
-mvn test
-
-git add services/soap-legacy-adapter
-git commit -m "add unit tests for soap/rest translation mapping"</code></pre>
+mvn test</code></pre>
     <p><strong>How to check:</strong> the test command's own output.</p>
     <p><strong>Expected:</strong> passes — confirmed, <code>Tests run: 1, Failures: 0, Errors: 0</code>.</p>
   </div>
@@ -3489,10 +2981,7 @@ git commit -m "add unit tests for soap/rest translation mapping"</code></pre>
 # MockWebServiceClient.sendRequest(...) with a real XML envelope,
 # .andExpect(payload(...)) assertion on the response XML shape
 
-mvn verify
-
-git add services/soap-legacy-adapter
-git commit -m "add soap integration tests via MockWebServiceClient"</code></pre>
+mvn verify</code></pre>
     <p><strong>How to check:</strong> the test command's own output.</p>
     <p><strong>Expected:</strong> passes — confirmed, <code>Tests run: 1, Failures: 0, Errors: 0</code>.</p>
     <div class="box gotcha">
@@ -3520,12 +3009,7 @@ git commit -m "add soap integration tests via MockWebServiceClient"</code></pre>
     <p><strong>Why this step:</strong> same multi-stage Maven→JRE Dockerfile pattern as every other Java
       service in this project — nothing SOAP-specific changes here.</p>
     <pre><code># write Dockerfile — multi-stage: eclipse-temurin:25-jdk build stage (using ./mvnw), eclipse-temurin:25-jre run stage
-# same pattern as move-entitlement-service
-
-docker build -t soap-legacy-adapter services/soap-legacy-adapter
-
-git add services/soap-legacy-adapter/Dockerfile
-git commit -m "containerize soap legacy adapter"</code></pre>
+# same pattern as move-entitlement-service</code></pre>
     <p><strong>How to check:</strong> the build command's own output.</p>
     <p><strong>Expected:</strong> builds clean, no errors.</p>
     <div class="box gotcha">
@@ -3543,19 +3027,7 @@ git commit -m "containerize soap legacy adapter"</code></pre>
       <span class="step-title">Wire into docker-compose.yml, verify end-to-end, merge</span>
       <span class="step-status done">Done</span>
     </div>
-    <pre><code># add soap-legacy-adapter to docker-compose.yml — port 8083, depends_on move-entitlement-service
-
-docker compose up -d --build
-docker compose ps
-# 15 containers now: the 14 from Phase 9 plus soap-legacy-adapter
-
-git add docker-compose.yml
-git commit -m "wire soap legacy adapter into compose"
-git push -u origin feature/soap-legacy-adapter
-gh pr create --title "Add SOAP legacy adapter"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
+    <pre><code># add soap-legacy-adapter to docker-compose.yml — port 8083, depends_on move-entitlement-service</code></pre>
     <p><strong>How to check:</strong> send a real SOAP request to <code>http://localhost:8083/ws</code>, fully
       inside Docker, then cross-check the response against Postgres directly.</p>
     <pre><code>docker compose exec postgres psql -U movetrack -d move_entitlement_db `
@@ -3593,266 +3065,264 @@ git pull origin main</code></pre>
   <h2 id="phase13">Phase 13 — Raw Sockets + WireGuard + Failover</h2>
   <p class="pill">11 steps (99–109), 1 branch. Extends Phase 6's Go service directly — no new service box in
     the architecture diagram. Adds raw UDP (primary) and raw TCP (failover) listeners alongside the existing
-    REST endpoint, both traveling through a WireGuard-encrypted tunnel. <strong>In progress.</strong> Full
-    concept explanation on <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>.</p>
+    REST endpoint, both traveling through a WireGuard-encrypted tunnel. <strong>Complete</strong> — verified
+    with a live tunnel, a real UDP delivery, and a genuine TCP failover, all cross-checked directly against
+    Postgres. Full concept explanation on <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>.</p>
 
   <div class="step" id="step99">
     <div class="step-header">
       <span class="step-num">STEP 99</span>
-      <span class="step-title">WireGuard tunnel container — keypair, peer config, verify tunnel</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">WireGuard tunnel — real keypair, peer config, verified tunnel</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Why this step first:</strong> raw UDP/TCP have no encryption of their own — building the
       listeners before the tunnel exists would mean testing them over an unencrypted connection and having to
-      retrofit security later. The tunnel needs to exist and be provably working before anything travels
-      through it. Full explanation on
+      retrofit security later. Full explanation on
       <a href="tech/raw-sockets.html#wireguard-basics">Raw Sockets &amp; WireGuard → WireGuard basics</a>.</p>
-    <pre><code>git checkout main
-git pull origin main
-git checkout -b feature/raw-sockets-wireguard
-
-mkdir -p infra/wireguard
-# generate a keypair for the "server" side (the shipment-ingestion side of the tunnel)
-wg genkey | tee server_private.key | wg pubkey > server_public.key
-# generate a keypair for the "device" side (the simulated tracking device / test client)
-wg genkey | tee device_private.key | wg pubkey > device_public.key
-
-# write infra/wireguard/wg0.conf — server's own private key, a peer entry for the
-# device's public key, AllowedIPs scoped to a small private tunnel subnet (e.g. 10.13.13.0/24)
-
-git add infra/wireguard
-git commit -m "add wireguard keypairs and tunnel config"</code></pre>
-    <p><strong>How to check:</strong> bring the interface up locally and run <code>wg show</code>.</p>
-    <p><strong>Expected:</strong> the interface shows the configured peer, with a public key matching what was
-      generated — proves the config is valid and WireGuard recognizes the peer, before any real traffic
-      exists to send through it.</p>
+    <p>Generated a real Curve25519 keypair for each side (<code>wg genkey</code>/<code>wg pubkey</code>) and
+      wrote <code>wg0.conf</code> pointing the server's private key at the device's public key, scoped to a
+      small private tunnel subnet.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the private key ended up committed in plain text</div>
+      The generated keys got pasted directly into <code>wg0.conf</code>, and only the standalone
+      <code>*.key</code> files were gitignored — not the config file itself, which now had the real private
+      key baked into it. Caught before pushing (never made it past a local, unpushed commit). Fixed by
+      undoing that commit, switching to a committed <code>wg0.conf.template</code> with
+      <code>${WG_SERVER_PRIVATE_KEY}</code>/<code>${WG_DEVICE_PUBLIC_KEY}</code> placeholders, and gitignoring
+      the real rendered config entirely — the real keys only ever exist locally and inside the running
+      container, injected via environment variables at startup, never in git history.
+    </div>
+    <p><strong>How to check:</strong> bring the interface up and run <code>wg show</code>.</p>
+    <p><strong>Expected, and confirmed:</strong> a live interface, listening on the configured port, with a
+      peer entry whose public key matched the device key exactly.</p>
   </div>
 
   <div class="step" id="step100">
     <div class="step-header">
       <span class="step-num">STEP 100</span>
-      <span class="step-title">Shared ping-processing handler — extract validate+persist+publish out of the REST handler</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Shared ping-processing handler</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> Steps 101 and 103 add two more ways bytes can arrive at this service —
+    <p><strong>Why this step:</strong> Steps 101-102 add two more ways bytes can arrive at this service —
       doing this refactor first means both new listeners are built against one already-correct shared
-      function from day one, instead of copy-pasting Phase 6's REST logic twice and risking drift. Full
-      explanation on <a href="tech/raw-sockets.html#go-listeners">Raw Sockets &amp; WireGuard → Raw listeners
-      in Go</a>.</p>
-    <pre><code># in services/shipment-ingestion, extract the existing POST /ingest logic
-# (validatePing, insertPing, publishPing from Phase 6/10) into one function:
-#   func handlePing(raw []byte) error
-# update the existing REST handler to call handlePing() instead of inlining that logic
-
-go test ./...
-
-git add services/shipment-ingestion
-git commit -m "extract shared handlePing function from REST handler"</code></pre>
-    <p><strong>How to check:</strong> re-run Phase 6/10's existing tests, plus a manual REST ping.</p>
-    <p><strong>Expected:</strong> identical behavior to before this refactor — same validation, same Postgres
-      row, same Kafka publish. This step should be invisible from the outside; it only changes internal
-      structure.</p>
+      function, instead of copy-pasting Phase 6's REST logic twice and risking drift. Full explanation on
+      <a href="tech/raw-sockets.html#go-listeners">Raw Sockets &amp; WireGuard → Raw listeners in Go</a>.</p>
+    <p>Extracted the REST handler's validate → persist → publish logic into one <code>handlePing(p
+      ShipmentPing) error</code> function. Preserving the original REST behavior needed one deliberate design
+      choice: a typed <code>ValidationError</code> so the REST handler can still tell "bad input" (400) apart
+      from "server failure" (500) even though both now flow through the same shared function.</p>
+    <p><strong>How to check:</strong> re-run the existing test suite, plus a manual REST ping.</p>
+    <p><strong>Expected, and confirmed:</strong> identical behavior to before the refactor — invisible from
+      the outside, only internal structure changed.</p>
   </div>
 
   <div class="step" id="step101">
     <div class="step-header">
       <span class="step-num">STEP 101</span>
-      <span class="step-title">Raw UDP listener on 8091, reuses the shared handler</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Raw UDP listener on 8091, with a delivery ack</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step, and why UDP is the primary transport:</strong> frequent location pings can
-      tolerate occasionally losing one — the next ping supersedes it. UDP's lack of a handshake or delivery
-      guarantee is a fair tradeoff for that specific traffic shape, not a shortcut. Full explanation on
+    <p><strong>Why UDP is the primary transport:</strong> frequent location pings can tolerate occasionally
+      losing one — the next ping supersedes it. UDP's lack of a handshake or delivery guarantee is a fair
+      tradeoff for that traffic shape, not a shortcut. Full explanation on
       <a href="tech/raw-sockets.html#udp-vs-tcp">Raw Sockets &amp; WireGuard → UDP vs. TCP</a>.</p>
-    <pre><code># write udp.go — net.ListenUDP on :8091, reads datagrams in a loop,
-# calls the shared handlePing() from Step 100 for each one
-
-go build ./...
-
-git add services/shipment-ingestion
-git commit -m "add raw udp listener on 8091"</code></pre>
-    <p><strong>How to check:</strong> send a raw UDP datagram with a small test script (PowerShell's
-      <code>System.Net.Sockets.UdpClient</code>, or a one-off Go/Python script).</p>
-    <p><strong>Expected:</strong> the same Postgres row appears as a REST-submitted ping would produce —
-      proves the shared handler behaves identically regardless of which listener called it.</p>
+    <p>A <code>net.ListenUDP</code> loop reading datagrams, calling the shared handler, and writing back a
+      small <code>"ACK"</code> — UDP itself never confirms delivery, so this ack is what a failover-aware
+      client needs to detect a drop at all.</p>
+    <p><strong>How to check:</strong> send a raw UDP datagram, confirm a Postgres row appears.</p>
+    <p><strong>Expected, and confirmed:</strong> a real UDP ping produced a real Postgres row, verified with a
+      live containerized test (not just a local unit test) — the actual failure this later surfaced is
+      documented under Step 109.</p>
   </div>
 
   <div class="step" id="step102">
     <div class="step-header">
       <span class="step-num">STEP 102</span>
-      <span class="step-title">UDP ack datagram — lets a client confirm delivery over a connectionless protocol</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Raw TCP listener on 8092</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> UDP itself never tells a sender whether a datagram arrived — without
-      an application-level ack, Step 104's failover logic would have nothing to react to. This is a small,
-      deliberate addition on top of raw UDP, not something UDP provides for free.</p>
-    <pre><code># after handlePing() succeeds inside the UDP listener, write a small ack
-# datagram (e.g. "ACK") back to the sender's address
-
-git add services/shipment-ingestion
-git commit -m "send udp ack after successful ping processing"</code></pre>
-    <p><strong>How to check:</strong> same manual UDP test as Step 101, but read a response back on the same
-      socket.</p>
-    <p><strong>Expected:</strong> the ack datagram arrives shortly after sending — confirms the round trip a
-      real failover-aware client depends on.</p>
+    <p><strong>Why this step:</strong> exists specifically as the fallback path for Step 103's failover
+      client — the transport a device switches to when it can no longer trust UDP delivery.</p>
+    <p>Final design reads a 4-byte length prefix, then exactly that many bytes, rather than reading until the
+      connection closes — see Step 109 for why that specific choice mattered.</p>
+    <p><strong>How to check:</strong> send a length-prefixed payload over a raw TCP connection, confirm a
+      Postgres row appears and an ack comes back.</p>
+    <p><strong>Expected, and confirmed:</strong> a real TCP ping produced a real Postgres row and a real ack —
+      but getting to that point took two real fixes, documented under Step 109.</p>
   </div>
 
   <div class="step" id="step103">
     <div class="step-header">
       <span class="step-num">STEP 103</span>
-      <span class="step-title">Raw TCP listener on 8092, reuses the shared handler</span>
-      <span class="step-status planned">Planned</span>
-    </div>
-    <p><strong>Why this step:</strong> TCP's own handshake and retransmission already guarantee delivery — no
-      separate ack scheme is needed here the way UDP required one in Step 102. This listener exists
-      specifically as the fallback path for Step 104's failover logic.</p>
-    <pre><code># write tcp.go — net.Listen("tcp", ":8092"), one goroutine per accepted
-# connection, reads the full payload, calls the same handlePing()
-
-go build ./...
-
-git add services/shipment-ingestion
-git commit -m "add raw tcp listener on 8092"</code></pre>
-    <p><strong>How to check:</strong> send the same ping payload over a raw TCP connection (e.g. PowerShell's
-      <code>System.Net.Sockets.TcpClient</code>).</p>
-    <p><strong>Expected:</strong> the same Postgres row appears, and the connection succeeding or failing
-      outright is itself the delivery confirmation — no extra ack logic needed.</p>
-  </div>
-
-  <div class="step" id="step104">
-    <div class="step-header">
-      <span class="step-num">STEP 104</span>
-      <span class="step-title">Failover-capable test client — UDP first, retries over TCP after N missed acks</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Failover-capable test client</span>
+      <span class="step-status done">Done</span>
     </div>
     <p><strong>Why this step:</strong> this is the actual point of the whole phase — proving a client can
       detect an unreliable UDP path and fail over to TCP on its own, without the server orchestrating
       anything. Full explanation on <a href="tech/raw-sockets.html#failover">Raw Sockets &amp; WireGuard → The
       failover pattern</a>.</p>
-    <pre><code># write a small standalone test client (Go or Python) — sends a ping via UDP,
-# waits briefly for the Step 102 ack, retries up to N times, then falls back
-# to sending the same ping over TCP (:8092) if no ack ever arrived
+    <p>A small standalone Go tool: sends a ping via UDP, waits briefly for the ack, retries a few times, then
+      falls back to TCP if no ack ever arrived — generating one <code>RequestID</code> up front and reusing
+      it across every retry (see Step 109 for why that mattered).</p>
+    <p><strong>How to check:</strong> run it normally, then again with the UDP listener disabled.</p>
+    <p><strong>Expected, and confirmed:</strong> normal run delivers via UDP; with UDP disabled, it genuinely
+      falls back to TCP and still lands a real row — verified twice, since the first "successful" failover
+      turned out to be a false positive (Step 109).</p>
+  </div>
 
-git add tools/failover-test-client
-git commit -m "add udp-then-tcp failover test client"</code></pre>
-    <p><strong>How to check:</strong> run it normally (UDP listener up), then run it again with the UDP
-      listener temporarily stopped.</p>
-    <p><strong>Expected:</strong> normal run succeeds via UDP with no TCP fallback triggered; the second run
-      times out on UDP acks and the ping still lands in Postgres via the TCP fallback — proof the failover
-      decision genuinely changes the outcome, not just logs a message.</p>
+  <div class="step" id="step104">
+    <div class="step-header">
+      <span class="step-num">STEP 104</span>
+      <span class="step-title">Config plumbing — env vars for ports, enable/disable each listener</span>
+      <span class="step-status done">Done</span>
+    </div>
+    <p><strong>Why this step:</strong> the containerized version needs configurable ports the same way every
+      other service's ports already are — matching this project's existing convention, and this specific
+      toggle (<code>UDP_LISTENER_ENABLED</code>) is what made a genuine, live failover test possible at all
+      (see Step 109).</p>
+    <p><strong>How to check:</strong> run with the env vars overridden, confirm the listeners respect them.</p>
+    <p><strong>Expected, and confirmed:</strong> works identically to hardcoded ports, just configurable.</p>
   </div>
 
   <div class="step" id="step105">
     <div class="step-header">
       <span class="step-num">STEP 105</span>
-      <span class="step-title">Config plumbing — env vars for ports, enable/disable each listener</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Unit tests — payload parsing, dedup cache</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> hardcoded ports made sense for local testing in Steps 101-104, but the
-      containerized version (Step 108) needs these configurable the same way every other service's ports are
-      — matching this project's existing convention rather than being a one-off special case.</p>
-    <pre><code># read UDP_PORT / TCP_PORT from environment variables (default 8091/8092),
-# same pattern as this service's existing config reads
-
-git add services/shipment-ingestion
-git commit -m "make udp/tcp ports configurable via env vars"</code></pre>
-    <p><strong>How to check:</strong> run with the env vars overridden to different ports, confirm both
-      listeners bind to the overridden values.</p>
-    <p><strong>Expected:</strong> works identically to the hardcoded version, just configurable.</p>
+    <p><strong>Why this step:</strong> same table-driven Go test style already used for the REST handler in
+      Phase 6 — parsing and the dedup cache's logic are both plain Go once isolated from real socket I/O.</p>
+    <p><strong>How to check:</strong> the test command's own output.</p>
+    <p><strong>Expected, and confirmed:</strong> passes — including the dedup cache tests written after Step
+      109's real duplicate-row bug was found and fixed.</p>
   </div>
 
   <div class="step" id="step106">
     <div class="step-header">
       <span class="step-num">STEP 106</span>
-      <span class="step-title">Unit tests — UDP/TCP payload parsing</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Integration tests — real UDP/TCP packets in-process</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> same table-driven Go test style already used for the REST handler in
-      Phase 6 — the parsing/validation logic is plain Go once isolated from the actual socket I/O.</p>
-    <pre><code># write udp_test.go / tcp_test.go — table-driven tests covering valid and
-# malformed raw payloads, no real socket involved
-
-go test ./...
-
-git add services/shipment-ingestion
-git commit -m "add unit tests for udp/tcp payload parsing"</code></pre>
+    <p><strong>Why this step:</strong> unit tests prove parsing is correct in isolation — this step proves a
+      real UDP datagram and a real TCP connection, sent to an actually-running listener in the test process,
+      both still end up as a real Postgres row through the shared handler.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real mistake — the UDP test timed out for a reason that had nothing to do with UDP</div>
+      With a real local Postgres reachable for the first time, this test started actually exercising
+      <code>handlePing</code>'s full pipeline — including a Kafka publish to the Docker-only
+      <code>kafka:29092</code> hostname, unresolvable outside a container. That failed lookup took 2.7
+      seconds, longer than the test's ack-wait window, so the ack never arrived in time even though the
+      Postgres write had already succeeded. Confirmed by timing the exact publish call in isolation. This is
+      the same underlying issue documented under Step 109 (Kafka publish wasn't actually non-blocking) —
+      fixing that fixed this test too.
+    </div>
     <p><strong>How to check:</strong> the test command's own output.</p>
-    <p><strong>Expected:</strong> passes.</p>
+    <p><strong>Expected, and confirmed:</strong> passes — real socket I/O end to end, not just parsing logic
+      in isolation.</p>
   </div>
 
   <div class="step" id="step107">
     <div class="step-header">
       <span class="step-num">STEP 107</span>
-      <span class="step-title">Integration tests — real UDP/TCP packets in-process, confirm Postgres row</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Dockerize — WireGuard sidecar</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> unit tests prove parsing is correct in isolation — this step proves a
-      real UDP datagram and a real TCP connection, sent to an actually-running listener in the test process,
-      both still end up as a real Postgres row through the shared handler.</p>
-    <pre><code># write udp_integration_test.go / tcp_integration_test.go — start each
-# listener on a random local port, send a real packet via net.DialUDP /
-# net.Dial("tcp", ...), assert the row exists in a real test database
-
-go test -tags=integration ./...
-
-git add services/shipment-ingestion
-git commit -m "add udp/tcp integration tests"</code></pre>
-    <p><strong>How to check:</strong> the test command's own output.</p>
-    <p><strong>Expected:</strong> passes — confirms real socket I/O end to end, not just the parsing logic in
-      isolation.</p>
+    <p><strong>Why this step:</strong> the WireGuard tunnel needs elevated network privileges
+      (<code>NET_ADMIN</code>) the main service shouldn't have — a separate container, with
+      <code>shipment-ingestion</code> sharing its network namespace so raw UDP/TCP traffic actually travels
+      through the tunnel interface, not the regular Docker bridge network.</p>
+    <p>The image renders the real <code>wg0.conf</code> from the committed template at container start,
+      substituting in the real keys from environment variables — the real config never exists as a file until
+      the container actually boots.</p>
+    <p><strong>How to check:</strong> the build's own output, then the container's logs after starting it.</p>
+    <p><strong>Expected, and confirmed:</strong> builds clean; startup logs show <code>wg-quick</code> bringing
+      the real interface up with no errors.</p>
   </div>
 
   <div class="step" id="step108">
     <div class="step-header">
       <span class="step-num">STEP 108</span>
-      <span class="step-title">Dockerize — WireGuard sidecar, Go service shares its network namespace</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Wired into docker-compose.yml, tunnel verified live</span>
+      <span class="step-status done">Done</span>
     </div>
-    <p><strong>Why this step:</strong> the WireGuard tunnel needs to exist as its own container (it needs
-      elevated network privileges the main service shouldn't have), with <code>shipment-ingestion</code>
-      sharing that container's network namespace so its raw UDP/TCP traffic actually travels through the
-      tunnel interface rather than the regular Docker bridge network.</p>
-    <pre><code># write infra/wireguard/Dockerfile (or use an existing wireguard image) —
-# needs NET_ADMIN capability and the wg0.conf from Step 99
-# shipment-ingestion's Dockerfile itself is unchanged — the network sharing
-# happens in docker-compose.yml (Step 109), not in either image
-
-docker build -t movetrack-wireguard infra/wireguard
-
-git add infra/wireguard
-git commit -m "add wireguard sidecar dockerfile"</code></pre>
-    <p><strong>How to check:</strong> the build command's own output.</p>
-    <p><strong>Expected:</strong> builds clean, no errors.</p>
+    <p><strong>Why this step:</strong> everything up to here had only been unit/local-integration tested —
+      this is where the real WireGuard container, the real shared network namespace, and the real Docker
+      networking all had to actually work together for the first time.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real, unrelated bug this uncovered — an already-merged service couldn't build</div>
+      Bringing the full stack up for the first time in this session surfaced a completely unrelated failure:
+      <code>soap-legacy-adapter</code>'s container build failed with <code>./mvnw: not found</code>. Its
+      <code>mvnw</code> script had CRLF line endings from a Windows checkout — unlike
+      <code>move-entitlement-service</code>, it had no <code>.gitattributes</code> forcing that file to stay
+      LF. A single service failing cancels the whole <code>docker compose up --build</code>, blocking this
+      phase's own testing until it was fixed. Full story on
+      <a href="tech/git.html#line-endings-crlf">Git &amp; GitHub → A checked-out shell script that "doesn't exist"</a>.
+    </div>
+    <p><strong>How to check:</strong> <code>wg show</code> inside the running tunnel container; a real ping
+      through the failover client.</p>
+    <p><strong>Expected, and confirmed:</strong> a live interface with the real peer key; a real UDP ping
+      landed in Postgres. (The genuine failover path had its own real bugs — see Step 109.)</p>
   </div>
 
   <div class="step" id="step109">
     <div class="step-header">
       <span class="step-num">STEP 109</span>
-      <span class="step-title">Wire into docker-compose.yml, verify tunnel + failover end-to-end, merge</span>
-      <span class="step-status planned">Planned</span>
+      <span class="step-title">Real failures found under live testing, fixed, merged</span>
+      <span class="step-status done">Done</span>
     </div>
-    <pre><code># add a wireguard service to docker-compose.yml — cap_add: NET_ADMIN, the
-# wg0.conf mounted in, published UDP port for the tunnel itself
-# shipment-ingestion gets: network_mode: "service:wireguard" — so its raw
-# UDP/TCP listeners bind inside the tunnel's network namespace
+    <p><strong>Why this step exists separately:</strong> the previous 8 steps all passed their own local
+      tests, but running the real system end to end — real tunnel, real containers, real Docker networking —
+      surfaced three genuine design gaps none of the earlier tests could have caught.</p>
+    <div class="box gotcha">
+      <div class="box-title">Real bug — UDP retries caused duplicate database rows</div>
+      A single client run produced 3 identical Postgres rows, not 1. The client resends a ping if it doesn't
+      get an ack quickly enough, but the server had no way to tell "this is a retry" from "this is a new
+      ping." Root cause: the first UDP round trip through the tunnel took longer than the client's short
+      ack-wait window, triggering retries even though the server had already succeeded each time. Fixed with
+      a <code>RequestID</code> the client reuses across retries and a small server-side dedup cache that
+      still re-acks a duplicate without reprocessing it. Full story on
+      <a href="tech/raw-sockets.html#go-listeners">Raw Sockets &amp; WireGuard → Raw listeners in Go</a>.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real bug — a "successful" TCP delivery that never actually happened</div>
+      Testing the TCP fallback by stopping the service produced a false positive: the client reported success
+      even though the real container was down. Docker Desktop's port-publishing proxy was still listening and
+      accepted the connection independently of the backend's state — a successful <code>Write()</code> only
+      proves the local kernel accepted the bytes, not that the real application received them. Fixed by
+      requiring a genuine application-level ack the client must read back before declaring success.
+    </div>
+    <div class="box gotcha">
+      <div class="box-title">Real bug — the ack fix above then broke on a second, unrelated Docker quirk</div>
+      The first ack implementation had the client half-close its connection (<code>CloseWrite</code>) to
+      signal "done sending," so the server's read would finish. Docker Desktop's proxy doesn't pass that
+      half-close through correctly — it tears down the whole connection on the client's FIN, so the ack
+      written afterward never arrived. Fixed by switching to a 4-byte length-prefixed message, which needs no
+      half-close at all — more robust in general, not just a workaround for this one proxy.
+    </div>
+    <div class="box why">
+      <div class="box-title">A fourth fix, found the same way — Kafka publish wasn't actually non-blocking</div>
+      <code>handlePing</code>'s Kafka publish already only logged a failure instead of returning one — the
+      intent was clearly "don't let Kafka block the response." But the call was still synchronous, and timed
+      at 2.7 seconds against an unreachable broker — long enough to make an ack window time out. Fixed by
+      firing the publish in a goroutine, matching what the code already claimed to do.
+    </div>
+    <p><strong>How to check:</strong> the failover client, run once normally and once with UDP disabled;
+      cross-check both outcomes directly against Postgres.</p>
+    <p><strong>Final verification:</strong> a real UDP ping landed with a matching timestamp; with UDP
+      disabled, a genuine TCP failover produced a real ack and a real row with its own matching timestamp —
+      confirmed by reading the actual database rows, not just trusting the client's printed output.</p>
+    <p><strong>This completes Phase 13</strong> — 11 steps, 99–109.</p>
 
-docker compose up -d --build
-docker compose ps
-# 16 containers now: the 15 from Phase 7 plus wireguard (shipment-ingestion
-# container count itself doesn't change — it's sharing wireguard's network)
-
-git add docker-compose.yml
-git commit -m "wire wireguard tunnel + shared network namespace into compose"
-git push -u origin feature/raw-sockets-wireguard
-gh pr create --title "Add raw UDP/TCP transports with WireGuard tunnel and failover"
-gh pr merge --squash --delete-branch
-git checkout main
-git pull origin main</code></pre>
-    <p><strong>How to check:</strong> run Step 104's failover test client against the containerized service,
-      through the tunnel, once normally and once with the UDP path blocked.</p>
-    <p><strong>Expected:</strong> both scenarios succeed — a real ping lands in Postgres via UDP in the normal
-      case, and via the TCP fallback when UDP is unavailable, all traveling through the WireGuard tunnel
-      rather than the open Docker network.</p>
+    <h3>Interview Q&amp;A</h3>
+    <div class="qa" id="qa-rawsockets-live-vs-unit-tested">
+      <div class="q">Code passes every unit and local integration test — why test it live in real containers too?</div>
+      <div class="a">Unit and local integration tests exercise the logic in isolation, but they can't catch
+        failures that only exist at the boundary between real infrastructure pieces — a Docker networking
+        proxy that doesn't pass through a TCP half-close, a container-only DNS hostname that's unresolvable
+        locally, a WireGuard tunnel's actual round-trip latency. All three real bugs in this phase were
+        specifically the kind that only shows up when the real system runs as a whole, not in a mocked or
+        local-only test.</div>
+    </div>
   </div>
 
   <!-- Future steps get appended here, one .step block each, never batched. -->

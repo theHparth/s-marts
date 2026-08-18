@@ -444,6 +444,32 @@ job's "Branches to build" setting) will fail with:
     PR title you just merged, the branch is gone because the merge already succeeded, not because of a real
     failure.</p>
 
+  <h2 id="line-endings-crlf">A checked-out shell script that "doesn't exist" inside a Linux container</h2>
+  <p>Windows Git can silently rewrite a text file's line endings on checkout — a shell script written with
+    Unix (LF) line endings can come back with Windows (CRLF) ones the next time it's checked out, depending on
+    the <code>core.autocrlf</code> setting and whether anything protects that specific file.</p>
+  <div class="diagram">A shell script's first line: #!/bin/sh
+  With LF:    #!/bin/sh\n           -&gt; kernel looks for an interpreter literally named /bin/sh -&gt; found
+  With CRLF:  #!/bin/sh\r\n         -&gt; kernel looks for an interpreter literally named /bin/sh\r -&gt; not found
+
+Inside a container: ./mvnw: not found  (exit code 127)
+Looks like a missing file — it's actually a mangled shebang line on a file that's really there.</div>
+  <div class="box gotcha">
+    <div class="box-title">Real incident — one service's Maven wrapper had CRLF, its sibling didn't</div>
+    <code>services/soap-legacy-adapter/mvnw</code> broke its own Docker build with exactly the error above.
+    <code>services/move-entitlement-service/mvnw</code> — the file it was originally copied from — stayed
+    fine. The difference: <code>move-entitlement-service</code> has its own <code>.gitattributes</code> with
+    <code>/mvnw text eol=lf</code>, generated automatically by Spring Initializr, forcing that one file to
+    always stay LF regardless of local <code>core.autocrlf</code> settings. <code>soap-legacy-adapter</code>
+    was created manually (its <code>mvnw</code> copied over by hand, not generated), so nothing protected it —
+    a routine checkout was enough to convert it. Fixed by stripping the CRLF back to LF and adding the same
+    <code>.gitattributes</code> rule this service was missing.
+  </div>
+  <p>Worth checking early whenever a shell script "isn't found" despite clearly being present:
+    <code>file &lt;script&gt;</code> reports <code>CRLF line terminators</code> directly if that's the cause,
+    and <code>cat -A &lt;script&gt; | head -1</code> shows a literal <code>^M</code> right before the shebang's
+    line ending.</p>
+
   <h2 id="interview-qa">Interview Q&amp;A</h2>
   <div class="qa" id="qa-cherry-pick-wrong-branch">
     <div class="q">You committed to the wrong branch — how do you fix it without losing work?</div>

@@ -93,8 +93,9 @@
     <tr><td>8089</td><td>kafka-ui</td><td>Kafka UI</td><td>Browser-based topic/message/consumer-group inspection</td></tr>
     <tr><td>8095</td><td>ws-live-feed</td><td>Node.js + <code>ws</code> + KafkaJS</td><td>WebSocket endpoint the dashboard connects to for live shipment updates</td></tr>
     <tr><td>8083</td><td>soap-legacy-adapter</td><td>Java / Spring-WS</td><td>SOAP/XML endpoint, translates to/from Move &amp; Entitlement's REST API</td></tr>
-    <tr><td>8091 <em>(planned)</em></td><td>shipment-ingestion</td><td>Go — raw UDP</td><td>Primary transport for frequent, lightweight location pings, over the WireGuard tunnel</td></tr>
-    <tr><td>8092 <em>(planned)</em></td><td>shipment-ingestion</td><td>Go — raw TCP</td><td>Failover transport when UDP delivery can't be confirmed, over the WireGuard tunnel</td></tr>
+    <tr><td>8091</td><td>shipment-ingestion</td><td>Go — raw UDP</td><td>Primary transport for frequent, lightweight location pings, over the WireGuard tunnel</td></tr>
+    <tr><td>8092</td><td>shipment-ingestion</td><td>Go — raw TCP</td><td>Failover transport when UDP delivery can't be confirmed, over the WireGuard tunnel</td></tr>
+    <tr><td>51820/udp</td><td>wireguard</td><td>WireGuard</td><td>The tunnel itself — shipment-ingestion shares this container's network namespace</td></tr>
   </table>
 
   <h2 id="one-chart">The whole system, one chart</h2>
@@ -328,7 +329,7 @@
     <li><a href="#flow-kafka-tracking">Kafka shipment tracking</a> — Go producer, Python consumer, dual listeners</li>
     <li><a href="#flow-websocket-live-feed">WebSocket live feed</a> — Kafka to browser, no refresh</li>
     <li><a href="#flow-soap-legacy-adapter">SOAP legacy adapter</a> — SOAP/XML in, REST out, standalone (nothing else calls it)</li>
-    <li><a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> — planned, UDP primary, TCP fallback</li>
+    <li><a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> — UDP primary, TCP fallback, real tunnel</li>
     <li><a href="#failure-signatures">Common failure signatures, cross-cutting reference</a></li>
     <li><a href="#growth">How this page grows with each new phase</a></li>
   </ul>
@@ -762,42 +763,66 @@ docker compose exec postgres psql ... SELECT id, service_member_name, rank FROM 
   ORDER BY id DESC LIMIT 1  →  same id=19, same Jane Doe / E5 — proves the SOAP response reflects
   a real database write, not just an echoed/faked value</div>
 
-  <h2 id="flow-raw-sockets-wireguard">Raw sockets + WireGuard failover — planned</h2>
-  <p>Planned — <a href="steps.html#phase13">Steps page → Phase 13</a>, in progress. Full concept explanation
-    on <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>. This diagram uses a
-    <code>├─</code> decision branch, not box-and-branch notation — UDP failing over to TCP is a genuine
-    sequential retry (try UDP, then conditionally try TCP), not two independent actions consuming the same
-    value simultaneously the way Kafka's dual-write or WebSocket's independent consumer are.</p>
-  <div class="box warn">
-    <div class="box-title">Planned, not yet built — corrected once Phase 13 is confirmed</div>
-    <div class="diagram">Device (simulated) — inside the WireGuard tunnel
+  <h2 id="flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</h2>
+  <p>Confirmed built — <a href="steps.html#phase13">Steps page → Phase 13</a>. Full concept explanation on
+    <a href="tech/raw-sockets.html">Raw Sockets &amp; WireGuard</a>. This diagram uses a <code>├─</code>
+    decision branch, not box-and-branch notation — UDP failing over to TCP is a genuine sequential retry (try
+    UDP, then conditionally try TCP), not two independent actions consuming the same value simultaneously the
+    way Kafka's dual-write or WebSocket's independent consumer are.</p>
+  <div class="diagram">Device — real WireGuard tunnel (verified with wg show: live peer, matching keys)
   │
-  │ sends ping via raw UDP → shipment-ingestion : 8091
+  │ sends ping via raw UDP → shipment-ingestion : 8091 (RequestID reused across retries)
   ▼
 shipment-ingestion (Go) — UDP listener
-  │ handlePing(raw) — same shared validate/persist/publish function REST and Kafka already use
+  │ udpDedup.seenBefore(RequestID)?
+  │
+  ├─ yes, already processed ─► re-send ACK without reprocessing — the client's
+  │      retry means the earlier ack got lost, not that the ping did. A live
+  │      test without this produced 3 duplicate Postgres rows from one send.
+  │      Full story: tech/raw-sockets.html#go-listeners
+  │
+  ▼ no — first time seeing this RequestID
+handlePing(p) — same shared validate/persist/publish function REST and Kafka already use
   ▼
-PostgreSQL : 5432 — INSERT INTO shipment pings
+PostgreSQL : 5432 — INSERT INTO shipment_pings
+  ▼
+Kafka publish fired in a background goroutine — a slow/unreachable broker
+used to block this response for ~2.7s before that fix; now genuinely async
   ▼
 UDP ack datagram sent back to device
   │
   ├─ ack received within timeout ─► done, delivered via UDP (the normal case —
   │      most pings never touch TCP at all)
   │
-  ├─ no ack after N attempts ─► device falls back to TCP :8092 for this ping
+  ├─ no ack after N attempts ─► device falls back to TCP :8092 for this same ping
   │      (device-driven decision — the server never orchestrates the fallback,
   │      it just exposes both listeners)
   │      ▼
-  │      shipment-ingestion (Go) — TCP listener
-  │      │ same handlePing(raw) — identical downstream behavior regardless of transport
+  │      shipment-ingestion (Go) — TCP listener, length-prefixed message
+  │      (4-byte size, then payload — not "read until EOF/close", see below)
   │      ▼
-  │      PostgreSQL : 5432 — INSERT INTO shipment pings
-  │      TCP's own handshake success/failure IS the delivery confirmation —
-  │      no separate ack scheme needed on top of it
+  │      same handlePing(p) — identical downstream behavior regardless of transport
+  │      ▼
+  │      PostgreSQL : 5432 — INSERT INTO shipment_pings
+  │      ▼
+  │      explicit "ACK" written back, client reads it before declaring success
+  │
+  ├─ a successful TCP Write() alone is NOT proof of delivery ─► FAILURE (real,
+  │      live-tested): Docker Desktop's port-publishing proxy accepted a
+  │      connection and returned success even after the real container
+  │      behind it had exited — no row appeared. Fixed by requiring the
+  │      explicit ack above, not just a successful local Write().
+  │
+  ├─ half-close (CloseWrite) to signal "done sending" ─► FAILURE (real,
+  │      live-tested): Docker Desktop's proxy doesn't pass a client's
+  │      half-close through correctly — it tears down the whole connection
+  │      on the FIN, so an ack written afterward never arrives. Fixed by
+  │      switching to length-prefixed framing, which needs no half-close at
+  │      all. Full story: tech/raw-sockets.html#go-listeners
   ▼
 Either path: a real ping lands in Postgres, encrypted end-to-end by the
-WireGuard tunnel the entire way — raw UDP/TCP never touch the open network</div>
-  </div>
+WireGuard tunnel the entire way — raw UDP/TCP never touch the open network.
+Confirmed with real timestamps cross-checked directly against Postgres.</div>
 
   <h2 id="failure-signatures">Common failure signatures — cross-cutting reference</h2>
   <p>The same handful of failure shapes keep recurring across totally different technologies. This table is
@@ -820,6 +845,9 @@ WireGuard tunnel the entire way — raw UDP/TCP never touch the open network</di
     <tr><td><code>Non-parseable POM</code> / <code>end tag name ... must match start tag name</code></td><td>Any Maven build, right after editing <code>pom.xml</code></td><td>A POM is strict, well-formed XML — one incomplete or orphan tag fails the entire build before any dependency resolves</td><td><a href="tech/soap.html#contract-first">soap.html#contract-first</a></td></tr>
     <tr><td>Editor shows "declared package does not match expected package"</td><td>Any newly-added Java file, right after creating a new Maven module</td><td>The editor's Java language server hasn't recognized the new module's source root yet — not a real compile error, a project reload fixes it</td><td><a href="tech/soap.html#contract-first">soap.html#contract-first</a></td></tr>
     <tr><td>PowerShell prints only a root element name (e.g. <code>Envelope</code>) for an XML response</td><td><code>Invoke-RestMethod</code> against any XML/SOAP endpoint</td><td>Auto-parsed into an object; direct printing hides nested content — read <code>$response.OuterXml</code> instead</td><td><a href="tech/soap.html#verifying-the-round-trip">soap.html#verifying-the-round-trip</a></td></tr>
+    <tr><td>Duplicate rows/messages from a single client action</td><td>Any UDP-based transport with client-side retries</td><td>UDP guarantees nothing; the server has no way to distinguish a retry from a new message without an explicit request ID</td><td><a href="tech/raw-sockets.html#go-listeners">raw-sockets.html#go-listeners</a></td></tr>
+    <tr><td>A TCP write/connection reports success, but nothing was actually persisted</td><td>Any TCP client behind Docker's port-publishing proxy</td><td>The proxy can accept a connection independently of whether the real backend container is running</td><td><a href="tech/raw-sockets.html#qa-rawsockets-tcp-write-not-proof">raw-sockets.html#qa-rawsockets-tcp-write-not-proof</a></td></tr>
+    <tr><td>A response written after a client half-closes (<code>CloseWrite</code>) never arrives</td><td>Any TCP server/client pair routed through Docker Desktop's port-publishing proxy</td><td>The proxy tears down the whole connection on the client's FIN instead of passing the half-close through</td><td><a href="tech/raw-sockets.html#go-listeners">raw-sockets.html#go-listeners</a></td></tr>
   </table>
 
   <h2 id="growth">How this page grows with each new phase</h2>
@@ -828,7 +856,12 @@ WireGuard tunnel the entire way — raw UDP/TCP never touch the open network</di
     new service is expected to do, before any of it is built. Once that phase is confirmed working, the
     diagram gets replaced with the normal style, corrected to match what was actually built (including
     whatever real failure branches got hit along the way, the same as every flow above).</p>
-  <p>Currently planned: <a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a>, above.</p>
+  <div class="box warn">
+    <div class="box-title">No phase currently planned/in-progress</div>
+    Phase 13 (raw sockets + WireGuard) is the most recently completed phase as of this page's last update —
+    see <a href="#flow-raw-sockets-wireguard">Raw sockets + WireGuard failover</a> above for its confirmed
+    flow. The next phase's planned flow diagram will appear here the moment a new phase is picked.
+  </div>
 
   <footer class="page-footer">MoveTrack Ops — companion to Architecture &amp; Progress. That page shows what
     exists; this one shows what happens when a request actually moves through it. Grows by one confirmed flow

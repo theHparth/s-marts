@@ -75,3 +75,37 @@ box-and-branch — UDP-then-TCP failover is a sequential retry, not two simultan
 one value), TOC and #growth updated to match, inserted in document order to match TOC order from the start
 this time (the Phase 7 pass had left its flow in the wrong position and needed a follow-up fix). Next entries
 go here once Phase 13 completes or another phase starts.)
+
+---
+
+(Empty — last full pass covered Phase 13 COMPLETION, Raw Sockets + WireGuard + Failover. Verified with a real
+live WireGuard tunnel (wg show, matching real peer keys), a real UDP ping cross-checked against Postgres, and
+a genuine TCP failover (UDP disabled for real, real ack received, real row landed). Live testing surfaced 4
+real bugs beyond the original plan, all fixed: UDP client retries caused duplicate Postgres rows (fixed with
+a RequestID + server-side dedup cache), a "successful" TCP write turned out to be a false positive from
+Docker Desktop's port-publishing proxy accepting connections independent of backend state (fixed with an
+explicit application-level ack), the first ack fix then broke on a second Docker quirk — the proxy doesn't
+pass a client half-close (CloseWrite) through correctly (fixed by switching to length-prefixed TCP framing,
+removing the need for half-close entirely), and handlePing's Kafka publish was synchronous despite the
+documented "don't block the response" intent (fixed by firing it in a goroutine). Also found and fixed one
+unrelated pre-existing bug: services/soap-legacy-adapter/mvnw had CRLF line endings from a Windows checkout
+with no protecting .gitattributes (unlike move-entitlement-service, which has one) — broke that service's own
+Docker build; fixed the file and added the missing .gitattributes. architecture.html goingest node flipped
+fully green/done, phase table row 13 → Done, nodeData.goingest steps 99-109 renumbered to match what actually
+got built (11 steps, real hrefs); tech/raw-sockets.html flipped to confirmed-built, corrected the Go code
+samples to match the real final implementation (dedup check, length-prefixed TCP), added 4 new gotcha boxes
+for the real bugs, corrected the failover diagram (TCP does need an explicit ack after all), 2 new Interview
+Q&As; interview.html "From Raw Sockets & WireGuard" got the same 2 new Q&As; architecture-2.html's flow
+diagram rewritten with all 4 real failure branches, port table cleaned up (no more "planned"), 3 new
+failure-signatures rows, #growth reset to "no phase currently planned." Also standing rule change mid-session: user said steps.html should never include routine/repeated git or
+docker commands per step (only genuinely new ones). A background agent retroactively cleaned Phases 1-12
+(everything before the phase13 heading, left untouched as instructed) — verified afterward: tag balance
+clean, real incidents (cherry-pick/reset --hard/revert recoveries) correctly preserved, only one real problem
+found (step49 left with zero content after its all-ceremony code block was stripped) — fixed with a real
+one-line note instead of leaving it empty. Phase 13's own steps.html completion section was then written from
+scratch following the new rule (no git/docker commands at all — every step now reads as pure why/what
+happened/how to check). Also added a new tech/git.html section (#line-endings-crlf) for the mvnw CRLF
+incident, since steps.html referenced it but the real explanation didn't exist anywhere yet — matches this
+project's "link to the tech page, don't repeat the explanation" convention. All 6 touched files
+(steps.html, tech/git.html, tech/raw-sockets.html, architecture.html, architecture-2.html, interview.html)
+tag-balance validated clean. Next entries go here once a new phase starts.)
